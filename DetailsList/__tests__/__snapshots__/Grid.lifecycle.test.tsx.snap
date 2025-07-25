@@ -1,0 +1,199 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`FilteredDetailsListV2 renders 1`] = `
+<Memo(Grid)
+  columns={
+    Object {
+      "1": MockEntityRecord {
+        "getNamedReference": [MockFunction],
+        "id": "1",
+        "values": Object {
+          "ColDisplayName": "Name",
+          "ColName": "name",
+          "ColWidth": "100",
+        },
+      },
+    }
+  }
+  compact={false}
+  componentRef={[Function]}
+  dataset={
+    MockDataSet {
+      "addColumn": [MockFunction],
+      "clearSelectedRecordIds": [MockFunction],
+      "columns": Array [
+        MockColumn {
+          "displayName": "Name",
+          "name": "name",
+        },
+      ],
+      "getSelectedRecordIds": [MockFunction] {
+        "calls": Array [
+          Array [],
+        ],
+        "results": Array [
+          Object {
+            "type": "return",
+            "value": Array [],
+          },
+        ],
+      },
+      "getTargetEntityType": [MockFunction] {
+        "calls": Array [
+          Array [],
+          Array [],
+        ],
+        "results": Array [
+          Object {
+            "type": "return",
+            "value": undefined,
+          },
+          Object {
+            "type": "return",
+            "value": undefined,
+          },
+        ],
+      },
+      "getTitle": [MockFunction],
+      "getViewId": [MockFunction],
+      "openDatasetItem": [MockFunction],
+      "paging": Object {
+        "firstPageNumber": 0,
+        "hasNextPage": false,
+        "hasPreviousPage": false,
+        "lastPageNumber": 0,
+        "loadExactPage": [MockFunction],
+        "loadNextPage": [MockFunction],
+        "loadPreviousPage": [MockFunction],
+        "pageSize": 0,
+        "reset": [MockFunction],
+        "setPageSize": [MockFunction] {
+          "calls": Array [
+            Array [
+              150,
+            ],
+          ],
+          "results": Array [
+            Object {
+              "type": "return",
+              "value": undefined,
+            },
+          ],
+        },
+        "totalResultCount": 0,
+      },
+      "records": Object {
+        "1": MockEntityRecord {
+          "getNamedReference": [MockFunction],
+          "id": "1",
+          "values": Object {
+            "RecordKey": "1",
+            "name": "Row 1",
+          },
+        },
+      },
+      "refresh": [MockFunction],
+      "rows": Array [
+        MockEntityRecord {
+          "getNamedReference": [MockFunction],
+          "id": "1",
+          "values": Object {
+            "RecordKey": "1",
+            "name": "Row 1",
+          },
+        },
+      ],
+      "setSelectedRecordIds": [MockFunction] {
+        "calls": Array [
+          Array [
+            Array [],
+          ],
+        ],
+        "results": Array [
+          Object {
+            "type": "return",
+            "value": undefined,
+          },
+        ],
+      },
+      "sortedRecordIds": Array [
+        "1",
+      ],
+    }
+  }
+  datasetColumns={
+    Array [
+      MockColumn {
+        "displayName": "Name",
+        "name": "name",
+      },
+    ]
+  }
+  enableFiltering={false}
+  filters={Object {}}
+  height={-1}
+  isHeaderVisible={true}
+  onCellAction={[Function]}
+  onFilterChange={[Function]}
+  onNavigate={[Function]}
+  onSort={[Function]}
+  overlayOnSort={false}
+  pageSize={null}
+  records={
+    Object {
+      "1": MockEntityRecord {
+        "getNamedReference": [MockFunction],
+        "id": "1",
+        "values": Object {
+          "RecordKey": "1",
+          "name": "Row 1",
+        },
+      },
+    }
+  }
+  selectOnFocus={false}
+  selection={
+    Selection {
+      "_anchoredIndex": 0,
+      "_canSelectItem": [Function],
+      "_changeEventSuppressionCount": 0,
+      "_exemptedCount": 0,
+      "_exemptedIndices": Object {},
+      "_getKey": [Function],
+      "_isModal": false,
+      "_items": Array [],
+      "_keyToIndexMap": Object {},
+      "_onItemsChanged": undefined,
+      "_onSelectionChanged": [Function],
+      "_selectedItems": null,
+      "_unselectableCount": 0,
+      "_unselectableIndices": Object {},
+      "count": 0,
+      "mode": 2,
+    }
+  }
+  selectionAlwaysVisible={false}
+  selectionType={0}
+  shimmer={false}
+  sortedColumnIds={
+    Array [
+      "1",
+    ]
+  }
+  sortedRecordIds={
+    Array [
+      "1",
+    ]
+  }
+  sorting={
+    Array [
+      Object {
+        "name": "",
+        "sortDirection": "0",
+      },
+    ]
+  }
+  visible={true}
+  width={-1}
+/>
+`;
