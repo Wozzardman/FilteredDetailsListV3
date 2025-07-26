@@ -4,6 +4,13 @@ export const enum RecordsColumns {
     RecordSelected = 'RecordSelected',
 }
 
+// Legacy compatibility - Items dataset properties
+export const enum ItemsColumns {
+    ItemKey = 'ItemKey',
+    ItemCanSelect = 'ItemCanSelect',
+    ItemSelected = 'ItemSelected',
+}
+
 export const enum ColumnsColumns {
     ColDisplayName = 'ColDisplayName',
     ColName = 'ColName',

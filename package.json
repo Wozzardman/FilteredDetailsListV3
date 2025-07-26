@@ -1,8 +1,23 @@
 {
   "name": "filtered-detailslist-v2",
-  "version": "4.0.6",
-  "description": "Enhanced PowerApps Component Framework (PCF) control for filtered details list functionality.",
+  "version": "6.0.0",
+  "description": "Enterprise-grade PowerApps Component Framework (PCF) control with advanced filtering, AI insights, real-time collaboration, and industry-leading performance.",
   "author": "jvt",
+  "keywords": [
+    "pcf",
+    "powerapps",
+    "datagrid",
+    "filtering",
+    "virtualization",
+    "enterprise",
+    "accessibility",
+    "performance"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/filtered-detailslist-v2.git"
+  },
   "scripts": {
     "build": "pcf-scripts build",
     "clean": "pcf-scripts clean",
@@ -11,41 +26,113 @@
     "refreshTypes": "pcf-scripts refreshTypes",
     "lint": "eslint DetailsList --ext .ts,.tsx",
     "lint:fix": "npm run lint -- --fix",
-    "test": "jest --collectCoverage"
+    "test": "jest --collectCoverage --maxWorkers=4",
+    "test:watch": "jest --watch",
+    "test:e2e": "playwright test",
+    "test:performance": "jest --config=jest.performance.config.js",
+    "test:accessibility": "axe-core --include=DetailsList",
+    "test:visual": "backstop test",
+    "analyze": "npm run build && webpack-bundle-analyzer dist/bundle.js",
+    "security": "npm audit && snyk test",
+    "docs": "typedoc --out docs DetailsList",
+    "storybook": "start-storybook -p 6006",
+    "build-storybook": "build-storybook"
   },
   "dependencies": {
     "@fluentui/react": "8.121.1",
     "@react-hook/resize-observer": "^1.2.5",
+    "d3": "^7.9.0",
+    "date-fns": "^2.30.0",
+    "file-saver": "^2.0.5",
+    "fuse.js": "^7.1.0",
+    "immer": "^10.1.1",
+    "jspdf": "^2.5.2",
+    "jspdf-autotable": "^3.5.31",
+    "lodash": "^4.17.21",
+    "memoize-one": "^6.0.0",
     "react": "16.14.0",
-    "react-dom": "16.14.0"
+    "react-dom": "16.14.0",
+    "react-virtualized": "^9.22.5",
+    "react-window": "^1.8.11",
+    "react-window-infinite-loader": "^1.0.10",
+    "web-vitals": "^3.5.2",
+    "xlsx": "^0.18.5",
+    "zustand": "^4.4.1"
   },
   "devDependencies": {
     "@fluentui/jest-serializer-merge-styles": "^8.0.17",
+    "@playwright/test": "^1.40.0",
+    "@storybook/addon-essentials": "^6.5.16",
+    "@storybook/react": "^6.5.16",
+    "@testing-library/jest-dom": "^5.16.5",
+    "@testing-library/react": "^12.1.5",
+    "@testing-library/user-event": "^14.4.3",
+    "@types/aria-query": "^5.0.4",
+    "@types/conventional-commits-parser": "^5.0.1",
+    "@types/d3": "^7.4.3",
     "@types/enzyme": "^3.10.11",
     "@types/enzyme-adapter-react-16": "^1.0.6",
+    "@types/file-saver": "^2.0.7",
+    "@types/geojson": "^7946.0.16",
     "@types/jest": "^27.4.0",
+    "@types/jsdom": "^21.1.7",
+    "@types/lodash": "^4.14.202",
     "@types/node": "^18.8.2",
     "@types/powerapps-component-framework": "^1.3.4",
     "@types/react": "^16.14.60",
     "@types/react-dom": "^16.9.24",
     "@types/react-test-renderer": "^18.0.7",
+    "@types/react-virtualized": "^9.22.2",
+    "@types/react-window": "^1.8.8",
+    "@types/testing-library__jest-dom": "^5.14.9",
+    "@types/tough-cookie": "^4.0.5",
+    "@types/yauzl": "^2.10.3",
     "@typescript-eslint/eslint-plugin": "^7.7.1",
     "@typescript-eslint/parser": "^7.7.1",
+    "axe-core": "^4.8.3",
+    "backstopjs": "^6.2.2",
+    "commitizen": "^4.3.0",
     "enzyme": "^3.11.0",
     "enzyme-adapter-react-16": "^1.15.6",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-jsx-a11y": "^6.8.0",
     "eslint-plugin-prettier": "^5.1.3",
     "eslint-plugin-promise": "^4.3.1",
     "eslint-plugin-react": "^7.29.3",
     "eslint-plugin-react-hooks": "^4.4.0",
     "eslint-plugin-sonarjs": "^0.13.0",
+    "husky": "^8.0.3",
     "jest": "^27.4.7",
+    "jest-axe": "^8.0.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "lint-staged": "^15.2.0",
     "pcf-scripts": "^1",
     "pcf-start": "^1",
     "prettier": "^3.2.5",
     "react-test-renderer": "16.8.6",
+    "semantic-release": "^22.0.12",
+    "snyk": "^1.1254.0",
     "ts-jest": "^27.1.3",
-    "typescript": "^4.5.4"
+    "typedoc": "^0.25.4",
+    "typescript": "^4.5.4",
+    "webpack-bundle-analyzer": "^4.10.1"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged",
+      "commit-msg": "commitizen"
+    }
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ]
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
   }
 }

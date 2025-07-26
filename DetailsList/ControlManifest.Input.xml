@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest>
-  <control namespace="JVT" constructor="FilteredDetailsListV2" version="4.0.6" display-name-key="FilteredDetailsListV2" description-key="FilteredDetailsListV2_Desc" control-type="virtual">
+  <control namespace="JVT" constructor="FilteredDetailsListV2" version="6.0.0" display-name-key="FilteredDetailsListV2" description-key="FilteredDetailsListV2_Desc" control-type="virtual">
     <external-service-usage enabled="false"></external-service-usage>
     <data-set name="records" display-name-key="Records" >
       <property-set name="RecordKey" display-name-key="RecordKey" of-type="SingleLine.Text" usage="bound" required="false" />
@@ -47,20 +47,12 @@
     </property>
     <property name="SelectRowsOnFocus" display-name-key="SelectRowsOnFocus" of-type="TwoOptions" usage="input" required="false" default-value="false" />
     <property name="PageSize" display-name-key="PageSize" of-type="Whole.None" usage="input" default-value="150" />
-    <property name="LargeDatasetPaging" display-name-key="LargeDatasetPaging" of-type="TwoOptions" usage="input" default-value="false" />
-    <property name="PageNumber" display-name-key="PageNumber" of-type="Whole.None" usage="output" required="false" />
-    <property name="HasNextPage" display-name-key="HasNextPage" of-type="TwoOptions" usage="output" required="false" />
-    <property name="HasPreviousPage" display-name-key="HasNextPage" of-type="TwoOptions" usage="output" required="false" />
-    <property name="TotalRecords" display-name-key="TotalRecords" of-type="Whole.None" usage="output" required="false" />
-    <property name="TotalPages" display-name-key="TotalPages" of-type="Whole.None" usage="output" required="false" />
     <property name="CurrentSortColumn" display-name-key="CurrentSortColumn" of-type="SingleLine.Text" usage="input" />
     <property name="CurrentSortDirection" display-name-key="CurrentSortDirection" of-type="Enum" usage="input">
       <value name="Ascending" display-name-key="Ascending">0</value>
       <value name="Descending" display-name-key="Descending">1</value>
     </property>
     <property name="AccessibilityLabel" display-name-key="AccessibilityLabel" of-type="SingleLine.Text" usage="input" required="false" />
-    <property name="RaiseOnRowSelectionChangeEvent" display-name-key="RaiseOnRowSelectionChangeEvent" of-type="TwoOptions" usage="input" required="false" default-value="false" />
-    <property name="InputEvent" display-name-key="InputEvent" of-type="SingleLine.Text" usage="input" />
     <property name="EventName" display-name-key="EventName" of-type="SingleLine.Text" usage="output" />
     <property name="EventColumn" display-name-key="EventColumn" of-type="SingleLine.Text" usage="output" />
     <property name="EventRowKey" display-name-key="EventRowKey" of-type="SingleLine.Text" usage="output" />
@@ -73,8 +65,6 @@
     <property name="Theme" display-name-key="Theme" of-type="Multiple" usage="input" required="false" />
     <property name="Compact" display-name-key="Compact" of-type="TwoOptions" usage="input" required="false" default-value="true" />
     <property name="HeaderVisible" display-name-key="HeaderVisible" of-type="TwoOptions" usage="input" required="false" default-value="true" />
-    <property name="AlternateRowColor" display-name-key="AlternateRowColor" of-type="SingleLine.Text" usage="input" required="false" />
-    <property name="SelectionAlwaysVisible" display-name-key="SelectionAlwaysVisible" of-type="TwoOptions" usage="input" required="false" default-value="false" />
     <!-- Filter properties -->
     <property name="EnableFiltering" display-name-key="EnableFiltering" of-type="TwoOptions" usage="input" required="false" default-value="false" />
     <property name="FilterConfiguration" display-name-key="FilterConfiguration" of-type="Multiple" usage="input" required="false" />

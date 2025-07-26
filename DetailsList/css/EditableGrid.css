@@ -1,0 +1,215 @@
+/* Editable Grid Styles */
+.editable-grid-container {
+    position: relative;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.editable-grid-cell {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 0;
+    border: 1px solid transparent;
+    transition: border-color 0.2s ease;
+}
+
+.editable-grid-cell:hover {
+    border-color: #edebe9;
+    background-color: #f3f2f1;
+}
+
+.editable-grid-cell.has-changes {
+    background-color: #fff4ce !important;
+    border-left: 3px solid #ffb900;
+}
+
+.editable-grid-cell.is-editing {
+    border-color: #0078d4;
+    background-color: white;
+    z-index: 1000;
+}
+
+.inline-editor {
+    flex: 1;
+    min-height: 32px;
+    width: 100%;
+}
+
+/* Drag Fill Handle */
+.drag-fill-handle {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 6px;
+    height: 6px;
+    background-color: #0078d4;
+    border: 1px solid white;
+    cursor: crosshair;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 10;
+}
+
+.editable-grid-cell:hover .drag-fill-handle {
+    opacity: 1;
+}
+
+.drag-fill-handle:hover {
+    width: 8px;
+    height: 8px;
+    bottom: -1px;
+    right: -1px;
+}
+
+/* Drag Fill Preview */
+.editable-grid-cell.drag-over {
+    background-color: #deecf9 !important;
+    border: 1px solid #0078d4;
+}
+
+/* Row highlighting for changes */
+.ms-DetailsRow.has-changes {
+    background-color: #fff4ce;
+}
+
+/* Command bar styling */
+.editable-grid-container .ms-CommandBar {
+    min-height: 40px;
+    margin-bottom: 8px;
+}
+
+/* Message bar styling */
+.editable-grid-container .ms-MessageBar {
+    margin-bottom: 8px;
+}
+
+/* Cell type specific styling */
+.editable-grid-cell .ms-TextField {
+    border: none;
+    background: transparent;
+}
+
+.editable-grid-cell .ms-TextField:focus {
+    border: 2px solid #0078d4;
+    background: white;
+}
+
+.editable-grid-cell .ms-Dropdown {
+    border: none;
+    background: transparent;
+}
+
+.editable-grid-cell .ms-Toggle {
+    margin: 0;
+}
+
+/* Loading states */
+.editable-grid-cell.is-loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* Read-only cells */
+.editable-grid-cell.read-only {
+    background-color: #f8f8f8;
+    cursor: not-allowed;
+}
+
+.editable-grid-cell.read-only:hover {
+    background-color: #f8f8f8;
+    border-color: transparent;
+}
+
+/* Excel-like cell selection */
+.editable-grid-cell.selected {
+    outline: 2px solid #0078d4;
+    outline-offset: -2px;
+}
+
+/* Validation error styling */
+.editable-grid-cell.has-error {
+    border-color: #d13438;
+    background-color: #fdf3f4;
+}
+
+.editable-grid-cell.has-error .ms-TextField {
+    border-color: #d13438;
+}
+
+/* Multi-select drag area */
+.drag-fill-selection {
+    position: absolute;
+    border: 2px dashed #0078d4;
+    background-color: rgba(0, 120, 212, 0.1);
+    pointer-events: none;
+    z-index: 1000;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .drag-fill-handle {
+        width: 8px;
+        height: 8px;
+        opacity: 1;
+    }
+    
+    .editable-grid-cell {
+        min-height: 40px;
+    }
+}
+
+/* Dark theme support */
+[data-theme="dark"] .editable-grid-cell {
+    border-color: #484644;
+}
+
+[data-theme="dark"] .editable-grid-cell:hover {
+    background-color: #323130;
+    border-color: #605e5c;
+}
+
+[data-theme="dark"] .editable-grid-cell.has-changes {
+    background-color: #4a3100;
+    border-left-color: #ffb900;
+}
+
+[data-theme="dark"] .drag-fill-handle {
+    background-color: #0078d4;
+    border-color: #323130;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .editable-grid-cell {
+        border-width: 2px;
+    }
+    
+    .drag-fill-handle {
+        border-width: 2px;
+        width: 8px;
+        height: 8px;
+    }
+    
+    .editable-grid-cell.has-changes {
+        border-left-width: 4px;
+    }
+}
+
+/* Print styles */
+@media print {
+    .drag-fill-handle {
+        display: none;
+    }
+    
+    .editable-grid-container .ms-CommandBar {
+        display: none;
+    }
+    
+    .editable-grid-cell.has-changes {
+        background-color: #f0f0f0 !important;
+        border-left: 2px solid #000;
+    }
+}

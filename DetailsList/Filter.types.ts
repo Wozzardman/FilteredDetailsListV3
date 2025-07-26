@@ -1,5 +1,8 @@
 import { FilterTypes, FilterOperators } from './ManifestConstants';
 
+// Re-export for use in other components
+export { FilterTypes, FilterOperators };
+
 export interface IFilterCondition {
     field: string;
     operator: FilterOperators;

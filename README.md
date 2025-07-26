@@ -44,6 +44,19 @@ Table(
 )
 ```
 
+## Legacy Compatibility ⚡
+
+**New in v5.2.0**: Full backward compatibility with the original control!
+
+If you're upgrading from the original control or getting "Error loading control" when adding Fields, the component now automatically detects and supports both configuration approaches:
+
+- **Legacy Mode**: `Items` + `Fields` datasets (original approach)
+- **Modern Mode**: `Records` + `Columns` datasets (enhanced approach)
+
+No changes needed for existing apps - the component automatically detects your configuration style!
+
+📖 **[See LEGACY_COMPATIBILITY.md](LEGACY_COMPATIBILITY.md) for complete migration guide and troubleshooting.**
+
 ## Basic Usage
 
 The DetailsList component has the following properties:

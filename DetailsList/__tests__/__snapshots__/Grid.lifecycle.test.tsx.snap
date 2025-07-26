@@ -1,7 +1,7 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
 exports[`FilteredDetailsListV2 renders 1`] = `
-<Memo(Grid)
+<SimpleEnhancedGridWrapper
   columns={
     Object {
       "1": MockEntityRecord {
@@ -193,6 +193,7 @@ exports[`FilteredDetailsListV2 renders 1`] = `
       },
     ]
   }
+  useEnhancedFeatures={true}
   visible={true}
   width={-1}
 />

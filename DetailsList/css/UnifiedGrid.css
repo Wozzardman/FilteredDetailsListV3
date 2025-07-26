@@ -1,0 +1,28 @@
+.unified-grid-container {
+    height: 100%;
+    width: 100%;
+    position: relative;
+    overflow: auto;
+}
+
+.unified-grid-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+}
+
+.unified-grid-performance-container {
+    height: 100%;
+    width: 100%;
+    position: relative;
+}
+
+.unified-grid-editable-container {
+    height: 100%;
+    width: 100%;
+    position: relative;
+    overflow: auto;
+}

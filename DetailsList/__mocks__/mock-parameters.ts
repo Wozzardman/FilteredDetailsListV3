@@ -7,23 +7,18 @@ import { MockDataSet } from './mock-datasets';
 export function getMockParameters(): IInputs {
     return {
         AccessibilityLabel: new MockStringProperty(),
-        InputEvent: new MockStringProperty(),
         Theme: new MockStringProperty(),
         Compact: new MockTwoOptionsProperty(),
         CurrentSortColumn: new MockStringProperty(),
         CurrentSortDirection: new MockEnumProperty('0'),
         PageSize: new MockWholeNumberProperty(),
-        RaiseOnRowSelectionChangeEvent: new MockTwoOptionsProperty(),
         SelectRowsOnFocus: new MockTwoOptionsProperty(),
         SelectionType: new MockEnumProperty('0'),
-        AlternateRowColor: new MockStringProperty(),
         HeaderVisible: new MockTwoOptionsProperty(false),
-        SelectionAlwaysVisible: new MockTwoOptionsProperty(false),
         EnableFiltering: new MockTwoOptionsProperty(),
         FilterConfiguration: new MockStringProperty(),
         AppliedFilters: new MockStringProperty(),
         records: new MockDataSet([]),
         columns: new MockDataSet([]),
-        LargeDatasetPaging: new MockTwoOptionsProperty(),
     };
 }
