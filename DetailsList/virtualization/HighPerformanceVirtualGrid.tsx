@@ -65,8 +65,8 @@ const VirtualRow: React.FC<{
             onClick={onClick}
             onDoubleClick={onDoubleClick}
             role="row"
-            aria-rowindex={index + 1}
-            aria-selected={isSelected}
+            aria-rowindex={index + 2} // +2 because header is row 1, data starts at row 2
+            aria-selected={isSelected ? 'true' : 'false'}
         >
             {columns.map((column, colIndex) => {
                 const cellValue = item[column.fieldName || column.key];
@@ -282,25 +282,23 @@ export class HighPerformanceVirtualGrid extends React.PureComponent<VirtualGridP
                 aria-label="Virtual data grid"
                 aria-rowcount={items.length}
             >
-                <VirtualHeader columns={columns} onColumnClick={onColumnClick} />
+                <div role="rowgroup">
+                    <VirtualHeader columns={columns} onColumnClick={onColumnClick} />
+                </div>
 
                 <div
                     ref={this.scrollElementRef}
+                    className="enterprise-virtual-scroll-container"
                     style={{
                         height: containerHeight,
-                        width: '100%',
-                        overflow: 'auto',
-                        position: 'relative',
                     }}
-                    role="presentation"
+                    role="rowgroup"
                 >
                     <div
+                        className="enterprise-virtual-content"
                         style={{
                             height: totalHeight,
-                            width: '100%',
-                            position: 'relative',
                         }}
-                        role="rowgroup"
                     >
                         {this.renderRows()}
                     </div>

@@ -1,7 +1,7 @@
 export const enum RecordsColumns {
-    RecordKey = 'RecordKey',
-    RecordCanSelect = 'RecordCanSelect',
-    RecordSelected = 'RecordSelected',
+    RecordKey = 'RecordsKey',
+    RecordCanSelect = 'RecordsCanSelect',
+    RecordSelected = 'RecordsSelected',
 }
 
 // Legacy compatibility - Items dataset properties
@@ -46,6 +46,18 @@ export const enum ColumnsColumns {
 
 export const enum InputProperties {
     InputEvent = 'InputEvent',
+    LargeDatasetPaging = 'LargeDatasetPaging',
+    RaiseOnRowSelectionChangeEvent = 'RaiseOnRowSelectionChangeEvent',
+    AlternateRowColor = 'AlternateRowColor',
+    SelectionAlwaysVisible = 'SelectionAlwaysVisible',
+}
+
+export const enum OutputProperties {
+    PageNumber = 'PageNumber',
+    HasNextPage = 'HasNextPage',
+    HasPreviousPage = 'HasPreviousPage',
+    TotalRecords = 'TotalRecords',
+    TotalPages = 'TotalPages',
 }
 
 export const enum InputEvents {

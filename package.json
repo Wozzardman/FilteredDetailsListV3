@@ -1,6 +1,6 @@
 {
   "name": "filtered-detailslist-v2",
-  "version": "7.0.7",
+  "version": "7.1.0",
   "description": "Enterprise-grade PowerApps Component Framework (PCF) control with advanced filtering, AI insights, real-time collaboration, and industry-leading performance.",
   "author": "jvt",
   "keywords": [
@@ -19,8 +19,9 @@
     "url": "https://github.com/your-org/filtered-detailslist-v2.git"
   },
   "scripts": {
-    "build": "pcf-scripts build && node scripts/remove-telemetry.js",
+    "build": "pcf-scripts build && node scripts/remove-telemetry.js && node scripts/optimize-for-canvas.js",
     "build:original": "pcf-scripts build",
+    "build:canvas": "pcf-scripts build && node scripts/remove-telemetry.js && node scripts/optimize-for-canvas.js",
     "clean": "pcf-scripts clean",
     "rebuild": "pcf-scripts rebuild",
     "start": "pcf-scripts start",

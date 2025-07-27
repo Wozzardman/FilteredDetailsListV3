@@ -159,3 +159,34 @@
     padding: 8px;
     border-right: 1px solid #e1e1e1;
 }
+
+/* Scroll container and content styles */
+.enterprise-virtual-scroll-container {
+    width: 100%;
+    overflow: auto;
+    position: relative;
+}
+
+.enterprise-virtual-content {
+    width: 100%;
+    position: relative;
+}
+
+.enterprise-virtual-rowgroup {
+    /* Container for rowgroup elements */
+    position: relative;
+}
+
+/* Performance overlay */
+.virtualization-performance-overlay {
+    position: absolute;
+    top: 50px;
+    right: 10px;
+    background: rgba(0, 120, 212, 0.8);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    z-index: 10;
+    pointer-events: none;
+}

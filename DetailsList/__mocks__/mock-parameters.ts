@@ -15,13 +15,16 @@ export function getMockParameters(): IInputs {
         SelectRowsOnFocus: new MockTwoOptionsProperty(),
         SelectionType: new MockEnumProperty('0'),
         HeaderVisible: new MockTwoOptionsProperty(false),
+        LargeDatasetPaging: new MockTwoOptionsProperty(false),
+        RaiseOnRowSelectionChangeEvent: new MockTwoOptionsProperty(false),
+        InputEvent: new MockStringProperty(),
         EnableFiltering: new MockTwoOptionsProperty(),
         FilterConfiguration: new MockStringProperty(),
         AppliedFilters: new MockStringProperty(),
-        // New change management properties
+        // Legacy properties that need to be included for compatibility
         CommitTrigger: new MockStringProperty(),
         CancelChangesTrigger: new MockStringProperty(),
-        PerformanceMode: new MockEnumProperty(0),
+        PerformanceMode: new MockEnumProperty("1"),
         EnableVirtualization: new MockTwoOptionsProperty(true),
         VirtualizationThreshold: new MockWholeNumberProperty(),
         records: new MockDataSet([]),

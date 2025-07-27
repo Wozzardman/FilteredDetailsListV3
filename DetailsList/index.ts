@@ -1,9 +1,8 @@
 import { IDetailsList, IObjectWithKey, SelectionMode, Selection, getWindow, IColumn } from '@fluentui/react';
 import * as React from 'react';
 import { IInputs, IOutputs } from './generated/ManifestTypes';
-import { getRecordKey, GridProps } from './Grid';
+import { getRecordKey } from './Grid';
 import { UltimateEnterpriseGrid } from './components/UltimateEnterpriseGrid';
-import { EditChange } from './components/EditableGrid';
 import { InputEvents, OutputEvents, RecordsColumns, ItemsColumns, SortDirection } from './ManifestConstants';
 import { IFilterState } from './Filter.types';
 import { FilterUtils } from './FilterUtils';
@@ -475,96 +474,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         // noop
     }
 
-    private getGridProps(context: ComponentFramework.Context<IInputs>) {
-        // Use modern datasets only
-        const dataset = context.parameters.records;
-        const columns = context.parameters.columns;
-
-        // The test harness provides width/height as strings
-        // PowerApps may provide -1 for dynamic sizing, so we need fallbacks
-        let allocatedWidth = parseInt(context.mode.allocatedWidth as unknown as string);
-        let allocatedHeight = parseInt(context.mode.allocatedHeight as unknown as string);
-
-        // Handle PowerApps dynamic sizing (-1 values)
-        if (allocatedWidth <= 0 || isNaN(allocatedWidth)) {
-            allocatedWidth = 1366; // Use a reasonable default width
-        }
-        if (allocatedHeight <= 0 || isNaN(allocatedHeight)) {
-            allocatedHeight = 768; // Use a reasonable default height
-        }
-
-        console.log(
-            `PCF Sizing: allocated(${context.mode.allocatedWidth}, ${context.mode.allocatedHeight}) -> parsed(${allocatedWidth}, ${allocatedHeight})`,
-        );
-
-        const sorting = this.datasetSupportsSorting()
-            ? dataset.sorting
-            : [
-                  {
-                      name: context.parameters.CurrentSortColumn.raw ?? '',
-                      sortDirection: context.parameters.CurrentSortDirection
-                          .raw as unknown as ComponentFramework.PropertyHelper.DataSetApi.Types.SortDirection,
-                  } as ComponentFramework.PropertyHelper.DataSetApi.SortStatus,
-              ];
-
-        // There are two types of visual indicators to items loading
-        // - Shimmer - for when the dataset has not yet been initialized or is in an error state
-        // - Loading overlay - a less invasive semi-transparent overlay for when we are loading data/sorting/paging
-        let shimmer = !dataset.loading && dataset.paging.totalResultCount === -1;
-        let loading = this.pagingEventPending || dataset.loading || columns.loading;
-
-        // If there are selected items, disable shimmer and instead use the loading overlay because
-        // the ShimmeredDetailsList does not preserve selected items after the shimmer has been displayed
-        if (shimmer && this.selection.count > 0) {
-            shimmer = false;
-            loading = true;
-        }
-
-        return {
-            width: allocatedWidth,
-            height: allocatedHeight,
-            visible: context.mode.isVisible,
-            records: this.records,
-            sortedRecordIds: this.sortedRecordsIds,
-            columns: this.columns,
-            datasetColumns: this.datasetColumns,
-            sortedColumnIds: this.sortedColumnsIds,
-            dataset: dataset, // Add full dataset for filtering
-            shimmer: shimmer,
-            itemsLoading: loading,
-            selection: this.selection,
-            onNavigate: this.onNavigate,
-            onCellAction: this.onCellAction,
-            sorting: sorting,
-            onSort: this.onSort,
-            overlayOnSort: this.datasetSupportsSorting(),
-            selectionType:
-                context.mode.isControlDisabled !== true
-                    ? SelectionTypes[context.parameters.SelectionType.raw]
-                    : SelectionMode.none,
-
-            componentRef: this.componentRef,
-            selectOnFocus: context.parameters.SelectRowsOnFocus.raw === true,
-            ariaLabel: this.undefinedIfEmpty(context.parameters.AccessibilityLabel),
-            compact: context.parameters.Compact.raw === true,
-            pageSize: context.parameters.PageSize.raw,
-            themeJSON: this.undefinedIfEmpty(context.parameters.Theme),
-            isHeaderVisible: context.parameters.HeaderVisible?.raw !== false,
-            resources: this.resources,
-            columnDatasetNotDefined: columns.error && !columns.loading,
-            // Filter properties
-            enableFiltering: context.parameters.EnableFiltering?.raw === true,
-            filters: this.filters,
-            onFilterChange: this.onFilterChange,
-
-            // Enterprise features
-            enablePerformanceMonitoring: this.enablePerformanceMonitoring,
-            enableAIInsights: this.enableAIInsights,
-            enableCollaboration: false, // Disabled for now - requires WebSocket infrastructure
-            enableAdvancedVirtualization: true,
-        } as GridProps;
-    }
-
     private setPageSize(context: ComponentFramework.Context<IInputs>) {
         const dataset = context.parameters.records;
         if (
@@ -883,84 +792,5 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         recordChanges.set(columnName, newValue);
 
         console.log(`📝 Pending changes for record ${recordId}:`, Object.fromEntries(recordChanges));
-    };
-
-    /**
-     * Commit all pending changes to the data source
-     */
-    private handleCommitChanges = async (changes: EditChange[]): Promise<void> => {
-        console.log(`💾 Committing ${changes.length} changes to data source...`);
-
-        try {
-            // Group changes by record for batch processing
-            const changesByRecord = new Map<string, EditChange[]>();
-            changes.forEach((change) => {
-                if (!changesByRecord.has(change.itemId)) {
-                    changesByRecord.set(change.itemId, []);
-                }
-                changesByRecord.get(change.itemId)!.push(change);
-            });
-
-            // Process each record's changes
-            for (const [recordId, recordChanges] of changesByRecord) {
-                const record = this.records[recordId];
-                if (!record) {
-                    console.warn(`⚠️ Record ${recordId} not found, skipping changes`);
-                    continue;
-                }
-
-                console.log(`🔄 Updating record ${recordId} with ${recordChanges.length} changes`);
-
-                // In a real implementation, you would call the Power Platform API here
-                // For now, we'll just log the changes and update our local state
-                const updateData: any = {};
-                recordChanges.forEach((change) => {
-                    updateData[change.columnKey] = change.newValue;
-                });
-
-                // TODO: Implement actual data source update
-                // await this.context.webAPI.updateRecord(entityName, recordId, updateData);
-
-                console.log(`✅ Record ${recordId} updated successfully:`, updateData);
-            }
-
-            // Clear pending changes after successful commit
-            this.pendingChanges.clear();
-
-            // Refresh the dataset to get updated data
-            const dataset = this.context.parameters.records;
-            dataset.refresh();
-
-            console.log('✨ All changes committed successfully!');
-        } catch (error) {
-            console.error('❌ Error committing changes:', error);
-            throw error;
-        }
-    };
-
-    /**
-     * Get list of read-only columns that cannot be edited
-     */
-    private getReadOnlyColumns = (): string[] => {
-        // Define which columns should be read-only
-        const readOnlyColumns: string[] = [];
-
-        // You can make this configurable via the manifest or context
-        // For now, we'll make primary key columns read-only
-        this.sortedColumnsIds.forEach((colId) => {
-            const columnRecord = this.columns[colId];
-            if (columnRecord) {
-                const columnName = columnRecord.getValue('ColName') as string;
-                const cellType = columnRecord.getFormattedValue('ColCellType');
-
-                // Make certain cell types read-only
-                if (cellType === 'expand' || cellType === 'key' || columnName.toLowerCase().includes('id')) {
-                    readOnlyColumns.push(columnName);
-                }
-            }
-        });
-
-        console.log('🔒 Read-only columns:', readOnlyColumns);
-        return readOnlyColumns;
     };
 }
