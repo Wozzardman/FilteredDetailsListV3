@@ -1,5 +1,5 @@
 import React from 'react';
-import { Stack, Text, IconButton, DefaultButton } from '@fluentui/react';
+import { Stack, Text, DefaultButton } from '@fluentui/react';
 import { IFilterBarProps, IColumnFilter } from './Filter.types';
 
 export const FilterBar: React.FC<IFilterBarProps> = ({ filters, onRemoveFilter, onEditFilter, onClearAllFilters }) => {
@@ -71,17 +71,17 @@ export const FilterBar: React.FC<IFilterBarProps> = ({ filters, onRemoveFilter, 
                             <Text variant="small">
                                 <strong>{filter.columnName}:</strong> {getFilterDisplayText(filter)}
                             </Text>
-                            <IconButton
-                                iconProps={{ iconName: 'Settings' }}
+                            <DefaultButton
+                                text="Edit"
                                 onClick={() => onEditFilter(filter.columnName)}
                                 title={`Edit filter for ${filter.columnName}`}
-                                styles={{ root: { minWidth: '16px', height: '16px' } }}
+                                styles={{ root: { minWidth: '40px', height: '20px', fontSize: '10px' } }}
                             />
-                            <IconButton
-                                iconProps={{ iconName: 'Clear' }}
+                            <DefaultButton
+                                text="×"
                                 onClick={() => onRemoveFilter(filter.columnName)}
                                 title={`Remove filter for ${filter.columnName}`}
-                                styles={{ root: { minWidth: '16px', height: '16px' } }}
+                                styles={{ root: { minWidth: '20px', height: '20px', fontSize: '12px' } }}
                             />
                         </Stack>
                     </div>

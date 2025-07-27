@@ -1,6 +1,6 @@
 /**
  * Enterprise-grade enhanced FilteredDetailsListV2 main component
- * Integrates all advanced features for industry-competitive performance
+ * Integrates essential features for industry-competitive performance
  */
 
 import React from 'react';
@@ -9,11 +9,8 @@ import { SimpleEnhancedGridWrapper } from './components/SimpleEnhancedGridWrappe
 import { VirtualizedEditableGrid } from './components/VirtualizedEditableGrid';
 import { performanceMonitor } from './performance/PerformanceMonitor';
 import { useAccessibility } from './accessibility/AccessibilityManager';
-import { useCollaboration } from './collaboration/CollaborationEngine';
-import { useAIInsights } from './ai/AIEngine';
 import { InputEvents, OutputEvents, RecordsColumns, SortDirection } from './ManifestConstants';
 import { IFilterState } from './Filter.types';
-import { FilterUtils } from './FilterUtils';
 
 // Enhanced component with all enterprise features
 export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.ReactControl<IInputs, IOutputs> {
@@ -67,8 +64,6 @@ export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.React
 
     // Enterprise features
     private performanceMonitor = performanceMonitor;
-    private aiInsightsEnabled = false;
-    private collaborationEnabled = false;
     private accessibilityManager: any;
     private virtualizedMode = false;
     private enhancedFeaturesEnabled = false;
@@ -94,7 +89,7 @@ export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.React
             this.setColumnLimit(context);
 
             // Log initialization
-            console.log('🚀 Enterprise FilteredDetailsListV2 initialized with advanced features');
+            console.log('🚀 Enterprise FilteredDetailsListV2 initialized with essential features');
         } finally {
             endMeasurement();
         }
@@ -117,8 +112,6 @@ export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.React
                 virtualization: this.virtualizedMode,
                 performance: true,
                 accessibility: true,
-                aiInsights: this.aiInsightsEnabled,
-                collaboration: this.collaborationEnabled,
             });
         }
     }
@@ -236,9 +229,6 @@ export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.React
             this.sortedColumnsIds = columns.sortedRecordIds;
             this.datasetColumns = dataset.columns;
 
-            // Initialize filters from input
-            this.initializeFilters(context);
-
             // Reset selection if needed
             if (dataset.getSelectedRecordIds().length === 0 && this.selection.count > 0) {
                 this.onSelectionChanged();
@@ -247,18 +237,6 @@ export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.React
             this.pagingEventPending = false;
         } finally {
             endMeasurement();
-        }
-    }
-
-    private initializeFilters(context: ComponentFramework.Context<IInputs>) {
-        const filtersInput = context.parameters.AppliedFilters?.raw;
-        if (filtersInput && typeof filtersInput === 'string') {
-            try {
-                this.filters = FilterUtils.deserializeFilters(filtersInput);
-            } catch (error) {
-                console.warn('Failed to deserialize filters:', error);
-                this.filters = {};
-            }
         }
     }
 

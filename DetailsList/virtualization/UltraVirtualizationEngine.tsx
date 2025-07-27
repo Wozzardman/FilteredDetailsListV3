@@ -507,7 +507,7 @@ export const UltraVirtualizedGrid: React.FC<UltraVirtualizedGridProps> = ({
                                 className="sort-indicator"
                                 aria-label={`Sorted ${column.isSortedDescending ? 'descending' : 'ascending'}`}
                             >
-                                {column.isSortedDescending ? '▼' : '▲'}
+                                {column.isSortedDescending ? ' DESC' : ' ASC'}
                             </span>
                         )}
                     </div>

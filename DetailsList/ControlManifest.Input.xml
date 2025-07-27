@@ -1,11 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest>
-  <control namespace="JVT" constructor="FilteredDetailsListV2" version="7.1.0" display-name-key="FilteredDetailsListV2" description-key="FilteredDetailsListV2_Desc" control-type="virtual">
+  <control namespace="JVT" constructor="FilteredDetailsListV2" version="7.2.5" display-name-key="FilteredDetailsListV2" description-key="FilteredDetailsListV2_Desc" control-type="virtual">
     <external-service-usage enabled="false"></external-service-usage>
     <data-set name="records" display-name-key="Records" >
-      <property-set name="RecordsKey" display-name-key="RecordKey" of-type="SingleLine.Text" usage="bound" required="false" />
-      <property-set name="RecordsCanSelect" display-name-key="RecordCanSelect" of-type="TwoOptions" usage="bound" required="false" />
-      <property-set name="RecordsSelected" display-name-key="RecordSelected" of-type="TwoOptions" usage="bound" required="false" />
     </data-set>
     <data-set name="columns" display-name-key="Columns">
       <property-set name="ColDisplayName" display-name-key="ColDisplayName" of-type="SingleLine.Text" usage="bound" required="true" />
@@ -95,6 +92,8 @@
     <property name="Theme" display-name-key="Theme" of-type="SingleLine.Text" usage="input" required="false" />
     <property name="Compact" display-name-key="Compact" of-type="TwoOptions" usage="input" required="false" default-value="true" />
     <property name="HeaderVisible" display-name-key="HeaderVisible" of-type="TwoOptions" usage="input" required="false" default-value="true" />
+    <property name="DefaultColumnWidth" display-name-key="DefaultColumnWidth" of-type="Whole.None" usage="input" required="false" default-value="150" />
+    <property name="EnableColumnResizing" display-name-key="EnableColumnResizing" of-type="TwoOptions" usage="input" required="false" default-value="true" />
     <!-- Filter properties -->
     <property name="EnableFiltering" display-name-key="EnableFiltering" of-type="TwoOptions" usage="input" required="false" default-value="false" />
     <property name="FilterConfiguration" display-name-key="FilterConfiguration" of-type="SingleLine.Text" usage="input" required="false" />

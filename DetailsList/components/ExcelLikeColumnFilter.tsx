@@ -21,6 +21,18 @@ import {
     PrimaryButton
 } from '@fluentui/react';
 
+// Helper function for PCF EntityRecord compatibility
+const getPCFValue = (item: any, columnKey: string): any => {
+    if (item && typeof item.getValue === 'function') {
+        try {
+            return item.getValue(columnKey);
+        } catch (e) {
+            return null;
+        }
+    }
+    return item[columnKey];
+};
+
 export interface IDistinctValue {
     value: any;
     displayValue: string;
@@ -39,6 +51,7 @@ export interface IExcelLikeColumnFilterProps {
     target: HTMLElement | null;
     onDismiss: () => void;
     isOpen: boolean;
+    getAvailableValues?: (columnKey: string) => string[];
 }
 
 export const ExcelLikeColumnFilter: React.FC<IExcelLikeColumnFilterProps> = ({
@@ -51,7 +64,8 @@ export const ExcelLikeColumnFilter: React.FC<IExcelLikeColumnFilterProps> = ({
     onFilterChange,
     target,
     onDismiss,
-    isOpen
+    isOpen,
+    getAvailableValues
 }) => {
     const [searchTerm, setSearchTerm] = React.useState<string>('');
     const [selectAll, setSelectAll] = React.useState<boolean>(true);
@@ -61,51 +75,73 @@ export const ExcelLikeColumnFilter: React.FC<IExcelLikeColumnFilterProps> = ({
     // Refs for virtualization
     const listRef = React.useRef<HTMLDivElement>(null);
 
-    // Calculate distinct values with counts based on cascading filters
+    // Calculate distinct values with counts - OPTIMIZED with getAvailableValues
     React.useEffect(() => {
         if (!isOpen) return;
 
-        // Get data filtered by OTHER columns (for cascading effect)
-        const otherFilters = { ...currentFilters };
-        delete otherFilters[columnKey];
+        let values: IDistinctValue[];
         
-        const cascadedData = filterDataByOtherColumns(allData, otherFilters);
-        const currentColumnFilter = currentFilters[columnKey];
-
-        // Calculate distinct values from cascaded data
-        const valueMap = new Map<any, { count: number; selected: boolean }>();
-        
-        cascadedData.forEach(item => {
-            const value = item[columnKey];
-            const normalizedValue = normalizeValue(value, dataType);
+        if (getAvailableValues) {
+            // Use the optimized getAvailableValues function for better performance
+            const availableValues = getAvailableValues(columnKey);
+            const currentColumnFilter = currentFilters[columnKey];
             
-            if (valueMap.has(normalizedValue)) {
-                valueMap.get(normalizedValue)!.count++;
-            } else {
-                const isSelected = currentColumnFilter 
+            values = availableValues.map(value => ({
+                value,
+                displayValue: formatDisplayValue(value, dataType),
+                count: 1, // Count not available with optimized version, but much faster
+                selected: currentColumnFilter 
                     ? Array.isArray(currentColumnFilter) 
-                        ? currentColumnFilter.includes(normalizedValue)
-                        : currentColumnFilter === normalizedValue
-                    : true;
+                        ? currentColumnFilter.includes(value)
+                        : currentColumnFilter === value
+                    : true
+            }));
+            
+            // Sort based on data type
+            values.sort((a, b) => sortByDataType(a.value, b.value, dataType));
+        } else {
+            // Fallback to original calculation if getAvailableValues not provided
+            const otherFilters = { ...currentFilters };
+            delete otherFilters[columnKey];
+            
+            const cascadedData = filterDataByOtherColumns(allData, otherFilters);
+            const currentColumnFilter = currentFilters[columnKey];
+
+            // Calculate distinct values from cascaded data
+            const valueMap = new Map<any, { count: number; selected: boolean }>();
+            
+            cascadedData.forEach(item => {
+                const value = getPCFValue(item, columnKey);
+                const normalizedValue = normalizeValue(value, dataType);
                 
-                valueMap.set(normalizedValue, { count: 1, selected: isSelected });
-            }
-        });
+                if (valueMap.has(normalizedValue)) {
+                    valueMap.get(normalizedValue)!.count++;
+                } else {
+                    const isSelected = currentColumnFilter 
+                        ? Array.isArray(currentColumnFilter) 
+                            ? currentColumnFilter.includes(normalizedValue)
+                            : currentColumnFilter === normalizedValue
+                        : true;
+                    
+                    valueMap.set(normalizedValue, { count: 1, selected: isSelected });
+                }
+            });
 
-        // Convert to array and sort by data type
-        const values: IDistinctValue[] = Array.from(valueMap.entries()).map(([value, info]) => ({
-            value,
-            displayValue: formatDisplayValue(value, dataType),
-            count: info.count,
-            selected: info.selected
-        }));
+            // Convert to array and sort by data type
+            values = Array.from(valueMap.entries()).map(([value, info]) => ({
+                value,
+                displayValue: formatDisplayValue(value, dataType),
+                count: info.count,
+                selected: info.selected
+            }));
 
-        // Sort based on data type
-        values.sort((a, b) => sortByDataType(a.value, b.value, dataType));
+            // Sort based on data type
+            values.sort((a, b) => sortByDataType(a.value, b.value, dataType));
+        }
 
         setDistinctValues(values);
         setSelectAll(values.every(v => v.selected));
-    }, [allData, currentFilters, columnKey, dataType, isOpen]);
+    }, [allData, currentFilters, columnKey, dataType, isOpen, getAvailableValues]);
 
     // Filter distinct values by search term
     React.useEffect(() => {
@@ -348,7 +384,7 @@ function filterDataByOtherColumns(data: any[], filters: Record<string, any>): an
                 return true;
             }
             
-            const value = item[column];
+            const value = getPCFValue(item, column);
             return Array.isArray(filterValues) 
                 ? filterValues.includes(value)
                 : filterValues === value;

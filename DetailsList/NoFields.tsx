@@ -1,4 +1,4 @@
-import { Icon, Overlay, Stack } from '@fluentui/react';
+import { Overlay, Stack } from '@fluentui/react';
 import React from 'react';
 
 export interface NoFieldsProps {
@@ -13,7 +13,7 @@ export const NoFields = React.memo((props: NoFieldsProps): React.ReactElement =>
                 style={{ color: '#575757', textAlign: 'center' }}
                 horizontalAlign={'center'}
             >
-                <Icon iconName="List" style={{ fontSize: 40 }} />
+                <div className="no-fields-icon">LIST</div>
                 <Stack.Item>{resources.getString('Message_NoFieldsConfigured')}</Stack.Item>
                 <Stack.Item>{resources.getString('Message_ChooseFields')}</Stack.Item>
             </Stack>

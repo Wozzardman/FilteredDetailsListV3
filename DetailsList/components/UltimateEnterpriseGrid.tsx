@@ -36,6 +36,7 @@ export interface IUltimateEnterpriseGridProps {
     onItemsChanged?: (items: any[]) => void;
     onCellEdit?: (item: any, column: IUltimateEnterpriseGridColumn, newValue: any) => void;
     onExport?: (format: 'CSV' | 'Excel' | 'PDF' | 'JSON', data: any[]) => void;
+    getColumnDataType?: (columnKey: string) => 'text' | 'number' | 'date' | 'boolean' | 'choice';
     selectionMode?: SelectionMode;
     className?: string;
     theme?: 'light' | 'dark' | 'high-contrast';
@@ -61,6 +62,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     onItemsChanged,
     onCellEdit,
     onExport,
+    getColumnDataType,
     selectionMode = SelectionMode.multiple,
     className = '',
     theme = 'light',
@@ -94,7 +96,19 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
             const filterLower = globalFilter.toLowerCase();
             result = result.filter(item =>
                 columns.some(column => {
-                    const value = item[column.fieldName || column.key];
+                    // Handle PCF EntityRecord objects
+                    let value;
+                    if (item && typeof item.getValue === 'function') {
+                        // PCF EntityRecord - use getValue method
+                        try {
+                            value = item.getValue(column.fieldName || column.key);
+                        } catch (e) {
+                            value = null;
+                        }
+                    } else {
+                        // Plain object - use property access
+                        value = item[column.fieldName || column.key];
+                    }
                     return value && value.toString().toLowerCase().includes(filterLower);
                 })
             );
@@ -109,13 +123,63 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
             onCellEdit?.(item, column, newValue);
             
             if (enableChangeTracking && changeManager) {
-                const recordKey = item.key || item.id || 'unknown';
+                const recordKey = item.key || item.id || item.recordId || 'unknown';
                 const columnKey = column.fieldName || column.key;
-                const oldValue = item[columnKey];
+                
+                // Get old value from PCF EntityRecord or plain object
+                let oldValue;
+                if (item && typeof item.getValue === 'function') {
+                    try {
+                        oldValue = item.getValue(columnKey);
+                    } catch (e) {
+                        oldValue = null;
+                    }
+                } else {
+                    oldValue = item[columnKey];
+                }
+                
                 changeManager.addChange(recordKey, columnKey, oldValue, newValue);
             }
         }
     }, [enableInlineEditing, enableChangeTracking, onCellEdit, changeManager]);
+
+    // Get available values for column filters using proper PCF data access pattern
+    const getAvailableValues = useCallback((columnKey: string) => {
+        const uniqueValues = new Set<string>();
+        
+        items.forEach(item => {
+            let value;
+            
+            // Handle PCF EntityRecord objects with the new data access pattern
+            if (item && typeof item.getValue === 'function') {
+                // PCF EntityRecord - use getValue method
+                try {
+                    value = item.getValue(columnKey);
+                } catch (e) {
+                    // Fallback to getValueByColumn method if available
+                    if (typeof item.getValueByColumn === 'function') {
+                        value = item.getValueByColumn(columnKey);
+                    } else {
+                        value = null;
+                    }
+                }
+            } else {
+                // Plain object - use property access
+                value = item[columnKey];
+            }
+            
+            // Add non-null, non-undefined values to the set
+            if (value !== null && value !== undefined && value !== '') {
+                const stringValue = value.toString().trim();
+                if (stringValue.length > 0) {
+                    uniqueValues.add(stringValue);
+                }
+            }
+        });
+        
+        // Convert to sorted array
+        return Array.from(uniqueValues).sort();
+    }, [items]);
 
     // Handle export functionality
     const handleExport = useCallback(async (format: 'CSV' | 'Excel' | 'PDF' | 'JSON') => {
@@ -176,38 +240,39 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     // Performance metrics display
     const performanceDisplay = enablePerformanceMonitoring && performanceMetrics ? (
         <div className="performance-metrics" data-theme={theme}>
-            <span>📊 {filteredItems.length} items</span>
-            <span>⚡ {performanceMetrics.renderTime}ms</span>
-            <span>🧠 {performanceMetrics.memoryUsage}MB</span>
-            <span>{isOptimized ? '🚀 Optimized' : '⏳ Loading'}</span>
+            <span>{filteredItems.length} items</span>
+            <span>{performanceMetrics.renderTime}ms</span>
+            <span>{performanceMetrics.memoryUsage}MB</span>
+            <span>{isOptimized ? 'Optimized' : 'Loading'}</span>
         </div>
     ) : null;
 
-    // Change tracking display
+    // Change tracking display (status only - no duplicate buttons)
     const pendingChangesCount = changeManager?.getPendingChanges().length || 0;
     const changeTrackingDisplay = enableChangeTracking && pendingChangesCount > 0 ? (
         <div className="change-tracking" data-theme={theme}>
-            <span>📝 {pendingChangesCount} pending changes</span>
-            <PrimaryButton 
-                text="Commit Changes" 
-                onClick={handleCommitChanges}
-                iconProps={{ iconName: 'CheckMark' }}
-            />
-            <DefaultButton 
-                text="Cancel Changes" 
-                onClick={handleCancelChanges}
-                iconProps={{ iconName: 'Clear' }}
-            />
+            <span>{pendingChangesCount} pending changes</span>
         </div>
     ) : null;
 
     return (
-        <div className={`ultimate-enterprise-grid ${className}`} data-theme={theme}>
+        <div 
+            className={`ultimate-enterprise-grid ${className}`} 
+            data-theme={theme}
+            style={{
+                width: typeof width === 'number' ? `${width}px` : width,
+                height: typeof height === 'number' ? `${height}px` : height,
+                maxWidth: typeof width === 'number' ? `${width}px` : width,
+                maxHeight: typeof height === 'number' ? `${height}px` : height,
+                overflow: 'hidden',
+                boxSizing: 'border-box'
+            }}
+        >
             {/* Control Bar */}
             <Stack horizontal tokens={{ childrenGap: 16 }} className="control-bar">
                 {enableFiltering && (
                     <TextField
-                        placeholder="🔍 Filter records..."
+                        placeholder="Filter records..."
                         value={globalFilter}
                         onChange={(_, value) => setGlobalFilter(value || '')}
                         styles={{
@@ -222,22 +287,18 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                         <DefaultButton 
                             text="Export CSV" 
                             onClick={() => handleExport('CSV')}
-                            iconProps={{ iconName: 'Download' }}
                         />
                         <DefaultButton 
                             text="Export Excel" 
                             onClick={() => handleExport('Excel')}
-                            iconProps={{ iconName: 'Table' }}
                         />
                         <DefaultButton 
                             text="Export PDF" 
                             onClick={() => handleExport('PDF')}
-                            iconProps={{ iconName: 'Download' }}
                         />
                         <DefaultButton 
                             text="Export JSON" 
                             onClick={() => handleExport('JSON')}
-                            iconProps={{ iconName: 'Download' }}
                         />
                     </Stack>
                 )}
@@ -249,14 +310,23 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
             {changeTrackingDisplay}
 
             {/* Main Grid - ALWAYS VIRTUALIZED for META/Google Competition */}
-            <div className="grid-container">
+            <div 
+                className="grid-container"
+                style={{
+                    width: '100%',
+                    height: typeof height === 'number' ? `${height - 120}px` : 'calc(100% - 120px)',
+                    overflow: 'hidden',
+                    boxSizing: 'border-box'
+                }}
+            >
                 <VirtualizedEditableGrid
                     items={filteredItems}
                     columns={columns}
-                    height={typeof height === 'number' ? height - 100 : 500}
+                    height={typeof height === 'number' ? height - 120 : 400}
                     width={typeof width === 'number' ? width : '100%'}
                     enableInlineEditing={enableInlineEditing}
                     enableDragFill={true}
+                    getAvailableValues={getAvailableValues}
                     onCellEdit={(itemId: string, columnKey: string, newValue: any) => {
                         const item = filteredItems.find(i => (i.key || i.id) === itemId);
                         const column = columns.find(c => (c.fieldName || c.key) === columnKey);
@@ -264,6 +334,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                             handleCellEdit(item, column, newValue);
                         }
                     }}
+                    getColumnDataType={getColumnDataType}
                     changeManager={changeManager}
                     enablePerformanceMonitoring={enablePerformanceMonitoring}
                     rowHeight={42}

@@ -245,14 +245,12 @@ export const EditableGrid: React.FC<EditableGridProps> = ({
                 {
                     key: 'save',
                     text: `Save Changes (${pendingChanges.size})`,
-                    iconProps: { iconName: 'CheckMark' },
                     onClick: () => { commitAllChanges(); },
                     disabled: isCommitting,
                 },
                 {
                     key: 'cancel',
                     text: 'Cancel Changes',
-                    iconProps: { iconName: 'Cancel' },
                     onClick: cancelAllChanges,
                     disabled: isCommitting,
                 }

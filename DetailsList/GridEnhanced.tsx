@@ -35,7 +35,7 @@ import {
     ThemeProvider,
     IDetailsRowProps,
     IDetailsColumnProps,
-    IconButton,
+    DefaultButton,
     CommandBar,
     ICommandBarItemProps,
 } from '@fluentui/react';
@@ -313,19 +313,16 @@ export const GridEnhanced = React.memo((props: GridProps) => {
             items.push({
                 key: 'export',
                 text: 'Export',
-                iconProps: { iconName: 'Download' },
                 subMenuProps: {
                     items: [
                         {
                             key: 'csv',
                             text: 'Export to CSV',
-                            iconProps: { iconName: 'Table' },
                             onClick: () => handleExport('csv'),
                         },
                         {
                             key: 'excel',
                             text: 'Export to Excel',
-                            iconProps: { iconName: 'Table' },
                             onClick: () => handleExport('excel'),
                         },
                     ],
@@ -337,7 +334,6 @@ export const GridEnhanced = React.memo((props: GridProps) => {
             items.push({
                 key: 'insights',
                 text: 'AI Insights',
-                iconProps: { iconName: 'Info' },
                 onClick: () => {
                     console.log('🤖 AI Insights: Analyzing data patterns...');
                     // Future: Implement AI insights functionality
@@ -809,8 +805,8 @@ function mapToGridColumn(
                 <div className={`${headerCellStyleClass} filter-header-container`}>
                     <span>{props.column.name}</span>
                     {isFilterable && onFilterClick && (
-                        <IconButton
-                            iconProps={{ iconName: isFiltered ? 'Filter' : 'Filter' }}
+                        <DefaultButton
+                            text={isFiltered ? 'v' : 'v'}
                             title={isFiltered ? 'Filter applied - click to edit' : 'Click to filter'}
                             onClick={(ev: React.MouseEvent<HTMLElement>) => {
                                 ev.stopPropagation();
@@ -824,7 +820,7 @@ function mapToGridColumn(
                                     color: isFiltered ? '#0078d4' : '#605e5c',
                                     marginLeft: '4px',
                                 },
-                                icon: { fontSize: '12px' },
+                                label: { fontSize: '12px' },
                             }}
                         />
                     )}

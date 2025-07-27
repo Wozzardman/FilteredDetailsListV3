@@ -11,13 +11,40 @@ import { IColumn } from '@fluentui/react/lib/DetailsList';
 import { CommandBar, ICommandBarItemProps } from '@fluentui/react/lib/CommandBar';
 import { MessageBar, MessageBarType } from '@fluentui/react/lib/MessageBar';
 import { Spinner, SpinnerSize } from '@fluentui/react/lib/Spinner';
-import { IconButton } from '@fluentui/react/lib/Button';
+import { DefaultButton } from '@fluentui/react/lib/Button';
 import { InlineEditor } from './InlineEditor';
 import { EnterpriseChangeManager } from '../services/EnterpriseChangeManager';
 import { performanceMonitor } from '../performance/PerformanceMonitor';
 import { VirtualizedFilterDropdown, FilterValue } from './VirtualizedFilterDropdown';
 import { ExcelLikeColumnFilter } from './ExcelLikeColumnFilter';
 import '../css/VirtualizedEditableGrid.css';
+
+// Helper functions for PCF EntityRecord compatibility
+const getPCFValue = (item: any, columnKey: string): any => {
+    if (item && typeof item.getValue === 'function') {
+        try {
+            return item.getValue(columnKey);
+        } catch (e) {
+            return null;
+        }
+    }
+    return item[columnKey];
+};
+
+const setPCFValue = (item: any, columnKey: string, value: any): void => {
+    // For PCF EntityRecords, we can't directly set values - this would be handled by the parent component
+    // For now, we'll use the property access fallback
+    if (item && typeof item.setValue === 'function') {
+        try {
+            item.setValue(columnKey, value);
+        } catch (e) {
+            // Fallback to property access
+            item[columnKey] = value;
+        }
+    } else {
+        item[columnKey] = value;
+    }
+};
 
 export interface VirtualizedEditableGridProps {
     items: any[];
@@ -90,6 +117,12 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
     const [filterTargets, setFilterTargets] = React.useState<Record<string, HTMLElement | null>>({});
     const [originalItems] = React.useState<any[]>(items);
 
+    // Column resizing state
+    const [columnWidthOverrides, setColumnWidthOverrides] = React.useState<Record<string, number>>({});
+    const [isResizing, setIsResizing] = React.useState<string | null>(null);
+    const [resizeStartX, setResizeStartX] = React.useState<number>(0);
+    const [resizeStartWidth, setResizeStartWidth] = React.useState<number>(0);
+
     // Calculate filtered items based on column filters
     const filteredItems = React.useMemo(() => {
         if (Object.keys(columnFilters).length === 0) return items;
@@ -97,7 +130,7 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
         return items.filter(item => {
             return Object.entries(columnFilters).every(([columnKey, selectedValues]) => {
                 if (!selectedValues || selectedValues.length === 0) return true;
-                const value = item[columnKey];
+                const value = getPCFValue(item, columnKey);
                 return selectedValues.includes(value);
             });
         });
@@ -118,6 +151,45 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
             [columnKey]: target
         }));
     }, [activeFilterColumn]);
+
+    // Column resizing handlers
+    const handleResizeStart = React.useCallback((columnKey: string, startX: number, startWidth: number) => {
+        setIsResizing(columnKey);
+        setResizeStartX(startX);
+        setResizeStartWidth(startWidth);
+        document.body.classList.add('resizing-columns');
+    }, []);
+
+    const handleResizeMove = React.useCallback((event: MouseEvent) => {
+        if (!isResizing) return;
+        
+        const deltaX = event.clientX - resizeStartX;
+        const newWidth = Math.max(50, resizeStartWidth + deltaX); // Minimum 50px
+        
+        setColumnWidthOverrides(prev => ({
+            ...prev,
+            [isResizing]: newWidth
+        }));
+    }, [isResizing, resizeStartX, resizeStartWidth]);
+
+    const handleResizeEnd = React.useCallback(() => {
+        setIsResizing(null);
+        setResizeStartX(0);
+        setResizeStartWidth(0);
+        document.body.classList.remove('resizing-columns');
+    }, []);
+
+    // Add global mouse event listeners for column resizing
+    React.useEffect(() => {
+        if (isResizing) {
+            document.addEventListener('mousemove', handleResizeMove);
+            document.addEventListener('mouseup', handleResizeEnd);
+            return () => {
+                document.removeEventListener('mousemove', handleResizeMove);
+                document.removeEventListener('mouseup', handleResizeEnd);
+            };
+        }
+    }, [isResizing, handleResizeMove, handleResizeEnd]);
 
     // Performance monitoring
     const endMeasurement = React.useMemo(() => 
@@ -154,16 +226,36 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
         },
     });
 
-    // Calculate column widths
+    // Calculate column widths with resizing support
     const columnWidths = React.useMemo(() => {
         const totalWidth = typeof width === 'number' ? width : 1200;
-        const fixedWidth = columns.reduce((sum, col) => sum + (col.minWidth || 0), 0);
-        const flexibleColumns = columns.filter(col => !col.minWidth);
-        const remainingWidth = Math.max(0, totalWidth - fixedWidth);
-        const flexWidth = flexibleColumns.length > 0 ? remainingWidth / flexibleColumns.length : 0;
-
-        return columns.map(col => col.minWidth || flexWidth);
-    }, [columns, width]);
+        
+        return columns.map((col, index) => {
+            // Check if user has manually resized this column
+            const overrideWidth = columnWidthOverrides[col.key || col.fieldName || index.toString()];
+            if (overrideWidth) {
+                return overrideWidth;
+            }
+            
+            // Use the column's configured width (minWidth represents the desired width)
+            if (col.minWidth) {
+                return col.minWidth;
+            }
+            
+            // Fallback to proportional width
+            const availableWidth = totalWidth - columns.reduce((sum, c) => {
+                const key = c.key || c.fieldName || columns.indexOf(c).toString();
+                return sum + (columnWidthOverrides[key] || c.minWidth || 0);
+            }, 0);
+            
+            const flexibleColumns = columns.filter((c, i) => {
+                const key = c.key || c.fieldName || i.toString();
+                return !columnWidthOverrides[key] && !c.minWidth;
+            });
+            
+            return flexibleColumns.length > 0 ? Math.max(150, availableWidth / flexibleColumns.length) : 150;
+        });
+    }, [columns, width, columnWidthOverrides]);
 
     // Get cell key for change tracking
     const getCellKey = (itemIndex: number, columnKey: string) => `${itemIndex}-${columnKey}`;
@@ -173,7 +265,7 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
         if (!enableInlineEditing || readOnlyColumns.includes(columnKey)) return;
 
         const item = filteredItems[itemIndex];
-        const originalValue = item[columnKey];
+        const originalValue = getPCFValue(item, columnKey);
         setEditingState({ itemIndex, columnKey, originalValue });
     }, [enableInlineEditing, readOnlyColumns, filteredItems]);
 
@@ -198,7 +290,7 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
             setPendingChanges(prev => new Map(prev.set(changeKey, change)));
 
             // Update item in memory for immediate UI feedback
-            item[columnKey] = newValue;
+            setPCFValue(item, columnKey, newValue);
 
             // Notify parent
             onCellEdit?.(itemId, columnKey, newValue);
@@ -245,7 +337,7 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
         pendingChanges.forEach((change) => {
             const item = items[change.itemIndex];
             if (item) {
-                item[change.columnKey] = change.oldValue;
+                setPCFValue(item, change.columnKey, change.oldValue);
             }
         });
 
@@ -265,15 +357,13 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
             items.push(
                 {
                     key: 'save',
-                    text: `💾 Save Changes (${pendingChanges.size})`,
-                    iconProps: { iconName: 'CheckMark' },
+                    text: `Save Changes (${pendingChanges.size})`,
                     onClick: () => { commitAllChanges(); },
                     disabled: isCommitting,
                 },
                 {
                     key: 'cancel',
-                    text: '❌ Cancel Changes',
-                    iconProps: { iconName: 'Clear' },
+                    text: 'Cancel Changes',
                     onClick: cancelAllChanges,
                     disabled: isCommitting,
                 }
@@ -283,7 +373,7 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
         // Performance metrics
         items.push({
             key: 'perf',
-            text: `⚡ ${items.length} rows virtualized`,
+            text: `${items.length} rows virtualized`,
             disabled: true
         });
 
@@ -303,6 +393,7 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
             <div
                 key={index}
                 className={rowClassName}
+                data-index={index}
                 style={{
                     position: 'absolute',
                     top: 0,
@@ -325,7 +416,7 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                     const hasChanges = pendingChanges.has(cellKey);
                     const isReadOnly = readOnlyColumns.includes(columnKey);
 
-                    const cellValue = pendingChanges.get(cellKey)?.newValue ?? item[columnKey];
+                    const cellValue = pendingChanges.get(cellKey)?.newValue ?? getPCFValue(item, columnKey);
                     const dataType = column.data?.dataType || 'string';
                     const availableValues = getAvailableValues?.(columnKey) || [];
 
@@ -390,7 +481,54 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                                     }}
                                     onMouseDown={(e) => {
                                         e.preventDefault();
-                                        // TODO: Implement drag fill
+                                        // Implement basic drag fill functionality
+                                        const startDragFill = (startIndex: number, columnKey: string, startValue: any) => {
+                                            const handleMouseMove = (moveEvent: MouseEvent) => {
+                                                // Find the target cell based on mouse position
+                                                const element = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY);
+                                                if (element && element.closest('.virtualized-row')) {
+                                                    const rowElement = element.closest('.virtualized-row') as HTMLElement;
+                                                    const targetIndex = parseInt(rowElement.dataset.index || '0');
+                                                    
+                                                    // Fill range with the start value
+                                                    if (targetIndex !== startIndex) {
+                                                        const minIndex = Math.min(startIndex, targetIndex);
+                                                        const maxIndex = Math.max(startIndex, targetIndex);
+                                                        
+                                                        for (let i = minIndex; i <= maxIndex; i++) {
+                                                            if (i !== startIndex) {
+                                                                const targetItem = filteredItems[i];
+                                                                if (targetItem) {
+                                                                    const itemId = targetItem.key || targetItem.id || targetItem.getRecordId?.() || i.toString();
+                                                                    const changeKey = getCellKey(i, columnKey);
+                                                                    const change = {
+                                                                        itemId,
+                                                                        itemIndex: i,
+                                                                        columnKey,
+                                                                        newValue: startValue,
+                                                                        oldValue: getPCFValue(targetItem, columnKey)
+                                                                    };
+                                                                    
+                                                                    setPendingChanges(prev => new Map(prev.set(changeKey, change)));
+                                                                    setPCFValue(targetItem, columnKey, startValue);
+                                                                    onCellEdit?.(itemId, columnKey, startValue);
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            };
+                                            
+                                            const handleMouseUp = () => {
+                                                document.removeEventListener('mousemove', handleMouseMove);
+                                                document.removeEventListener('mouseup', handleMouseUp);
+                                            };
+                                            
+                                            document.addEventListener('mousemove', handleMouseMove);
+                                            document.addEventListener('mouseup', handleMouseUp);
+                                        };
+                                        
+                                        startDragFill(index, columnKey, cellValue);
                                     }}
                                 />
                             )}
@@ -401,41 +539,94 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
         );
     }, [filteredItems, columns, columnWidths, editingState, pendingChanges, readOnlyColumns, enableInlineEditing, enableDragFill, startEdit, commitEdit, cancelEdit, getAvailableValues, onItemClick, onItemDoubleClick]);
 
-    // Render header
-    // Render header with Excel-like filter buttons
+    // Render header with Excel-like filter buttons and column resizing
     const renderHeader = () => (
         <div className="virtualized-header">
             {columns.map((column, index) => {
                 const hasFilter = columnFilters[column.key]?.length > 0;
                 const dataType = getColumnDataType?.(column.key) || 'text';
+                const columnKey = column.key || column.fieldName || index.toString();
                 
                 return (
                     <div
                         key={column.key}
-                        className="virtualized-header-cell"
-                        style={{ width: columnWidths[index] }}
+                        className={`virtualized-header-cell ${isResizing === column.key ? 'resizing' : ''}`}
+                        style={{ 
+                            width: columnWidths[index],
+                            position: 'relative',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            borderRight: '1px solid #e1dfdd',
+                            background: '#faf9f8',
+                            padding: '8px',
+                            overflow: 'hidden'
+                        }}
                     >
-                        <span className="virtualized-header-text">
+                        <span 
+                            className="virtualized-header-text"
+                            style={{ 
+                                flex: 1, 
+                                fontWeight: 600,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
+                            }}
+                        >
                             {column.name}
                         </span>
-                        {enableColumnFilters && (
-                            <IconButton
-                                className={`virtualized-header-filter-button ${hasFilter ? 'active' : ''}`}
-                                iconProps={{ 
-                                    iconName: hasFilter ? 'Filter' : 'Filter'
+                        
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            {enableColumnFilters && (
+                                <DefaultButton
+                                    className={`virtualized-header-filter-button ${hasFilter ? 'active' : ''}`}
+                                    text="⌄"
+                                    title={`Filter ${column.name}`}
+                                    onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                        const target = e.currentTarget as HTMLElement;
+                                        handleFilterButtonClick(columnKey, target);
+                                    }}
+                                    styles={{
+                                        root: { 
+                                            height: 24, 
+                                            width: 24,
+                                            minWidth: 24,
+                                            backgroundColor: hasFilter ? '#0078d4' : 'transparent',
+                                            color: hasFilter ? 'white' : '#605e5c'
+                                        },
+                                        label: { fontSize: 12 }
+                                    }}
+                                />
+                            )}
+                        </div>
+
+                        {/* Column resize handle */}
+                        {column.isResizable && (
+                            <div
+                                className="column-resize-handle"
+                                style={{
+                                    position: 'absolute',
+                                    right: 0,
+                                    top: 0,
+                                    bottom: 0,
+                                    width: '6px',
+                                    cursor: 'col-resize',
+                                    backgroundColor: isResizing === columnKey ? '#0078d4' : 'transparent',
+                                    opacity: isResizing === columnKey ? 0.8 : 0,
+                                    transition: 'opacity 0.2s',
+                                    zIndex: 10
                                 }}
-                                title={`Filter ${column.name}`}
-                                onClick={(e) => {
-                                    const target = e.currentTarget as HTMLElement;
-                                    handleFilterButtonClick(column.key, target);
+                                onMouseDown={(e: React.MouseEvent) => {
+                                    e.preventDefault();
+                                    handleResizeStart(columnKey, e.clientX, columnWidths[index]);
                                 }}
-                                styles={{
-                                    root: { 
-                                        height: 24, 
-                                        width: 24,
-                                        minWidth: 24 
-                                    },
-                                    icon: { fontSize: 12 }
+                                onMouseEnter={(e: React.MouseEvent) => {
+                                    (e.target as HTMLElement).style.opacity = '0.6';
+                                }}
+                                onMouseLeave={(e: React.MouseEvent) => {
+                                    if (isResizing !== columnKey) {
+                                        (e.target as HTMLElement).style.opacity = '0';
+                                    }
                                 }}
                             />
                         )}
@@ -446,7 +637,19 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
     );
 
     return (
-        <div className="virtualized-editable-grid-container">
+        <div 
+            className="virtualized-editable-grid-container"
+            style={{
+                width: typeof width === 'number' ? `${width}px` : width,
+                height: typeof height === 'number' ? `${height}px` : height,
+                maxWidth: typeof width === 'number' ? `${width}px` : width,
+                maxHeight: typeof height === 'number' ? `${height}px` : height,
+                overflow: 'hidden',
+                boxSizing: 'border-box',
+                display: 'flex',
+                flexDirection: 'column'
+            }}
+        >
             {/* Command Bar */}
             {(pendingChanges.size > 0 || commandBarItems.length > 0) && (
                 <CommandBar
@@ -481,6 +684,11 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
             <div 
                 ref={parentRef}
                 className="virtualized-grid-body"
+                style={{
+                    flex: 1,
+                    overflow: 'auto',
+                    minHeight: 0
+                }}
             >
                 <div
                     className="virtualized-grid-inner"
@@ -507,6 +715,7 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                     target={filterTargets[activeFilterColumn]}
                     onDismiss={() => setActiveFilterColumn(null)}
                     isOpen={!!activeFilterColumn}
+                    getAvailableValues={getAvailableValues}
                 />
             )}
         </div>

@@ -4,6 +4,46 @@ import * as XLSX from 'xlsx';
 const jsPDF = require('jspdf');
 const autoTable = require('jspdf-autotable');
 
+// Helper function for PCF EntityRecord compatibility
+const getPCFValue = (item: any, columnKey: string): any => {
+    if (item && typeof item.getValue === 'function') {
+        try {
+            return item.getValue(columnKey);
+        } catch (e) {
+            return null;
+        }
+    }
+    return item[columnKey];
+};
+
+// Helper function to get all available column keys from PCF EntityRecord or regular object
+const getPCFKeys = (item: any, customColumns?: string[]): string[] => {
+    // If custom columns are provided, use them
+    if (customColumns && customColumns.length > 0) {
+        return customColumns;
+    }
+    
+    if (item && typeof item.getValue === 'function') {
+        // For PCF EntityRecords, we need to use a different approach
+        // Try to get keys from the item's attributes or use known column structure
+        if (item.getColumnInfo) {
+            return item.getColumnInfo().map((col: any) => col.Name);
+        }
+        // Fallback: try common PCF EntityRecord methods
+        if (item._columns) {
+            return Object.keys(item._columns);
+        }
+        // Last resort: use Object.keys but filter out methods
+        return Object.keys(item).filter(key => 
+            typeof item[key] !== 'function' && 
+            !key.startsWith('_') &&
+            key !== 'getValue' && 
+            key !== 'setValue'
+        );
+    }
+    return Object.keys(item);
+};
+
 /**
  * Advanced Data Export Service with multiple format support
  */
@@ -62,8 +102,9 @@ export class DataExportService {
             exportData = exportData.map((row) => {
                 const filteredRow: any = {};
                 options.customColumns!.forEach((column) => {
-                    if (row.hasOwnProperty(column)) {
-                        filteredRow[column] = row[column];
+                    const value = getPCFValue(row, column);
+                    if (value !== undefined) {
+                        filteredRow[column] = value;
                     }
                 });
                 return filteredRow;
@@ -79,7 +120,7 @@ export class DataExportService {
     private async exportToCSV(data: any[], filename: string, options: IExportOptions): Promise<void> {
         if (data.length === 0) return;
 
-        const headers = Object.keys(data[0]);
+        const headers = getPCFKeys(data[0], options.customColumns);
         const csvRows: string[] = [];
 
         // Add headers if specified
@@ -90,7 +131,7 @@ export class DataExportService {
         // Add data rows
         data.forEach((row) => {
             const values = headers.map((header) => {
-                const value = row[header];
+                const value = getPCFValue(row, header);
 
                 // Handle null/undefined values
                 if (value == null) return '';
@@ -120,11 +161,21 @@ export class DataExportService {
      * Export to Excel format
      */
     private async exportToExcel(data: any[], filename: string, options: IExportOptions): Promise<void> {
+        // Convert PCF EntityRecords to plain objects for Excel compatibility
+        const plainData = data.map(row => {
+            const plainRow: any = {};
+            const headers = options.customColumns || getPCFKeys(row);
+            headers.forEach(header => {
+                plainRow[header] = getPCFValue(row, header);
+            });
+            return plainRow;
+        });
+
         // Create workbook
         const workbook = XLSX.utils.book_new();
 
         // Create main data worksheet
-        const worksheet = XLSX.utils.json_to_sheet(data, {
+        const worksheet = XLSX.utils.json_to_sheet(plainData, {
             header: options.customColumns || undefined,
             skipHeader: options.includeHeaders === false,
         });
@@ -134,16 +185,16 @@ export class DataExportService {
 
         // Add metadata worksheet if specified
         if (options.metadata) {
-            const metadataSheet = this.createMetadataWorksheet(XLSX, options.metadata, data.length);
+            const metadataSheet = this.createMetadataWorksheet(XLSX, options.metadata, plainData.length);
             XLSX.utils.book_append_sheet(workbook, metadataSheet, 'Metadata');
         }
 
         // Add summary worksheet with statistics
-        const summarySheet = this.createSummaryWorksheet(XLSX, data);
+        const summarySheet = this.createSummaryWorksheet(XLSX, plainData, options);
         XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
 
         // Style the worksheets
-        this.styleExcelWorksheet(worksheet, data);
+        this.styleExcelWorksheet(worksheet, plainData, options);
 
         // Generate and save file
         const excelBuffer = XLSX.write(workbook, {
@@ -174,10 +225,10 @@ export class DataExportService {
             return;
         }
 
-        const headers = Object.keys(data[0]);
+        const headers = getPCFKeys(data[0], options.customColumns);
         const tableData = data.map((row) =>
             headers.map((header) => {
-                const value = row[header];
+                const value = getPCFValue(row, header);
                 return value != null ? value.toString() : '';
             }),
         );
@@ -220,14 +271,24 @@ export class DataExportService {
      * Export to JSON format
      */
     private async exportToJSON(data: any[], filename: string, options: IExportOptions): Promise<void> {
+        // Convert PCF EntityRecords to plain objects for JSON compatibility
+        const plainData = data.map(row => {
+            const plainRow: any = {};
+            const headers = options.customColumns || getPCFKeys(row);
+            headers.forEach(header => {
+                plainRow[header] = getPCFValue(row, header);
+            });
+            return plainRow;
+        });
+
         const exportObject = {
             metadata: {
                 exportDate: new Date().toISOString(),
-                recordCount: data.length,
+                recordCount: plainData.length,
                 format: 'JSON',
                 ...options.metadata,
             },
-            data: data,
+            data: plainData,
         };
 
         const jsonString = JSON.stringify(exportObject, null, 2);
@@ -293,17 +354,17 @@ export class DataExportService {
     /**
      * Create summary worksheet for Excel
      */
-    private createSummaryWorksheet(XLSX: any, data: any[]): any {
+    private createSummaryWorksheet(XLSX: any, data: any[], options: IExportOptions): any {
         if (data.length === 0) {
             return XLSX.utils.aoa_to_sheet([['No data available']]);
         }
 
-        const headers = Object.keys(data[0]);
+        const headers = getPCFKeys(data[0], options.customColumns);
         const summaryData = [
             ['Column Statistics'],
             ['Column', 'Type', 'Non-null Count', 'Unique Values', 'Sample Values'],
             ...headers.map((header) => {
-                const values = data.map((row) => row[header]).filter((v) => v != null);
+                const values = data.map((row) => getPCFValue(row, header)).filter((v) => v != null);
                 const uniqueValues = new Set(values);
                 const sampleValues = Array.from(uniqueValues).slice(0, 3).join(', ');
                 const dataType = this.inferDataType(values);
@@ -318,7 +379,7 @@ export class DataExportService {
     /**
      * Style Excel worksheet
      */
-    private styleExcelWorksheet(worksheet: any, data: any[]): void {
+    private styleExcelWorksheet(worksheet: any, data: any[], options: IExportOptions): void {
         const range = worksheet['!ref'];
         if (!range) return;
 
@@ -326,12 +387,12 @@ export class DataExportService {
         worksheet['!autofilter'] = { ref: range };
 
         // Set column widths
-        const headers = Object.keys(data[0] || {});
+        const headers = getPCFKeys(data[0] || {}, options.customColumns);
         worksheet['!cols'] = headers.map((header) => {
             const maxLength = Math.max(
                 header.length,
                 ...data.slice(0, 100).map((row) => {
-                    const value = row[header];
+                    const value = getPCFValue(row, header);
                     return value ? value.toString().length : 0;
                 }),
             );
@@ -383,7 +444,7 @@ export class DataExportService {
         const styles: any = {};
 
         headers.forEach((header, index) => {
-            const values = data.slice(0, 50).map((row) => row[header]);
+            const values = data.slice(0, 50).map((row) => getPCFValue(row, header));
             const dataType = this.inferDataType(values);
 
             switch (dataType) {

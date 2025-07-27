@@ -66,7 +66,7 @@ const VirtualRow: React.FC<{
             onDoubleClick={onDoubleClick}
             role="row"
             aria-rowindex={index + 2} // +2 because header is row 1, data starts at row 2
-            aria-selected={isSelected ? 'true' : 'false'}
+            aria-selected={isSelected}
         >
             {columns.map((column, colIndex) => {
                 const cellValue = item[column.fieldName || column.key];
@@ -82,6 +82,7 @@ const VirtualRow: React.FC<{
                             maxWidth: column.maxWidth || 300,
                         }}
                         role="gridcell"
+                        aria-colindex={colIndex + 1}
                     >
                         {column.onRender ? column.onRender(item, index, column) : cellValue}
                     </div>
@@ -111,11 +112,12 @@ const VirtualHeader: React.FC<{
                     }}
                     onClick={() => onColumnClick?.(column, index)}
                     role="columnheader"
+                    aria-colindex={index + 1}
                     aria-sort={column.isSorted ? (column.isSortedDescending ? 'descending' : 'ascending') : 'none'}
                     tabIndex={0}
                 >
                     {column.name}
-                    {column.isSorted && <span className="sort-indicator">{column.isSortedDescending ? '▼' : '▲'}</span>}
+                    {column.isSorted && <span className="sort-indicator">{column.isSortedDescending ? ' DESC' : ' ASC'}</span>}
                 </div>
             ))}
         </div>
@@ -280,7 +282,8 @@ export class HighPerformanceVirtualGrid extends React.PureComponent<VirtualGridP
                 style={{ height, width }}
                 role="grid"
                 aria-label="Virtual data grid"
-                aria-rowcount={items.length}
+                aria-rowcount={items.length + 1} // +1 for header row
+                aria-colcount={columns.length}
             >
                 <div role="rowgroup">
                     <VirtualHeader columns={columns} onColumnClick={onColumnClick} />

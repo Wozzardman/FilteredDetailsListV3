@@ -1,6 +1,19 @@
 /* VirtualizedEditableGrid - Ultimate Performance CSS */
 /* META/Google competitive virtualized grid with inline editing */
 
+/* Global style for when user is resizing columns */
+.resizing-columns {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    cursor: col-resize !important;
+}
+
+.resizing-columns * {
+    cursor: col-resize !important;
+}
+
 .virtualized-editable-grid-container {
     height: 100%;
     display: flex;
@@ -41,6 +54,34 @@
 
 .virtualized-header-cell:last-child {
     border-right: none;
+}
+
+/* Column Resize Handle */
+.column-resize-handle {
+    position: absolute;
+    top: 0;
+    right: -2px;
+    width: 4px;
+    height: 100%;
+    cursor: col-resize;
+    background: transparent;
+    z-index: 10;
+    transition: background-color 0.2s ease;
+}
+
+.column-resize-handle:hover {
+    background-color: #0078d4;
+}
+
+.virtualized-header-cell.resizing {
+    background-color: #deecf9;
+    box-shadow: 0 2px 4px rgba(0, 120, 212, 0.2);
+}
+
+.virtualized-header-cell.resizing .column-resize-handle {
+    background-color: #0078d4;
+    width: 2px;
+    box-shadow: 1px 0 2px rgba(0, 120, 212, 0.3);
 }
 
 /* Virtualized Grid Body */

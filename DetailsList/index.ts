@@ -178,6 +178,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
 
     /**
      * Gets the correct property names based on legacy vs modern mode
+     * Since metadata columns have been removed, these return null for fallback handling
      */
     private getRecordPropertyNames() {
         return this.isLegacyMode
@@ -187,9 +188,9 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                   selected: ItemsColumns.ItemSelected,
               }
             : {
-                  key: RecordsColumns.RecordKey,
-                  canSelect: RecordsColumns.RecordCanSelect,
-                  selected: RecordsColumns.RecordSelected,
+                  key: null, // RecordsColumns.RecordKey - removed from manifest
+                  canSelect: null, // RecordsColumns.RecordCanSelect - removed from manifest
+                  selected: null, // RecordsColumns.RecordSelected - removed from manifest
               };
     }
 
@@ -224,6 +225,10 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         console.log('Dataset columns count:', columns.sortedRecordIds?.length || 0);
         console.log('Allocated width:', context.mode.allocatedWidth);
         console.log('Allocated height:', context.mode.allocatedHeight);
+        console.log('📐 SIZING DEBUG - Using dimensions:', {
+            width: context.mode.allocatedWidth > 0 ? context.mode.allocatedWidth : '100%',
+            height: context.mode.allocatedHeight > 0 ? context.mode.allocatedHeight : 400
+        });
 
         if (dataset.sortedRecordIds && dataset.sortedRecordIds.length > 0) {
             console.log('First 3 record IDs:', dataset.sortedRecordIds.slice(0, 3));
@@ -338,7 +343,47 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 this.sortedColumnsIds = columns.sortedRecordIds;
             }
 
-            this.datasetColumns = dataset.columns;
+            // Process column definitions from the columns dataset (not the records dataset metadata)
+            const processedColumns: any[] = [];
+            
+            if (columns && columns.sortedRecordIds && columns.sortedRecordIds.length > 0) {
+                console.log('🔍 Processing column definitions from columns dataset:', columns.sortedRecordIds.length);
+                columns.sortedRecordIds.forEach(colId => {
+                    const columnRecord = columns.records[colId];
+                    if (columnRecord) {
+                        try {
+                            const columnName = columnRecord.getFormattedValue('ColName') || columnRecord.getValue('name');
+                            const displayName = columnRecord.getFormattedValue('ColDisplayName') || columnRecord.getValue('displayName') || columnName;
+                            const dataType = columnRecord.getValue('ColCellType') || columnRecord.getValue('dataType') || 'SingleLine.Text';
+                            
+                            console.log(`🔧 Processing column: ${columnName} (${displayName})`);
+                            processedColumns.push({
+                                name: columnName,
+                                displayName: displayName,
+                                dataType: dataType,
+                                visualSizeFactor: 1 // Default width
+                            });
+                        } catch (e) {
+                            console.warn(`⚠️ Error processing column ${colId}:`, e);
+                        }
+                    }
+                });
+            } else {
+                console.log('⚠️ No columns dataset available, using data columns directly');
+                // Use dataset columns directly since metadata columns are no longer defined
+                const actualDataColumns = dataset.columns || [];
+                actualDataColumns.forEach(col => {
+                    console.log(`🔧 Direct column: ${col.name} (${col.displayName})`);
+                    processedColumns.push({
+                        name: col.name,
+                        displayName: col.displayName,
+                        dataType: col.dataType,
+                        visualSizeFactor: col.visualSizeFactor || 1
+                    });
+                });
+            }
+
+            this.datasetColumns = processedColumns;
 
             // Initialize filters from input if provided
             const filtersInput = context.parameters.AppliedFilters?.raw;
@@ -364,23 +409,86 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         const useEnhancedFeatures = true; // Enable enterprise-grade features
 
         // Convert records to items for UltimateEnterpriseGrid
-        const items = this.sortedRecordsIds.map(recordId => this.records[recordId]);
+        // Keep the PCF EntityRecord structure intact for proper data type handling
+        const items = this.sortedRecordsIds.map(recordId => {
+            const record = this.records[recordId];
+            if (!record) return null;
+            
+            // Return the PCF EntityRecord directly with additional properties for grid compatibility
+            const enhancedRecord = {
+                ...record,
+                recordId: recordId,
+                key: recordId,
+                // Add a getter method for the grid to access values by column name
+                getValueByColumn: (columnName: string) => {
+                    try {
+                        return record.getValue(columnName);
+                    } catch (e) {
+                        return null;
+                    }
+                },
+                // Add a getter for formatted values (for display)
+                getFormattedValueByColumn: (columnName: string) => {
+                    try {
+                        return record.getFormattedValue(columnName);
+                    } catch (e) {
+                        return null;
+                    }
+                }
+            };
+            
+            return enhancedRecord;
+        }).filter(item => item !== null);
         
-        // Convert columns to UltimateEnterpriseGrid format
-        const gridColumns = this.datasetColumns.map(col => ({
-            key: col.name,
-            name: col.displayName,
-            fieldName: col.name,
-            minWidth: col.visualSizeFactor > 0 ? col.visualSizeFactor * 100 : 100,
-            maxWidth: 300,
-            isResizable: true,
-            filterable: true,
-            sortable: true,
-            editable: this.enableInlineEditing,
-            dataType: (col.dataType === 'DateAndTime.DateOnly' ? 'date' : 
-                      col.dataType === 'Whole.None' ? 'number' : 
-                      col.dataType === 'TwoOptions' ? 'boolean' : 'string') as 'string' | 'number' | 'date' | 'boolean'
-        }));
+        console.log('📋 Enhanced records for grid (preserving data types):', items.slice(0, 1)); // Log first item for debugging
+        
+        // Convert columns to UltimateEnterpriseGrid format using actual data columns
+        const actualDataColumns = dataset.columns || [];
+        const metadataColumns = [
+            RecordsColumns.RecordKey,
+            RecordsColumns.RecordCanSelect,
+            RecordsColumns.RecordSelected,
+            ItemsColumns.ItemKey,
+            ItemsColumns.ItemCanSelect,
+            ItemsColumns.ItemSelected
+        ];
+        
+        const gridColumns = actualDataColumns
+            .filter(col => !metadataColumns.includes(col.name as any))
+            .map(col => {
+                console.log(`🔧 Processing column: ${col.name} (${col.displayName}) - Type: ${col.dataType}`);
+                
+                // Get default column width from manifest property, fallback to visualSizeFactor or default
+                const defaultWidth = context.parameters.DefaultColumnWidth?.raw || 150;
+                const columnWidth = col.visualSizeFactor > 0 ? col.visualSizeFactor * 100 : defaultWidth;
+                
+                // Check if column resizing is enabled globally and per-column
+                const globalResizeEnabled = context.parameters.EnableColumnResizing?.raw ?? true;
+                const columnResizable = globalResizeEnabled; // Could be extended to check per-column settings from columns dataset
+                
+                return {
+                    key: col.name,
+                    name: col.displayName,
+                    fieldName: col.name,
+                    minWidth: Math.max(columnWidth * 0.5, 50), // Minimum 50px or half the default width
+                    maxWidth: columnWidth * 3, // Maximum 3x the default width
+                    isResizable: columnResizable,
+                    filterable: true,
+                    sortable: true,
+                    editable: this.enableInlineEditing,
+                    dataType: (col.dataType === 'DateAndTime.DateOnly' ? 'date' : 
+                              col.dataType === 'DateAndTime.DateAndTime' ? 'date' : // Map datetime to date for now
+                              col.dataType === 'Whole.None' ? 'number' : 
+                              col.dataType === 'Decimal' ? 'number' :
+                              col.dataType === 'Currency' ? 'number' : // Map currency to number for now
+                              col.dataType === 'TwoOptions' ? 'boolean' : 'string') as 'string' | 'number' | 'date' | 'boolean',
+                    // Add PCF-specific properties for proper data access
+                    pcfDataType: col.dataType,
+                    pcfColumnName: col.name
+                };
+            });
+            
+        console.log(`✅ Final grid columns: ${gridColumns.length}`, gridColumns.map(c => c.name));
 
         // Create a wrapper for handleCellEdit to match the expected signature
         const onCellEditWrapper = (item: any, column: any, newValue: any) => {
@@ -391,7 +499,8 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         const grid = React.createElement(UltimateEnterpriseGrid, {
             items,
             columns: gridColumns,
-            height: 600,
+            height: context.mode.allocatedHeight > 0 ? context.mode.allocatedHeight : 400,
+            width: context.mode.allocatedWidth > 0 ? context.mode.allocatedWidth : '100%',
             enableVirtualization: true,
             virtualizationThreshold: 100,
             enableInlineEditing: this.enableInlineEditing,
@@ -400,6 +509,16 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             enablePerformanceMonitoring: this.enablePerformanceMonitoring,
             enableChangeTracking: true,
             onCellEdit: onCellEditWrapper,
+            getColumnDataType: (columnKey: string) => {
+                const column = gridColumns.find(col => col.key === columnKey);
+                const dataType = column?.dataType || 'string';
+                // Map the data types to match the expected return types
+                if (dataType === 'string') return 'text';
+                if (dataType === 'number') return 'number';
+                if (dataType === 'date') return 'date';
+                if (dataType === 'boolean') return 'boolean';
+                return 'text';
+            },
         });
 
         const pagingChanged =
@@ -552,12 +671,16 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         this.selection.setChangeEvents(false);
         this.selection.setAllSelected(false);
         const recordProps = this.getRecordPropertyNames();
-        this.sortedRecordsIds.forEach((s) => {
-            const item = this.records[s];
-            if (item && item.getValue(recordProps.selected) === true) {
-                this.selection.setKeySelected(getRecordKey(item), true, false);
-            }
-        });
+        
+        // Skip selection if metadata columns are not available
+        if (recordProps.selected) {
+            this.sortedRecordsIds.forEach((s) => {
+                const item = this.records[s];
+                if (item && item.getValue(recordProps.selected) === true) {
+                    this.selection.setKeySelected(getRecordKey(item), true, false);
+                }
+            });
+        }
 
         this.selection.setChangeEvents(true);
         this.onSelectionChanged();
@@ -585,7 +708,14 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             this.eventName = OutputEvents.CellAction;
             this.eventColumn = column.fieldName;
             const recordProps = this.getRecordPropertyNames();
-            let rowKey = item.getValue(recordProps.key);
+            let rowKey: string | null = null;
+            
+            // Try to get row key from metadata column if available
+            if (recordProps.key) {
+                const keyValue = item.getValue(recordProps.key);
+                rowKey = keyValue?.toString() || null;
+            }
+            
             if (rowKey === null) {
                 // Custom Row Id column is not set, so just use row index
                 rowKey = this.sortedRecordsIds.indexOf(item.getRecordId()).toString();
@@ -689,7 +819,10 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         let selectable = true;
         if (item) {
             const recordProps = this.getRecordPropertyNames();
-            selectable = (item as DataSet).getValue(recordProps.canSelect) !== false;
+            // Only check if canSelect property is available
+            if (recordProps.canSelect) {
+                selectable = (item as DataSet).getValue(recordProps.canSelect) !== false;
+            }
         }
 
         return selectable;

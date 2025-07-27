@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types */
-import { DefaultButton, FontIcon, IColumn, IconButton, Image, IRawStyle, Link, mergeStyles } from '@fluentui/react';
+import { DefaultButton, IColumn, Image, IRawStyle, Link, mergeStyles } from '@fluentui/react';
 import * as React from 'react';
 import { IGridColumn } from './Component.types';
 import { DatasetArray } from './DatasetArrayItem';
@@ -267,7 +267,7 @@ function getImageTag(imageData: string, column: IGridColumn, iconColor: string) 
             color: iconColor + CSS_IMPORTANT,
             fontSize: fontSize,
         });
-        buttonContent = <FontIcon iconName={iconName} className={iconColorClass} aria-hidden="true" />;
+        buttonContent = <span className={iconColorClass} aria-hidden="true">●</span>;
     } else if (imageData.startsWith('data:') || imageData.startsWith('https:')) {
         const imageSize = column.imageWidth || 32;
         buttonContent = <Image src={imageData} width={imageSize} />;
@@ -285,11 +285,11 @@ function getExpandIconCell(
             (item as ComponentFramework.PropertyHelper.DataSetApi.EntityRecord).getValue(column.fieldName) === true;
         const icon = expanded ? 'ChevronUp' : 'ChevronDown';
         return (
-            <IconButton
+            <DefaultButton
                 className={ClassNames.expandIcon}
                 ariaLabel={expanded ? 'Collapse' : 'Expand'}
                 data-is-focusable={true}
-                iconProps={{ iconName: icon }}
+                text={expanded ? '▲' : '▼'}
                 onClick={cellNavigation}
             />
         );
