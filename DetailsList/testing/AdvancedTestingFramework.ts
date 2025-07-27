@@ -39,29 +39,29 @@ export class AdvancedTestingFramework {
     public async measurePerformance<T>(
         testName: string,
         testFunction: () => Promise<T>,
-        iterations = 5
+        iterations = 5,
     ): Promise<{ result: T; metrics: any }> {
         const measurements: number[] = [];
         let result: T;
 
         for (let i = 0; i < iterations; i++) {
             const startTime = performance.now();
-            
+
             // Clear any existing performance marks
             performance.clearMarks();
             performance.clearMeasures();
-            
+
             result = await testFunction();
-            
+
             const endTime = performance.now();
             measurements.push(endTime - startTime);
-            
+
             // Allow for garbage collection between iterations
             if (global.gc) {
                 global.gc();
             }
-            
-            await new Promise(resolve => setTimeout(resolve, 100));
+
+            await new Promise((resolve) => setTimeout(resolve, 100));
         }
 
         this.performanceMetrics.set(testName, measurements);
@@ -72,7 +72,7 @@ export class AdvancedTestingFramework {
             max: Math.max(...measurements),
             median: this.calculateMedian(measurements),
             standardDeviation: this.calculateStandardDeviation(measurements),
-            percentile95: this.calculatePercentile(measurements, 95)
+            percentile95: this.calculatePercentile(measurements, 95),
         };
 
         return { result: result!, metrics };
@@ -81,7 +81,7 @@ export class AdvancedTestingFramework {
     // Memory Leak Detection
     public async detectMemoryLeaks(
         componentRender: () => any,
-        iterations = 10
+        iterations = 10,
     ): Promise<{
         hasLeak: boolean;
         memoryGrowth: number;
@@ -92,17 +92,17 @@ export class AdvancedTestingFramework {
 
         for (let i = 0; i < iterations; i++) {
             const { unmount } = componentRender();
-            
+
             // Force cleanup
             unmount();
-            
+
             // Force garbage collection if available
             if (global.gc) {
                 global.gc();
             }
-            
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
+
+            await new Promise((resolve) => setTimeout(resolve, 100));
+
             const currentHeap = this.getHeapUsage();
             measurements.push(currentHeap);
         }
@@ -118,21 +118,18 @@ export class AdvancedTestingFramework {
                 initialHeap,
                 finalHeap,
                 measurements,
-                average: measurements.reduce((sum, val) => sum + val, 0) / measurements.length
-            }
+                average: measurements.reduce((sum, val) => sum + val, 0) / measurements.length,
+            },
         };
     }
 
     // Visual Regression Testing
-    public async visualRegressionTest(
-        componentName: string,
-        scenarios: ITestScenario[]
-    ): Promise<boolean> {
+    public async visualRegressionTest(componentName: string, scenarios: ITestScenario[]): Promise<boolean> {
         for (const scenario of scenarios) {
             const { container } = render(
-                React.createElement('div', { 
-                    'data-testid': `${componentName}-${scenario.name}` 
-                })
+                React.createElement('div', {
+                    'data-testid': `${componentName}-${scenario.name}`,
+                }),
             );
 
             // Wait for component to stabilize
@@ -153,7 +150,8 @@ export class AdvancedTestingFramework {
             const baseline = await this.loadBaseline(componentName, scenario.name);
             const diff = await this.compareImages(baseline, screenshot);
 
-            if (diff.mismatchPercentage > 0.1) { // 0.1% threshold
+            if (diff.mismatchPercentage > 0.1) {
+                // 0.1% threshold
                 console.error(`Visual regression detected in ${componentName}-${scenario.name}:`, diff);
                 return false;
             }
@@ -165,7 +163,7 @@ export class AdvancedTestingFramework {
     // Accessibility Testing (WCAG compliance)
     public async testAccessibility(
         container: HTMLElement,
-        config: IAccessibilityTestConfig
+        config: IAccessibilityTestConfig,
     ): Promise<{
         passed: boolean;
         violations: any[];
@@ -197,7 +195,7 @@ export class AdvancedTestingFramework {
         return {
             passed: violations.length === 0,
             violations,
-            warnings
+            warnings,
         };
     }
 
@@ -205,7 +203,7 @@ export class AdvancedTestingFramework {
     public async loadTest(
         testFunction: () => Promise<void>,
         concurrentUsers: number,
-        duration: number
+        duration: number,
     ): Promise<{
         throughput: number;
         averageResponseTime: number;
@@ -225,14 +223,14 @@ export class AdvancedTestingFramework {
         await Promise.all(promises);
 
         const totalRequests = results.length;
-        const successfulRequests = results.filter(r => r.success).length;
-        const responseTimes = results.map(r => r.responseTime);
+        const successfulRequests = results.filter((r) => r.success).length;
+        const responseTimes = results.map((r) => r.responseTime);
 
         return {
             throughput: totalRequests / (duration / 1000),
             averageResponseTime: responseTimes.reduce((sum, time) => sum + time, 0) / responseTimes.length,
             errorRate: (totalRequests - successfulRequests) / totalRequests,
-            maxResponseTime: Math.max(...responseTimes)
+            maxResponseTime: Math.max(...responseTimes),
         };
     }
 
@@ -243,7 +241,7 @@ export class AdvancedTestingFramework {
             description: string;
             action: () => Promise<void>;
             verification: () => Promise<void>;
-        }>
+        }>,
     ): Promise<boolean> {
         console.log(`Starting E2E test: ${testName}`);
 
@@ -267,7 +265,7 @@ export class AdvancedTestingFramework {
     // Cross-browser Testing Utilities
     public async crossBrowserTest(
         testFunction: () => Promise<void>,
-        browsers: string[] = ['chrome', 'firefox', 'safari', 'edge']
+        browsers: string[] = ['chrome', 'firefox', 'safari', 'edge'],
     ): Promise<Map<string, boolean>> {
         const results = new Map<string, boolean>();
 
@@ -289,7 +287,7 @@ export class AdvancedTestingFramework {
     // Data-driven Testing
     public async dataDriverTest<T>(
         testFunction: (data: T) => Promise<void>,
-        testData: T[]
+        testData: T[],
     ): Promise<{
         passed: number;
         failed: number;
@@ -317,7 +315,7 @@ export class AdvancedTestingFramework {
     public async fuzzTest(
         targetFunction: (input: any) => any,
         inputGenerator: () => any,
-        iterations = 1000
+        iterations = 1000,
     ): Promise<{
         crashes: number;
         errors: any[];
@@ -331,7 +329,7 @@ export class AdvancedTestingFramework {
             try {
                 const input = inputGenerator();
                 const result = await targetFunction(input);
-                
+
                 // Track execution path (simplified)
                 const pathId = this.generatePathId(input, result);
                 executedPaths.add(pathId);
@@ -346,7 +344,7 @@ export class AdvancedTestingFramework {
         return {
             crashes,
             errors,
-            coverage: executedPaths.size / iterations
+            coverage: executedPaths.size / iterations,
         };
     }
 
@@ -354,14 +352,12 @@ export class AdvancedTestingFramework {
     private calculateMedian(numbers: number[]): number {
         const sorted = [...numbers].sort((a, b) => a - b);
         const mid = Math.floor(sorted.length / 2);
-        return sorted.length % 2 === 0 
-            ? (sorted[mid - 1] + sorted[mid]) / 2 
-            : sorted[mid];
+        return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
     }
 
     private calculateStandardDeviation(numbers: number[]): number {
         const avg = numbers.reduce((sum, val) => sum + val, 0) / numbers.length;
-        const squaredDiffs = numbers.map(val => Math.pow(val - avg, 2));
+        const squaredDiffs = numbers.map((val) => Math.pow(val - avg, 2));
         const avgSquaredDiff = squaredDiffs.reduce((sum, val) => sum + val, 0) / squaredDiffs.length;
         return Math.sqrt(avgSquaredDiff);
     }
@@ -386,7 +382,7 @@ export class AdvancedTestingFramework {
     private async simulateUser(
         testFunction: () => Promise<void>,
         duration: number,
-        results: Array<{ success: boolean; responseTime: number }>
+        results: Array<{ success: boolean; responseTime: number }>,
     ): Promise<void> {
         const endTime = Date.now() + duration;
 
@@ -396,17 +392,17 @@ export class AdvancedTestingFramework {
                 await testFunction();
                 results.push({
                     success: true,
-                    responseTime: Date.now() - startTime
+                    responseTime: Date.now() - startTime,
                 });
             } catch (error) {
                 results.push({
                     success: false,
-                    responseTime: Date.now() - startTime
+                    responseTime: Date.now() - startTime,
                 });
             }
 
             // Small delay between requests
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise((resolve) => setTimeout(resolve, 100));
         }
     }
 
@@ -443,16 +439,16 @@ export class AdvancedTestingFramework {
     private async checkKeyboardNavigation(container: HTMLElement): Promise<any[]> {
         // Test keyboard navigation
         const violations: any[] = [];
-        
+
         // Check for keyboard focusable elements
         const focusableElements = container.querySelectorAll(
-            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
         );
 
         if (focusableElements.length === 0) {
             violations.push({
                 type: 'keyboard-navigation',
-                message: 'No keyboard focusable elements found'
+                message: 'No keyboard focusable elements found',
             });
         }
 
@@ -462,14 +458,14 @@ export class AdvancedTestingFramework {
     private async checkScreenReaderCompatibility(container: HTMLElement): Promise<any[]> {
         // Check ARIA labels, roles, etc.
         const violations: any[] = [];
-        
+
         // Check for missing alt text on images
         const images = container.querySelectorAll('img');
         images.forEach((img, index) => {
             if (!img.getAttribute('alt') && !img.getAttribute('aria-label')) {
                 violations.push({
                     type: 'screen-reader',
-                    message: `Image ${index} missing alt text or aria-label`
+                    message: `Image ${index} missing alt text or aria-label`,
                 });
             }
         });
@@ -499,55 +495,47 @@ export class FilteredDetailsListTestUtils {
 
     public async testLargeDatasetPerformance(itemCount: number): Promise<any> {
         const data = this.generateTestData(itemCount);
-        
-        return await this.framework.measurePerformance(
-            `large-dataset-${itemCount}`,
-            async () => {
-                const { container } = render(
-                    React.createElement('div', { 'data-testid': 'grid' })
-                );
-                
-                // Simulate rendering large dataset
-                await waitFor(() => {
-                    expect(screen.getByTestId('grid')).toBeInTheDocument();
-                });
-                
-                return container;
-            }
-        );
+
+        return await this.framework.measurePerformance(`large-dataset-${itemCount}`, async () => {
+            const { container } = render(React.createElement('div', { 'data-testid': 'grid' }));
+
+            // Simulate rendering large dataset
+            await waitFor(() => {
+                expect(screen.getByTestId('grid')).toBeInTheDocument();
+            });
+
+            return container;
+        });
     }
 
     public async testFilteringPerformance(itemCount: number, filterCount: number): Promise<any> {
         const data = this.generateTestData(itemCount);
         const filters = this.generateTestFilters(filterCount);
-        
+
         return await this.framework.measurePerformance(
             `filtering-${itemCount}-items-${filterCount}-filters`,
             async () => {
                 // Simulate applying multiple filters
                 await act(async () => {
-                    filters.forEach(filter => {
+                    filters.forEach((filter) => {
                         // Apply filter logic
                     });
                 });
-            }
+            },
         );
     }
 
     public async testScrollingPerformance(): Promise<any> {
-        return await this.framework.measurePerformance(
-            'scrolling-performance',
-            async () => {
-                const user = userEvent.setup();
-                const container = screen.getByTestId('grid');
-                
-                // Simulate scroll events
-                for (let i = 0; i < 100; i++) {
-                    fireEvent.scroll(container, { target: { scrollTop: i * 50 } });
-                    await new Promise(resolve => setTimeout(resolve, 16)); // 60fps
-                }
+        return await this.framework.measurePerformance('scrolling-performance', async () => {
+            const user = userEvent.setup();
+            const container = screen.getByTestId('grid');
+
+            // Simulate scroll events
+            for (let i = 0; i < 100; i++) {
+                fireEvent.scroll(container, { target: { scrollTop: i * 50 } });
+                await new Promise((resolve) => setTimeout(resolve, 16)); // 60fps
             }
-        );
+        });
     }
 
     private generateTestData(count: number): any[] {
@@ -557,7 +545,7 @@ export class FilteredDetailsListTestUtils {
             value: Math.random() * 1000,
             category: `Category ${index % 10}`,
             date: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000),
-            isActive: Math.random() > 0.5
+            isActive: Math.random() > 0.5,
         }));
     }
 
@@ -565,7 +553,7 @@ export class FilteredDetailsListTestUtils {
         return Array.from({ length: count }, (_, index) => ({
             column: ['name', 'value', 'category'][index % 3],
             operator: 'contains',
-            value: `test${index}`
+            value: `test${index}`,
         }));
     }
 
@@ -586,29 +574,27 @@ export class FilteredDetailsListTestUtils {
             performance,
             accessibility,
             functionality,
-            compatibility
+            compatibility,
         };
     }
 
     private async runPerformanceTests(): Promise<any> {
-        const results = {
+        return {
             largeDataset: await this.testLargeDatasetPerformance(10000),
             filtering: await this.testFilteringPerformance(5000, 10),
-            scrolling: await this.testScrollingPerformance()
+            scrolling: await this.testScrollingPerformance(),
         };
-
-        return results;
     }
 
     private async runAccessibilityTests(): Promise<any> {
         const { container } = render(React.createElement('div'));
-        
+
         return await this.framework.testAccessibility(container, {
             checkContrast: true,
             checkKeyboardNavigation: true,
             checkScreenReader: true,
             checkFocus: true,
-            wcagLevel: 'AA'
+            wcagLevel: 'AA',
         });
     }
 
@@ -618,7 +604,7 @@ export class FilteredDetailsListTestUtils {
             filtering: await this.testFilteringFunctionality(),
             sorting: await this.testSortingFunctionality(),
             selection: await this.testSelectionFunctionality(),
-            virtualization: await this.testVirtualizationFunctionality()
+            virtualization: await this.testVirtualizationFunctionality(),
         };
     }
 

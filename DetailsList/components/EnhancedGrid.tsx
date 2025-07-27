@@ -58,11 +58,11 @@ interface IEnhancedGridProps extends IFilteredDetailsListProps {
     enableDataExport?: boolean;
     enablePlugins?: boolean;
     plugins?: string[];
-    
+
     // Size properties
     width?: number;
     height?: number;
-    
+
     // Enterprise features
     enablePerformanceMonitoring?: boolean;
     enableAIInsights?: boolean;
@@ -84,11 +84,11 @@ export const EnhancedGrid: React.FC<IEnhancedGridProps> = ({
     enableDataExport = true,
     enablePlugins = true,
     plugins = [],
-    
+
     // Size properties
     width,
     height,
-    
+
     // Enterprise features
     enablePerformanceMonitoring = true,
     enableAIInsights = false,
@@ -131,9 +131,9 @@ export const EnhancedGrid: React.FC<IEnhancedGridProps> = ({
     const { announce, handleKeyDown } = useAccessibility();
 
     // Enterprise feature hooks
-    const columnNames = useMemo(() => columns.map(col => col.fieldName || col.key), [columns]);
+    const columnNames = useMemo(() => columns.map((col) => col.fieldName || col.key), [columns]);
     const aiInsights = enableAIInsights ? useAIInsights(data, columnNames) : null;
-    
+
     // Enterprise feature refs
     const collaborationEngineRef = useRef<CollaborationEngine | null>(null);
     const accessibilityManagerRef = useRef<AccessibilityManager | null>(null);
@@ -144,13 +144,13 @@ export const EnhancedGrid: React.FC<IEnhancedGridProps> = ({
 
     // Update columns when prop changes
     useEffect(() => {
-        console.log('🔄 COLUMNS UPDATE:', { 
+        console.log('🔄 COLUMNS UPDATE:', {
             newColumnsLength: columns?.length || 0,
             currentColumnsLength: currentColumns?.length || 0,
-            newColumns: columns?.map(c => c.fieldName || c.key || c.name),
-            hasChanged: JSON.stringify(columns) !== JSON.stringify(currentColumns)
+            newColumns: columns?.map((c) => c.fieldName || c.key || c.name),
+            hasChanged: JSON.stringify(columns) !== JSON.stringify(currentColumns),
         });
-        
+
         if (columns && columns.length > 0) {
             setCurrentColumns(columns);
         }
@@ -158,12 +158,12 @@ export const EnhancedGrid: React.FC<IEnhancedGridProps> = ({
 
     // Initialize data
     useEffect(() => {
-        console.log('Enhanced Grid data initialization:', { 
-            hasData: !!data, 
-            dataLength: data?.length || 0, 
-            sampleData: data?.slice(0, 2) 
+        console.log('Enhanced Grid data initialization:', {
+            hasData: !!data,
+            dataLength: data?.length || 0,
+            sampleData: data?.slice(0, 2),
         });
-        
+
         if (data && data.length > 0) {
             console.log('Setting data in GridStore:', data.length, 'items');
             setData(data);
@@ -263,7 +263,7 @@ export const EnhancedGrid: React.FC<IEnhancedGridProps> = ({
 
     // Enterprise features initialization
     useEffect(() => {
-        const endMeasurement = enablePerformanceMonitoring 
+        const endMeasurement = enablePerformanceMonitoring
             ? performanceMonitor.startMeasure('enhanced-grid-init')
             : () => {};
 
@@ -461,7 +461,9 @@ export const EnhancedGrid: React.FC<IEnhancedGridProps> = ({
             onColumnClick: (ev, clickedColumn) => {
                 const newSorting = {
                     column: clickedColumn.key,
-                    direction: (sorting.column === clickedColumn.key && sorting.direction === 'asc' ? 'desc' : 'asc') as 'asc' | 'desc',
+                    direction: (sorting.column === clickedColumn.key && sorting.direction === 'asc'
+                        ? 'desc'
+                        : 'asc') as 'asc' | 'desc',
                 };
                 setSorting(newSorting);
                 onSortChanged?.(newSorting);
@@ -478,7 +480,7 @@ export const EnhancedGrid: React.FC<IEnhancedGridProps> = ({
             displayDataLength: displayData?.length || 0,
             hasFilteredData: filteredData && filteredData.length > 0,
             sampleFilteredItem: filteredData?.[0],
-            sampleDisplayItem: displayData?.[0]
+            sampleDisplayItem: displayData?.[0],
         });
 
         console.log('=== ENHANCED GRID RENDER CONDITIONS ===');
@@ -498,18 +500,19 @@ export const EnhancedGrid: React.FC<IEnhancedGridProps> = ({
 
         if (enableVirtualization && filteredData.length > 0) {
             console.log('✅ USING VIRTUALIZED GRID - conditions met');
-            console.log('Using VirtualizedGrid with:', { 
-                itemCount: filteredData.length, 
+            console.log('Using VirtualizedGrid with:', {
+                itemCount: filteredData.length,
                 columnCount: enhancedColumns.length,
                 sampleItem: filteredData[0],
-                sampleColumn: enhancedColumns[0]
+                sampleColumn: enhancedColumns[0],
             });
-            
+
             // Calculate total width from columns
-            const totalWidth = enhancedColumns.reduce((sum, col) => 
-                sum + (col.calculatedWidth || col.minWidth || 100), 0
+            const totalWidth = enhancedColumns.reduce(
+                (sum, col) => sum + (col.calculatedWidth || col.minWidth || 100),
+                0,
             );
-            
+
             // Use AdvancedVirtualization if enabled, otherwise fallback to VirtualizedGrid
             // Temporarily disabled due to React compatibility issues
             /*
@@ -637,7 +640,7 @@ export const EnhancedGrid: React.FC<IEnhancedGridProps> = ({
                 );
             }
             */
-            
+
             return (
                 <DetailsList
                     items={filteredData}
@@ -655,11 +658,11 @@ export const EnhancedGrid: React.FC<IEnhancedGridProps> = ({
             );
         }
 
-        console.log('Using fallback DetailsList with:', { 
-            itemCount: displayData.length, 
+        console.log('Using fallback DetailsList with:', {
+            itemCount: displayData.length,
             columnCount: enhancedColumns.length,
             sampleItem: displayData[0],
-            sampleColumn: enhancedColumns[0]
+            sampleColumn: enhancedColumns[0],
         });
 
         return (

@@ -61,10 +61,8 @@ export class AIEngine {
     public detectAnomalies(data: any[], columns: string[]): IAIInsight[] {
         const anomalies: IAIInsight[] = [];
 
-        columns.forEach(column => {
-            const values = data
-                .map(item => parseFloat(item[column]))
-                .filter(val => !isNaN(val));
+        columns.forEach((column) => {
+            const values = data.map((item) => parseFloat(item[column])).filter((val) => !isNaN(val));
 
             if (values.length < 10) return; // Need minimum data for analysis
 
@@ -90,19 +88,19 @@ export class AIEngine {
                             value,
                             zScore,
                             mean,
-                            stdDev
+                            stdDev,
                         },
                         actions: [
                             {
                                 label: 'Highlight Row',
-                                action: () => this.highlightAnomalousRow(index)
+                                action: () => this.highlightAnomalousRow(index),
                             },
                             {
                                 label: 'Filter Similar Values',
-                                action: () => this.filterSimilarValues(column, value, stdDev)
-                            }
+                                action: () => this.filterSimilarValues(column, value, stdDev),
+                            },
                         ],
-                        timestamp: Date.now()
+                        timestamp: Date.now(),
                     });
                 }
             });
@@ -115,7 +113,7 @@ export class AIEngine {
     public analyzePatterns(data: any[], columns: string[]): IAIInsight[] {
         const patterns: IAIInsight[] = [];
 
-        columns.forEach(column => {
+        columns.forEach((column) => {
             const timeSeries = this.extractTimeSeries(data, column);
             if (timeSeries.length < 5) return;
 
@@ -135,19 +133,19 @@ export class AIEngine {
                         column,
                         trend: trend.direction,
                         strength: trend.strength,
-                        slope: trend.slope
+                        slope: trend.slope,
                     },
                     actions: [
                         {
                             label: 'Show Trend Line',
-                            action: () => this.showTrendVisualization(column, trend)
+                            action: () => this.showTrendVisualization(column, trend),
                         },
                         {
                             label: 'Predict Future Values',
-                            action: () => this.predictFutureValues(column, trend)
-                        }
+                            action: () => this.predictFutureValues(column, trend),
+                        },
                     ],
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
                 });
             }
 
@@ -162,9 +160,9 @@ export class AIEngine {
                     data: {
                         column,
                         period: seasonality.period,
-                        strength: seasonality.strength
+                        strength: seasonality.strength,
                     },
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
                 });
             }
         });
@@ -183,8 +181,8 @@ export class AIEngine {
         }
 
         // Suggest filters based on data distribution
-        Object.keys(data[0] || {}).forEach(column => {
-            const values = data.map(item => item[column]);
+        Object.keys(data[0] || {}).forEach((column) => {
+            const values = data.map((item) => item[column]);
             const distribution = this.analyzeValueDistribution(values);
 
             // Suggest filtering outliers
@@ -194,7 +192,7 @@ export class AIEngine {
                     operator: 'not_in',
                     value: distribution.outliers,
                     confidence: 0.7,
-                    reasoning: `Remove ${distribution.outliers.length} outlier values to focus on main data`
+                    reasoning: `Remove ${distribution.outliers.length} outlier values to focus on main data`,
                 });
             }
 
@@ -203,9 +201,9 @@ export class AIEngine {
                 suggestions.push({
                     column,
                     operator: 'in',
-                    value: distribution.topValues.slice(0, 3).map(v => v.value),
+                    value: distribution.topValues.slice(0, 3).map((v) => v.value),
                     confidence: 0.8,
-                    reasoning: `Focus on top ${Math.min(3, distribution.topValues.length)} most common values`
+                    reasoning: `Focus on top ${Math.min(3, distribution.topValues.length)} most common values`,
                 });
             }
         });
@@ -220,10 +218,8 @@ export class AIEngine {
         const correlations: any[] = [];
 
         // Trend analysis
-        columns.forEach(column => {
-            const values = data
-                .map(item => parseFloat(item[column]))
-                .filter(val => !isNaN(val));
+        columns.forEach((column) => {
+            const values = data.map((item) => parseFloat(item[column])).filter((val) => !isNaN(val));
 
             if (values.length >= 5) {
                 const trend = this.detectTrend(values.map((val, idx) => ({ x: idx, y: val })));
@@ -233,22 +229,22 @@ export class AIEngine {
                     column,
                     direction: trend.direction,
                     confidence: trend.strength,
-                    prediction
+                    prediction,
                 });
             }
         });
 
         // Outlier detection
-        columns.forEach(column => {
+        columns.forEach((column) => {
             const anomalies = this.detectAnomalies(data, [column]);
-            anomalies.forEach(anomaly => {
+            anomalies.forEach((anomaly) => {
                 if (anomaly.type === 'anomaly') {
                     outliers.push({
                         rowId: anomaly.data.rowIndex.toString(),
                         column,
                         value: anomaly.data.value,
                         expectedValue: anomaly.data.mean,
-                        deviation: anomaly.data.zScore
+                        deviation: anomaly.data.zScore,
                     });
                 }
             });
@@ -257,8 +253,8 @@ export class AIEngine {
         // Correlation analysis
         for (let i = 0; i < columns.length; i++) {
             for (let j = i + 1; j < columns.length; j++) {
-                const col1Values = data.map(item => parseFloat(item[columns[i]])).filter(val => !isNaN(val));
-                const col2Values = data.map(item => parseFloat(item[columns[j]])).filter(val => !isNaN(val));
+                const col1Values = data.map((item) => parseFloat(item[columns[i]])).filter((val) => !isNaN(val));
+                const col2Values = data.map((item) => parseFloat(item[columns[j]])).filter((val) => !isNaN(val));
 
                 if (col1Values.length === col2Values.length && col1Values.length >= 10) {
                     const correlation = this.calculateCorrelation(col1Values, col2Values);
@@ -269,7 +265,7 @@ export class AIEngine {
                             column1: columns[i],
                             column2: columns[j],
                             correlation,
-                            significance
+                            significance,
                         });
                     }
                 }
@@ -280,14 +276,17 @@ export class AIEngine {
     }
 
     // Natural Language Query Processing
-    public processNaturalLanguageQuery(query: string, data: any[]): {
+    public processNaturalLanguageQuery(
+        query: string,
+        data: any[],
+    ): {
         filters: ISmartFilter[];
         confidence: number;
         interpretation: string;
     } {
         const lowercaseQuery = query.toLowerCase();
         const filters: ISmartFilter[] = [];
-        
+
         // Simple NLP patterns (in a real implementation, use a proper NLP library)
         const patterns = [
             {
@@ -298,9 +297,9 @@ export class AIEngine {
                         operator: 'greater_than',
                         value: parseFloat(matches[4]),
                         confidence: 0.9,
-                        reasoning: `Filter ${matches[2]} for values greater than ${matches[4]}`
+                        reasoning: `Filter ${matches[2]} for values greater than ${matches[4]}`,
                     });
-                }
+                },
             },
             {
                 pattern: /find (\w+) containing "([^"]+)"/,
@@ -310,25 +309,28 @@ export class AIEngine {
                         operator: 'contains',
                         value: matches[2],
                         confidence: 0.85,
-                        reasoning: `Search for ${matches[1]} containing "${matches[2]}"`
+                        reasoning: `Search for ${matches[1]} containing "${matches[2]}"`,
                     });
-                }
+                },
             },
             {
                 pattern: /top (\d+) (\w+)/,
                 handler: (matches: RegExpMatchArray) => {
                     const count = parseInt(matches[1]);
                     const column = matches[2];
-                    const values = data.map(item => item[column]).sort((a, b) => b - a).slice(0, count);
+                    const values = data
+                        .map((item) => item[column])
+                        .sort((a, b) => b - a)
+                        .slice(0, count);
                     filters.push({
                         column,
                         operator: 'in',
                         value: values,
                         confidence: 0.8,
-                        reasoning: `Show top ${count} values in ${column}`
+                        reasoning: `Show top ${count} values in ${column}`,
                     });
-                }
-            }
+                },
+            },
         ];
 
         let confidence = 0;
@@ -359,9 +361,9 @@ export class AIEngine {
         return data
             .map((item, index) => ({
                 x: index,
-                y: parseFloat(item[column])
+                y: parseFloat(item[column]),
             }))
-            .filter(point => !isNaN(point.y));
+            .filter((point) => !isNaN(point.y));
     }
 
     private detectTrend(timeSeries: Array<{ x: number; y: number }>) {
@@ -384,14 +386,14 @@ export class AIEngine {
             const predicted = slope * point.x + intercept;
             return sum + Math.pow(point.y - predicted, 2);
         }, 0);
-        const rSquared = 1 - (ssResidual / ssTotal);
+        const rSquared = 1 - ssResidual / ssTotal;
 
         const direction = slope > 0 ? 'increasing' : slope < 0 ? 'decreasing' : 'stable';
-        
+
         return {
             direction,
             strength: Math.abs(rSquared),
-            slope
+            slope,
         };
     }
 
@@ -411,7 +413,7 @@ export class AIEngine {
 
         return {
             period: bestPeriod,
-            strength: bestCorrelation
+            strength: bestCorrelation,
         };
     }
 
@@ -423,20 +425,20 @@ export class AIEngine {
     private calculateAutocorrelation(timeSeries: Array<{ x: number; y: number }>, lag: number): number {
         if (lag >= timeSeries.length) return 0;
 
-        const values = timeSeries.map(point => point.y);
+        const values = timeSeries.map((point) => point.y);
         const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
-        
+
         let numerator = 0;
         let denominator = 0;
-        
+
         for (let i = 0; i < values.length - lag; i++) {
             numerator += (values[i] - mean) * (values[i + lag] - mean);
         }
-        
+
         for (let i = 0; i < values.length; i++) {
             denominator += Math.pow(values[i] - mean, 2);
         }
-        
+
         return denominator === 0 ? 0 : numerator / denominator;
     }
 
@@ -469,21 +471,18 @@ export class AIEngine {
 
     private analyzeValueDistribution(values: any[]) {
         const frequency = new Map<any, number>();
-        values.forEach(val => {
+        values.forEach((val) => {
             frequency.set(val, (frequency.get(val) || 0) + 1);
         });
 
-        const sortedByFrequency = Array.from(frequency.entries())
-            .sort((a, b) => b[1] - a[1]);
+        const sortedByFrequency = Array.from(frequency.entries()).sort((a, b) => b[1] - a[1]);
 
-        const numericValues = values
-            .map(val => parseFloat(val))
-            .filter(val => !isNaN(val));
+        const numericValues = values.map((val) => parseFloat(val)).filter((val) => !isNaN(val));
 
         let outliers: any[] = [];
         if (numericValues.length > 0) {
             const { mean, stdDev } = this.calculateStatistics(numericValues);
-            outliers = values.filter(val => {
+            outliers = values.filter((val) => {
                 const num = parseFloat(val);
                 return !isNaN(num) && Math.abs(num - mean) > 2 * stdDev;
             });
@@ -493,7 +492,7 @@ export class AIEngine {
             topValues: sortedByFrequency.slice(0, 5).map(([value, count]) => ({ value, count })),
             outliers,
             uniqueCount: frequency.size,
-            totalCount: values.length
+            totalCount: values.length,
         };
     }
 
@@ -533,7 +532,7 @@ export class AIEngine {
     }
 
     private notifyInsightCallbacks() {
-        this.insightCallbacks.forEach(callback => callback(this.insights));
+        this.insightCallbacks.forEach((callback) => callback(this.insights));
     }
 
     public getInsights(): IAIInsight[] {
@@ -565,16 +564,16 @@ export const useAIInsights = (data: any[], columns: string[]) => {
         if (data.length === 0 || columns.length === 0) return;
 
         setIsAnalyzing(true);
-        
+
         try {
             // Run analysis in chunks to avoid blocking the UI
-            const anomalies = await new Promise<IAIInsight[]>(resolve => {
+            const anomalies = await new Promise<IAIInsight[]>((resolve) => {
                 setTimeout(() => {
                     resolve(aiEngine.detectAnomalies(data, columns));
                 }, 0);
             });
 
-            const patterns = await new Promise<IAIInsight[]>(resolve => {
+            const patterns = await new Promise<IAIInsight[]>((resolve) => {
                 setTimeout(() => {
                     resolve(aiEngine.analyzePatterns(data, columns));
                 }, 0);
@@ -594,6 +593,6 @@ export const useAIInsights = (data: any[], columns: string[]) => {
         suggestFilters: (userContext?: any) => aiEngine.suggestSmartFilters(data, userContext),
         processNaturalLanguage: (query: string) => aiEngine.processNaturalLanguageQuery(query, data),
         generatePredictions: () => aiEngine.generatePredictions(data, columns),
-        clearInsights: () => aiEngine.clearInsights()
+        clearInsights: () => aiEngine.clearInsights(),
     };
 };

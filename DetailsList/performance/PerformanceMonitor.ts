@@ -42,13 +42,13 @@ export class PerformanceMonitor {
 
         // Web Vitals monitoring (Google's Core Web Vitals)
         this.initializeWebVitals();
-        
+
         // Frame rate monitoring (60fps target like React DevTools)
         this.initializeFrameRateMonitor();
-        
+
         // Memory usage monitoring (Chrome DevTools style)
         this.initializeMemoryMonitor();
-        
+
         // Custom performance marks (similar to React Profiler)
         this.initializeCustomMarks();
     }
@@ -62,8 +62,8 @@ export class PerformanceMonitor {
                 });
             });
 
-            this.observer.observe({ 
-                entryTypes: ['paint', 'largest-contentful-paint', 'first-input', 'layout-shift', 'measure'] 
+            this.observer.observe({
+                entryTypes: ['paint', 'largest-contentful-paint', 'first-input', 'layout-shift', 'measure'],
             });
         }
     }
@@ -71,21 +71,22 @@ export class PerformanceMonitor {
     private initializeFrameRateMonitor() {
         let lastTime = performance.now();
         let frameCount = 0;
-        
+
         const measureFrameRate = () => {
             const currentTime = performance.now();
             frameCount++;
-            
-            if (currentTime - lastTime >= 1000) { // Every second
+
+            if (currentTime - lastTime >= 1000) {
+                // Every second
                 const fps = Math.round((frameCount * 1000) / (currentTime - lastTime));
                 this.recordMetric('frameRate', fps);
                 frameCount = 0;
                 lastTime = currentTime;
             }
-            
+
             this.frameRateMonitor = requestAnimationFrame(measureFrameRate);
         };
-        
+
         measureFrameRate();
     }
 
@@ -109,12 +110,12 @@ export class PerformanceMonitor {
     public startMeasure(name: string): () => void {
         const startMark = `${name}-start`;
         performance.mark(startMark);
-        
+
         return () => {
             const endMark = `${name}-end`;
             performance.mark(endMark);
             performance.measure(name, startMark, endMark);
-            
+
             const measure = performance.getEntriesByName(name, 'measure')[0];
             if (measure) {
                 this.recordMetric(name, measure.duration);
@@ -157,10 +158,10 @@ export class PerformanceMonitor {
     public recordMetric(name: string, value: number) {
         const currentMetrics = this.getCurrentMetrics();
         (currentMetrics as any)[name] = value;
-        
+
         // Alert if threshold exceeded
         this.checkThresholds(name, value);
-        
+
         // Sample rate limiting
         if (Math.random() < this.config.sampleRate) {
             this.metrics.push({ ...currentMetrics });
@@ -183,15 +184,15 @@ export class PerformanceMonitor {
 
     private checkThresholds(metricName: string, value: number) {
         const thresholds = this.config.alertThresholds;
-        
+
         if (metricName === 'renderTime' && value > thresholds.renderTime) {
             console.warn(`Performance Alert: Render time ${value}ms exceeds threshold ${thresholds.renderTime}ms`);
         }
-        
+
         if (metricName === 'memoryUsage' && value > thresholds.memoryUsage) {
             console.warn(`Performance Alert: Memory usage ${value}% exceeds threshold ${thresholds.memoryUsage}%`);
         }
-        
+
         if (metricName === 'frameRate' && value < thresholds.frameRate) {
             console.warn(`Performance Alert: Frame rate ${value}fps below threshold ${thresholds.frameRate}fps`);
         }
@@ -203,18 +204,18 @@ export class PerformanceMonitor {
 
     public getAverageMetrics(): IPerformanceMetrics {
         if (this.metrics.length === 0) return this.getCurrentMetrics();
-        
+
         const totals = this.metrics.reduce((acc, metric) => {
-            Object.keys(metric).forEach(key => {
+            Object.keys(metric).forEach((key) => {
                 acc[key] = (acc[key] || 0) + (metric as any)[key];
             });
             return acc;
         }, {} as any);
-        
-        Object.keys(totals).forEach(key => {
+
+        Object.keys(totals).forEach((key) => {
             totals[key] = totals[key] / this.metrics.length;
         });
-        
+
         return totals;
     }
 
@@ -226,9 +227,9 @@ export class PerformanceMonitor {
             averageMetrics: averages,
             totalSamples: this.metrics.length,
             webVitalsGrade: this.calculateWebVitalsGrade(averages),
-            recommendations: this.generateRecommendations(averages)
+            recommendations: this.generateRecommendations(averages),
         };
-        
+
         console.log('Performance Report:', report);
         return JSON.stringify(report, null, 2);
     }
@@ -238,21 +239,21 @@ export class PerformanceMonitor {
         const lcp = metrics.largestContentfulPaint;
         const fid = metrics.firstInputDelay;
         const cls = metrics.cumulativeLayoutShift;
-        
+
         let score = 0;
-        
+
         // LCP scoring
         if (lcp <= 2500) score += 40;
         else if (lcp <= 4000) score += 20;
-        
+
         // FID scoring
         if (fid <= 100) score += 30;
         else if (fid <= 300) score += 15;
-        
+
         // CLS scoring
         if (cls <= 0.1) score += 30;
         else if (cls <= 0.25) score += 15;
-        
+
         if (score >= 90) return 'A';
         if (score >= 80) return 'B';
         if (score >= 70) return 'C';
@@ -262,23 +263,23 @@ export class PerformanceMonitor {
 
     private generateRecommendations(metrics: IPerformanceMetrics): string[] {
         const recommendations: string[] = [];
-        
+
         if (metrics.largestContentfulPaint > 2500) {
             recommendations.push('Consider optimizing image loading and reducing render-blocking resources');
         }
-        
+
         if (metrics.firstInputDelay > 100) {
             recommendations.push('Reduce JavaScript execution time and consider code splitting');
         }
-        
+
         if (metrics.frameRate < 55) {
             recommendations.push('Optimize rendering performance and reduce layout thrashing');
         }
-        
+
         if (metrics.memoryUsage > 0.8) {
             recommendations.push('Investigate memory leaks and optimize data structures');
         }
-        
+
         return recommendations;
     }
 
@@ -286,11 +287,11 @@ export class PerformanceMonitor {
         if (this.observer) {
             this.observer.disconnect();
         }
-        
+
         if (this.frameRateMonitor) {
             cancelAnimationFrame(this.frameRateMonitor);
         }
-        
+
         if (this.memoryMonitor) {
             clearInterval(this.memoryMonitor);
         }
@@ -304,6 +305,6 @@ export const performanceMonitor = new PerformanceMonitor({
     alertThresholds: {
         renderTime: 16.67, // 60fps target
         memoryUsage: 0.8, // 80% memory usage
-        frameRate: 55 // Minimum acceptable frame rate
-    }
+        frameRate: 55, // Minimum acceptable frame rate
+    },
 });

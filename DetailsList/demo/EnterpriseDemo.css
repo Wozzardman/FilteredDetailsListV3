@@ -1,0 +1,435 @@
+/**
+ * Enterprise Demo Styles
+ * Comprehensive styling for the demo showcase
+ */
+
+.enterprise-demo {
+    padding: 24px;
+    background: #f8f9fa;
+    min-height: 100vh;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Header */
+.demo-header {
+    text-align: center;
+    margin-bottom: 32px;
+    padding: 24px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 8px;
+}
+
+.demo-header h2 {
+    margin: 0 0 8px 0;
+    font-size: 32px;
+    font-weight: 600;
+}
+
+.demo-header p {
+    margin: 0;
+    font-size: 16px;
+    opacity: 0.9;
+}
+
+/* Controls */
+.demo-controls {
+    background: white;
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.control-section {
+    margin-bottom: 32px;
+}
+
+.control-section:last-child {
+    margin-bottom: 0;
+}
+
+.control-section h3 {
+    margin: 0 0 16px 0;
+    font-size: 20px;
+    font-weight: 600;
+    color: #323130;
+}
+
+/* Demo Cards */
+.demo-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+}
+
+.demo-card {
+    padding: 20px;
+    background: #f8f9fa;
+    border: 1px solid #e1e1e1;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.demo-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.demo-card h4 {
+    margin: 0 0 8px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #323130;
+}
+
+.demo-card p {
+    margin: 0 0 16px 0;
+    font-size: 14px;
+    color: #605e5c;
+    line-height: 1.4;
+}
+
+/* Control Grid */
+.control-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    align-items: start;
+}
+
+.slider-control {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.slider-control label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #323130;
+}
+
+/* Action Buttons */
+.action-buttons {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+/* Demo Content */
+.demo-content {
+    background: white;
+    border-radius: 8px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    min-height: 600px;
+}
+
+/* Performance Metrics */
+.performance-metrics {
+    margin-bottom: 24px;
+}
+
+.performance-metrics h4 {
+    margin: 0 0 12px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #323130;
+}
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.metric {
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    background: #f8f9fa;
+    border: 1px solid #e1e1e1;
+    border-radius: 4px;
+}
+
+.metric-label {
+    font-size: 12px;
+    color: #605e5c;
+    margin-bottom: 4px;
+}
+
+.metric-value {
+    font-size: 18px;
+    font-weight: 600;
+    color: #0078d4;
+}
+
+/* Performance Alerts */
+.performance-alerts {
+    margin-bottom: 24px;
+}
+
+.performance-alerts h4 {
+    margin: 0 0 12px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #323130;
+}
+
+.alert {
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    border-radius: 4px;
+    font-size: 14px;
+    border-left: 4px solid;
+}
+
+.alert:last-child {
+    margin-bottom: 0;
+}
+
+.alert-warning {
+    background: #fff4e6;
+    border-left-color: #ffb900;
+    color: #8a6c00;
+}
+
+.alert-critical {
+    background: #fef0f0;
+    border-left-color: #d13438;
+    color: #a10e13;
+}
+
+.alert strong {
+    font-weight: 600;
+    margin-right: 4px;
+}
+
+/* Performance Tips */
+.performance-tips h4 {
+    margin: 0 0 12px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #323130;
+}
+
+.performance-tips ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.performance-tips li {
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: #605e5c;
+    line-height: 1.4;
+}
+
+.performance-tips li:last-child {
+    margin-bottom: 0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .enterprise-demo {
+        padding: 16px;
+    }
+    
+    .demo-header {
+        padding: 16px;
+    }
+    
+    .demo-header h2 {
+        font-size: 24px;
+    }
+    
+    .demo-controls,
+    .demo-content {
+        padding: 16px;
+    }
+    
+    .control-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    
+    .demo-buttons {
+        grid-template-columns: 1fr;
+    }
+    
+    .metrics-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 480px) {
+    .enterprise-demo {
+        padding: 12px;
+    }
+    
+    .demo-header h2 {
+        font-size: 20px;
+    }
+    
+    .demo-header p {
+        font-size: 14px;
+    }
+    
+    .control-section h3 {
+        font-size: 18px;
+    }
+}
+
+/* Dark Theme Support */
+@media (prefers-color-scheme: dark) {
+    .enterprise-demo {
+        background: #1e1e1e;
+        color: #ffffff;
+    }
+    
+    .demo-controls,
+    .demo-content {
+        background: #2d2d2d;
+        color: #ffffff;
+    }
+    
+    .control-section h3,
+    .performance-metrics h4,
+    .performance-alerts h4,
+    .performance-tips h4 {
+        color: #ffffff;
+    }
+    
+    .demo-card {
+        background: #333333;
+        border-color: #555555;
+    }
+    
+    .demo-card h4 {
+        color: #ffffff;
+    }
+    
+    .demo-card p {
+        color: #cccccc;
+    }
+    
+    .metric {
+        background: #333333;
+        border-color: #555555;
+    }
+    
+    .metric-label {
+        color: #cccccc;
+    }
+    
+    .metric-value {
+        color: #0078d4;
+    }
+    
+    .alert-warning {
+        background: #2d2000;
+        border-left-color: #ffb900;
+        color: #ffcc00;
+    }
+    
+    .alert-critical {
+        background: #2d0000;
+        border-left-color: #d13438;
+        color: #ff6666;
+    }
+    
+    .performance-tips li {
+        color: #cccccc;
+    }
+    
+    .slider-control label {
+        color: #ffffff;
+    }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+    .demo-card,
+    .metric {
+        border-width: 2px;
+    }
+    
+    .alert {
+        border-left-width: 6px;
+        font-weight: 600;
+    }
+    
+    .demo-header {
+        background: #000000;
+        border: 2px solid #ffffff;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .enterprise-demo {
+        background: white;
+        color: black;
+    }
+    
+    .demo-header {
+        background: none;
+        color: black;
+        border: 2px solid black;
+    }
+    
+    .demo-controls {
+        display: none;
+    }
+    
+    .demo-content {
+        box-shadow: none;
+        border: 1px solid black;
+    }
+}
+
+/* Animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.enterprise-demo > * {
+    animation: fadeIn 0.6s ease-out;
+}
+
+.control-section {
+    animation: fadeIn 0.6s ease-out 0.1s both;
+}
+
+.demo-content {
+    animation: fadeIn 0.6s ease-out 0.2s both;
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+    .enterprise-demo > *,
+    .control-section,
+    .demo-content {
+        animation: none;
+    }
+    
+    .demo-card {
+        transition: none;
+    }
+    
+    .demo-card:hover {
+        transform: none;
+    }
+}

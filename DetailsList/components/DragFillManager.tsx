@@ -1,7 +1,11 @@
 import * as React from 'react';
 
 export interface DragFillManagerProps {
-    onDragFill?: (startCell: { row: number; column: string }, endCell: { row: number; column: string }, value: any) => void;
+    onDragFill?: (
+        startCell: { row: number; column: string },
+        endCell: { row: number; column: string },
+        value: any,
+    ) => void;
     children: React.ReactNode;
 }
 
@@ -23,31 +27,34 @@ export const DragFillManager: React.FC<DragFillManagerProps> = ({ onDragFill, ch
         setDragStart({ row, column, value });
         setDragEnd({ row, column });
         setDragOverCells(new Set([`${row}-${column}`]));
-        
+
         // Prevent text selection during drag
         document.body.style.userSelect = 'none';
         document.body.style.webkitUserSelect = 'none';
     }, []);
 
-    const updateDragFill = React.useCallback((row: number, column: string) => {
-        if (!isDragging || !dragStart) return;
-        
-        setDragEnd({ row, column });
-        
-        // Calculate all cells in the drag range
-        const startRow = Math.min(dragStart.row, row);
-        const endRow = Math.max(dragStart.row, row);
-        const newDragOverCells = new Set<string>();
-        
-        // For now, only support single-column drag fill
-        if (column === dragStart.column) {
-            for (let r = startRow; r <= endRow; r++) {
-                newDragOverCells.add(`${r}-${column}`);
+    const updateDragFill = React.useCallback(
+        (row: number, column: string) => {
+            if (!isDragging || !dragStart) return;
+
+            setDragEnd({ row, column });
+
+            // Calculate all cells in the drag range
+            const startRow = Math.min(dragStart.row, row);
+            const endRow = Math.max(dragStart.row, row);
+            const newDragOverCells = new Set<string>();
+
+            // For now, only support single-column drag fill
+            if (column === dragStart.column) {
+                for (let r = startRow; r <= endRow; r++) {
+                    newDragOverCells.add(`${r}-${column}`);
+                }
             }
-        }
-        
-        setDragOverCells(newDragOverCells);
-    }, [isDragging, dragStart]);
+
+            setDragOverCells(newDragOverCells);
+        },
+        [isDragging, dragStart],
+    );
 
     const endDragFill = React.useCallback(() => {
         if (!isDragging || !dragStart || !dragEnd || !onDragFill) {
@@ -65,7 +72,7 @@ export const DragFillManager: React.FC<DragFillManagerProps> = ({ onDragFill, ch
             onDragFill(
                 { row: dragStart.row, column: dragStart.column },
                 { row: dragEnd.row, column: dragEnd.column },
-                dragStart.value
+                dragStart.value,
             );
         }
 
@@ -98,21 +105,20 @@ export const DragFillManager: React.FC<DragFillManagerProps> = ({ onDragFill, ch
         };
     }, [isDragging, endDragFill]);
 
-    const contextValue = React.useMemo(() => ({
-        isDragging,
-        dragStart,
-        dragEnd,
-        dragOverCells,
-        startDragFill,
-        updateDragFill,
-        endDragFill
-    }), [isDragging, dragStart, dragEnd, dragOverCells, startDragFill, updateDragFill, endDragFill]);
-
-    return (
-        <DragFillContext.Provider value={contextValue}>
-            {children}
-        </DragFillContext.Provider>
+    const contextValue = React.useMemo(
+        () => ({
+            isDragging,
+            dragStart,
+            dragEnd,
+            dragOverCells,
+            startDragFill,
+            updateDragFill,
+            endDragFill,
+        }),
+        [isDragging, dragStart, dragEnd, dragOverCells, startDragFill, updateDragFill, endDragFill],
     );
+
+    return <DragFillContext.Provider value={contextValue}>{children}</DragFillContext.Provider>;
 };
 
 export interface DragFillContextType {
@@ -132,7 +138,7 @@ export const DragFillContext = React.createContext<DragFillContextType>({
     dragOverCells: new Set(),
     startDragFill: () => {},
     updateDragFill: () => {},
-    endDragFill: () => {}
+    endDragFill: () => {},
 });
 
 export const useDragFill = () => {
@@ -153,11 +159,14 @@ export interface DragFillHandleProps {
 export const DragFillHandle: React.FC<DragFillHandleProps> = ({ row, column, value, className }) => {
     const { startDragFill } = useDragFill();
 
-    const handleMouseDown = React.useCallback((e: React.MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        startDragFill(row, column, value);
-    }, [row, column, value, startDragFill]);
+    const handleMouseDown = React.useCallback(
+        (e: React.MouseEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            startDragFill(row, column, value);
+        },
+        [row, column, value, startDragFill],
+    );
 
     return (
         <div

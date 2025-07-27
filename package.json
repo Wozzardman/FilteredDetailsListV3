@@ -1,6 +1,6 @@
 {
   "name": "filtered-detailslist-v2",
-  "version": "6.0.0",
+  "version": "6.0.1",
   "description": "Enterprise-grade PowerApps Component Framework (PCF) control with advanced filtering, AI insights, real-time collaboration, and industry-leading performance.",
   "author": "jvt",
   "keywords": [
@@ -40,7 +40,10 @@
   },
   "dependencies": {
     "@fluentui/react": "8.121.1",
+    "@microsoft/fast-web-utilities": "^6.0.0",
     "@react-hook/resize-observer": "^1.2.5",
+    "@tanstack/react-virtual": "^3.13.12",
+    "comlink": "^4.4.2",
     "d3": "^7.9.0",
     "date-fns": "^2.30.0",
     "file-saver": "^2.0.5",
@@ -53,8 +56,10 @@
     "react": "16.14.0",
     "react-dom": "16.14.0",
     "react-virtualized": "^9.22.5",
+    "react-virtualized-auto-sizer": "^1.0.26",
     "react-window": "^1.8.11",
     "react-window-infinite-loader": "^1.0.10",
+    "rxjs": "^7.8.2",
     "web-vitals": "^3.5.2",
     "xlsx": "^0.18.5",
     "zustand": "^4.4.1"

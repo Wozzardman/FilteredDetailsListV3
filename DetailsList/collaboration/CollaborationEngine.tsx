@@ -52,7 +52,7 @@ export class CollaborationEngine {
     constructor(
         currentUser: ICollaborationUser,
         websocketUrl?: string,
-        conflictResolution: IConflictResolution = { strategy: 'last-write-wins' }
+        conflictResolution: IConflictResolution = { strategy: 'last-write-wins' },
     ) {
         this.currentUser = currentUser;
         this.conflictResolution = conflictResolution;
@@ -65,7 +65,7 @@ export class CollaborationEngine {
 
         try {
             this.websocket = new WebSocket(url);
-            
+
             this.websocket.onopen = () => {
                 console.log('Collaboration WebSocket connected');
                 this.sendPresenceUpdate();
@@ -103,10 +103,10 @@ export class CollaborationEngine {
             type: 'cursor',
             data: {
                 user: this.currentUser,
-                isOnline: true
+                isOnline: true,
             },
             timestamp: Date.now(),
-            version: this.version
+            version: this.version,
         };
 
         this.broadcastEvent(presenceEvent);
@@ -125,7 +125,7 @@ export class CollaborationEngine {
 
         // Update user presence
         this.updateUserPresence(event);
-        
+
         // Emit to registered handlers
         this.emitEvent(event);
     }
@@ -186,7 +186,7 @@ export class CollaborationEngine {
         if (event.type === 'cursor' && event.data.user) {
             this.users.set(event.userId, {
                 ...event.data.user,
-                isOnline: true
+                isOnline: true,
             });
         }
     }
@@ -194,7 +194,7 @@ export class CollaborationEngine {
     private emitEvent(event: ICollaborationEvent) {
         const handlers = this.eventHandlers.get(event.type);
         if (handlers) {
-            handlers.forEach(handler => handler(event));
+            handlers.forEach((handler) => handler(event));
         }
     }
 
@@ -207,7 +207,7 @@ export class CollaborationEngine {
             type: 'filter',
             data: { filters, user: this.currentUser },
             timestamp: Date.now(),
-            version: ++this.version
+            version: ++this.version,
         };
 
         this.broadcastEvent(event);
@@ -220,7 +220,7 @@ export class CollaborationEngine {
             type: 'sort',
             data: { sorting, user: this.currentUser },
             timestamp: Date.now(),
-            version: ++this.version
+            version: ++this.version,
         };
 
         this.broadcastEvent(event);
@@ -233,7 +233,7 @@ export class CollaborationEngine {
             type: 'selection',
             data: { selection, user: this.currentUser },
             timestamp: Date.now(),
-            version: ++this.version
+            version: ++this.version,
         };
 
         this.broadcastEvent(event);
@@ -241,14 +241,14 @@ export class CollaborationEngine {
 
     public broadcastCursor(row: number, column: string) {
         this.currentUser.cursor = { row, column, timestamp: Date.now() };
-        
+
         const event: ICollaborationEvent = {
             id: this.generateEventId(),
             userId: this.currentUser.id,
             type: 'cursor',
             data: { cursor: this.currentUser.cursor, user: this.currentUser },
             timestamp: Date.now(),
-            version: ++this.version
+            version: ++this.version,
         };
 
         this.broadcastEvent(event);
@@ -267,7 +267,7 @@ export class CollaborationEngine {
     }
 
     public getOnlineUsers(): ICollaborationUser[] {
-        return Array.from(this.users.values()).filter(user => user.isOnline);
+        return Array.from(this.users.values()).filter((user) => user.isOnline);
     }
 
     public getUserPresence(userId: string): ICollaborationUser | null {
@@ -355,10 +355,7 @@ export class CollaborationEngine {
 }
 
 // React hook for collaboration features
-export const useCollaboration = (
-    currentUser: ICollaborationUser,
-    websocketUrl?: string
-) => {
+export const useCollaboration = (currentUser: ICollaborationUser, websocketUrl?: string) => {
     const [engine] = React.useState(() => new CollaborationEngine(currentUser, websocketUrl));
     const [onlineUsers, setOnlineUsers] = React.useState<ICollaborationUser[]>([]);
     const [userCursors, setUserCursors] = React.useState<Map<string, any>>(new Map());
@@ -367,7 +364,7 @@ export const useCollaboration = (
         // Subscribe to cursor events
         const unsubscribeCursor = engine.onEvent('cursor', (event) => {
             if (event.data.cursor) {
-                setUserCursors(prev => new Map(prev.set(event.userId, event.data.cursor)));
+                setUserCursors((prev) => new Map(prev.set(event.userId, event.data.cursor)));
             }
         });
 
@@ -396,7 +393,7 @@ export const useCollaboration = (
         broadcastSort: engine.broadcastSort.bind(engine),
         broadcastSelection: engine.broadcastSelection.bind(engine),
         broadcastCursor: engine.broadcastCursor.bind(engine),
-        onEvent: engine.onEvent.bind(engine)
+        onEvent: engine.onEvent.bind(engine),
     };
 };
 
@@ -410,7 +407,7 @@ export const UserPresenceIndicator: React.FC<{
 
     return (
         <div className="user-presence-indicator">
-            {visibleUsers.map(user => (
+            {visibleUsers.map((user) => (
                 <div
                     key={user.id}
                     className="user-avatar"
@@ -425,11 +422,7 @@ export const UserPresenceIndicator: React.FC<{
                     {user.isOnline && <div className="online-indicator" />}
                 </div>
             ))}
-            {hiddenCount > 0 && (
-                <div className="hidden-users-count">
-                    +{hiddenCount}
-                </div>
-            )}
+            {hiddenCount > 0 && <div className="hidden-users-count">+{hiddenCount}</div>}
         </div>
     );
 };
@@ -453,7 +446,7 @@ export const UserCursorOverlay: React.FC<{
                             left: cursor.x,
                             top: cursor.y,
                             borderColor: user.color,
-                            pointerEvents: 'none'
+                            pointerEvents: 'none',
                         }}
                     >
                         <div className="cursor-label" style={{ backgroundColor: user.color }}>

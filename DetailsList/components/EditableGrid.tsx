@@ -1,8 +1,8 @@
 import * as React from 'react';
-import { 
-    DetailsList, 
-    IColumn, 
-    IDetailsListProps, 
+import {
+    DetailsList,
+    IColumn,
+    IDetailsListProps,
     SelectionMode,
     IObjectWithKey,
     DetailsRow,
@@ -11,7 +11,7 @@ import {
     CommandBar,
     ICommandBarItemProps,
     MessageBar,
-    MessageBarType
+    MessageBarType,
 } from '@fluentui/react';
 import { InlineEditor } from './InlineEditor';
 import { DragFillManager, DragFillHandle, useDragFill } from './DragFillManager';
@@ -66,7 +66,7 @@ export const EditableGrid: React.FC<EditableGridProps> = ({
 
     // Track items with pending changes for visual feedback
     const itemsWithChanges = React.useMemo(() => {
-        return items.map(item => {
+        return items.map((item) => {
             const itemId = item.key || item.id || item.getRecordId?.();
             const changes = pendingChanges[itemId];
             if (changes) {
@@ -76,56 +76,58 @@ export const EditableGrid: React.FC<EditableGridProps> = ({
         });
     }, [items, pendingChanges]);
 
-    const handleCellEdit = React.useCallback((item: any, columnKey: string, newValue: any) => {
-        const itemId = item.key || item.id || item.getRecordId?.();
-        if (!itemId) return;
+    const handleCellEdit = React.useCallback(
+        (item: any, columnKey: string, newValue: any) => {
+            const itemId = item.key || item.id || item.getRecordId?.();
+            if (!itemId) return;
 
-        // Update pending changes
-        setPendingChanges(prev => ({
-            ...prev,
-            [itemId]: {
-                ...prev[itemId],
-                [columnKey]: newValue
+            // Update pending changes
+            setPendingChanges((prev) => ({
+                ...prev,
+                [itemId]: {
+                    ...prev[itemId],
+                    [columnKey]: newValue,
+                },
+            }));
+
+            setHasChanges(true);
+
+            // Call external handler if provided
+            if (onCellEdit) {
+                onCellEdit(item, columnKey, newValue);
             }
-        }));
 
-        setHasChanges(true);
+            // Exit edit mode
+            setEditingCell(null);
+        },
+        [onCellEdit],
+    );
 
-        // Call external handler if provided
-        if (onCellEdit) {
-            onCellEdit(item, columnKey, newValue);
-        }
+    const handleDragFill = React.useCallback(
+        (startCell: { row: number; column: string }, endCell: { row: number; column: string }, value: any) => {
+            if (!enableDragFill) return;
 
-        // Exit edit mode
-        setEditingCell(null);
-    }, [onCellEdit]);
+            const startRow = Math.min(startCell.row, endCell.row);
+            const endRow = Math.max(startCell.row, endCell.row);
+            const columnKey = startCell.column;
 
-    const handleDragFill = React.useCallback((
-        startCell: { row: number; column: string },
-        endCell: { row: number; column: string },
-        value: any
-    ) => {
-        if (!enableDragFill) return;
-
-        const startRow = Math.min(startCell.row, endCell.row);
-        const endRow = Math.max(startCell.row, endCell.row);
-        const columnKey = startCell.column;
-
-        // Apply the value to all cells in the range
-        for (let rowIndex = startRow; rowIndex <= endRow; rowIndex++) {
-            if (rowIndex < items.length) {
-                const item = items[rowIndex];
-                handleCellEdit(item, columnKey, value);
+            // Apply the value to all cells in the range
+            for (let rowIndex = startRow; rowIndex <= endRow; rowIndex++) {
+                if (rowIndex < items.length) {
+                    const item = items[rowIndex];
+                    handleCellEdit(item, columnKey, value);
+                }
             }
-        }
-    }, [enableDragFill, items, handleCellEdit]);
+        },
+        [enableDragFill, items, handleCellEdit],
+    );
 
     const handleCommitChanges = React.useCallback(() => {
         if (!onCommitChanges || !hasChanges) return;
 
         const changes: EditChange[] = [];
         Object.entries(pendingChanges).forEach(([itemId, itemChanges]) => {
-            const item = items.find(i => (i.key || i.id || i.getRecordId?.()) === itemId);
+            const item = items.find((i) => (i.key || i.id || i.getRecordId?.()) === itemId);
             if (item) {
                 const rowIndex = items.indexOf(item);
                 Object.entries(itemChanges).forEach(([columnKey, newValue]) => {
@@ -136,7 +138,7 @@ export const EditableGrid: React.FC<EditableGridProps> = ({
                             columnKey,
                             oldValue,
                             newValue,
-                            rowIndex
+                            rowIndex,
                         });
                     }
                 });
@@ -169,8 +171,8 @@ export const EditableGrid: React.FC<EditableGridProps> = ({
                 onClick: handleCommitChanges,
                 buttonStyles: {
                     root: { backgroundColor: '#107c10', color: 'white' },
-                    rootHovered: { backgroundColor: '#0e6e0e' }
-                }
+                    rootHovered: { backgroundColor: '#0e6e0e' },
+                },
             },
             {
                 key: 'cancel',
@@ -179,24 +181,24 @@ export const EditableGrid: React.FC<EditableGridProps> = ({
                 onClick: handleCancelChanges,
                 buttonStyles: {
                     root: { backgroundColor: '#d13438', color: 'white' },
-                    rootHovered: { backgroundColor: '#b52b30' }
-                }
-            }
+                    rootHovered: { backgroundColor: '#b52b30' },
+                },
+            },
         ];
     }, [hasChanges, handleCommitChanges, handleCancelChanges]);
 
     const enhancedColumns = React.useMemo(() => {
-        return columns.map(column => ({
+        return columns.map((column) => ({
             ...column,
             onRender: (item: any, index?: number) => {
                 const itemId = item.key || item.id || item.getRecordId?.();
                 const columnKey = column.fieldName || column.key;
                 const isReadOnly = readOnlyColumns.includes(columnKey);
                 const isCurrentlyEditing = editingCell?.itemId === itemId && editingCell?.columnKey === columnKey;
-                
+
                 // Get the current value (from pending changes or original item)
                 const currentValue = pendingChanges[itemId]?.[columnKey] ?? item[columnKey];
-                
+
                 if (!enableInlineEditing || isReadOnly) {
                     // Read-only cell
                     return (
@@ -221,9 +223,18 @@ export const EditableGrid: React.FC<EditableGridProps> = ({
                         enableDragFill={enableDragFill}
                     />
                 );
-            }
+            },
         }));
-    }, [columns, readOnlyColumns, enableInlineEditing, editingCell, pendingChanges, handleCellEdit, getAvailableValues, enableDragFill]);
+    }, [
+        columns,
+        readOnlyColumns,
+        enableInlineEditing,
+        editingCell,
+        pendingChanges,
+        handleCellEdit,
+        getAvailableValues,
+        enableDragFill,
+    ]);
 
     const onRenderRow = React.useCallback((props?: IDetailsRowProps) => {
         if (!props) return null;
@@ -231,7 +242,7 @@ export const EditableGrid: React.FC<EditableGridProps> = ({
         const customStyles: Partial<IDetailsRowStyles> = {
             root: {
                 backgroundColor: props.item._hasChanges ? '#fff4ce' : undefined, // Light yellow for changed rows
-            }
+            },
         };
 
         return <DetailsRow {...props} styles={customStyles} />;
@@ -245,15 +256,15 @@ export const EditableGrid: React.FC<EditableGridProps> = ({
                         You have unsaved changes. Click "Commit Changes" to save or "Cancel Changes" to discard.
                     </MessageBar>
                 )}
-                
+
                 <CommandBar
                     items={commandBarItems}
                     styles={{
                         root: {
                             padding: 0,
                             backgroundColor: 'transparent',
-                            borderBottom: hasChanges ? '1px solid #edebe9' : 'none'
-                        }
+                            borderBottom: hasChanges ? '1px solid #edebe9' : 'none',
+                        },
                     }}
                 />
 
@@ -294,7 +305,7 @@ const EditableGridCell: React.FC<EditableGridCellProps> = ({
     onCancelEdit,
     availableValues,
     hasChanges,
-    enableDragFill
+    enableDragFill,
 }) => {
     const { updateDragFill } = useDragFill();
     const cellRef = React.useRef<HTMLDivElement>(null);
@@ -322,7 +333,7 @@ const EditableGridCell: React.FC<EditableGridCellProps> = ({
                 onCancelEdit={onCancelEdit}
                 className="inline-editor"
             />
-            
+
             {enableDragFill && !isEditing && (
                 <DragFillHandle
                     row={rowIndex}

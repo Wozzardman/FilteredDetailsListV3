@@ -1,13 +1,5 @@
 import * as React from 'react';
-import { 
-    IColumn,
-    SelectionMode,
-    ISelection,
-    MessageBar,
-    MessageBarType,
-    Spinner,
-    SpinnerSize
-} from '@fluentui/react';
+import { IColumn, SelectionMode, ISelection, MessageBar, MessageBarType, Spinner, SpinnerSize } from '@fluentui/react';
 import { Grid, GridProps } from '../Grid';
 import { EditableGrid, EditChange } from './EditableGrid';
 import { GridEnhanced } from '../GridEnhanced';
@@ -23,7 +15,7 @@ export interface UnifiedGridProps extends GridProps {
     onCellEdit?: (recordId: string, columnName: string, newValue: any) => void;
     onCommitChanges?: (changes: EditChange[]) => void;
     readOnlyColumns?: string[];
-    
+
     // Grid mode selection
     gridMode?: 'original' | 'enhanced' | 'editable';
     useEnhancedFeatures?: boolean;
@@ -58,9 +50,10 @@ export const UnifiedGrid = React.memo((props: UnifiedGridProps) => {
     const [isProcessingChanges, setIsProcessingChanges] = React.useState(false);
 
     // Performance monitoring
-    const endMeasurement = enablePerformanceMonitoring ? 
-        performanceMonitor.startMeasure('unified-grid-render') : () => {};
-    
+    const endMeasurement = enablePerformanceMonitoring
+        ? performanceMonitor.startMeasure('unified-grid-render')
+        : () => {};
+
     React.useEffect(() => {
         return () => {
             endMeasurement();
@@ -70,7 +63,7 @@ export const UnifiedGrid = React.memo((props: UnifiedGridProps) => {
     // Convert PCF data to items for EditableGrid
     const items = React.useMemo(() => {
         if (!records || !sortedRecordIds) return [];
-        
+
         return sortedRecordIds
             .filter((id) => id !== undefined)
             .map((id) => {
@@ -79,11 +72,11 @@ export const UnifiedGrid = React.memo((props: UnifiedGridProps) => {
                     const item: any = {
                         key: record.getRecordId(),
                         id: record.getRecordId(),
-                        getRecordId: () => record.getRecordId()
+                        getRecordId: () => record.getRecordId(),
                     };
-                    
+
                     // Add all column values
-                    sortedColumnIds?.forEach(colId => {
+                    sortedColumnIds?.forEach((colId) => {
                         const columnRecord = columns?.[colId];
                         if (columnRecord) {
                             const columnName = columnRecord.getValue('ColName') as string;
@@ -93,76 +86,87 @@ export const UnifiedGrid = React.memo((props: UnifiedGridProps) => {
                             }
                         }
                     });
-                    
+
                     return item;
                 }
                 return null;
             })
-            .filter(item => item !== null);
+            .filter((item) => item !== null);
     }, [records, sortedRecordIds, sortedColumnIds, columns]);
 
     // Convert PCF columns to IColumn format
     const editableColumns = React.useMemo(() => {
         if (!sortedColumnIds || !columns) return [];
-        
-        return sortedColumnIds.map(colId => {
-            const columnRecord = columns[colId];
-            if (!columnRecord) return null;
 
-            const columnName = columnRecord.getValue('ColName') as string;
-            const displayName = columnRecord.getFormattedValue('ColDisplayName') || columnName;
-            const width = columnRecord.getValue('ColWidth') as number || 150;
-            const cellType = columnRecord.getFormattedValue('ColCellType');
-            const isResizable = columnRecord.getValue('ColResizable') === true;
+        return sortedColumnIds
+            .map((colId) => {
+                const columnRecord = columns[colId];
+                if (!columnRecord) return null;
 
-            const column: IColumn = {
-                key: `col-${colId}`,
-                name: displayName,
-                fieldName: columnName,
-                minWidth: Math.min(50, width),
-                maxWidth: width,
-                isResizable,
-                data: {
-                    cellType,
-                    columnRecord
-                }
-            };
+                const columnName = columnRecord.getValue('ColName') as string;
+                const displayName = columnRecord.getFormattedValue('ColDisplayName') || columnName;
+                const width = (columnRecord.getValue('ColWidth') as number) || 150;
+                const cellType = columnRecord.getFormattedValue('ColCellType');
+                const isResizable = columnRecord.getValue('ColResizable') === true;
 
-            return column;
-        }).filter(col => col !== null) as IColumn[];
+                const column: IColumn = {
+                    key: `col-${colId}`,
+                    name: displayName,
+                    fieldName: columnName,
+                    minWidth: Math.min(50, width),
+                    maxWidth: width,
+                    isResizable,
+                    data: {
+                        cellType,
+                        columnRecord,
+                    },
+                };
+
+                return column;
+            })
+            .filter((col) => col !== null) as IColumn[];
     }, [sortedColumnIds, columns]);
 
     // Inline editing handlers
-    const handleCellEdit = React.useCallback((item: any, columnKey: string, newValue: any) => {
-        if (onCellEdit) {
-            onCellEdit(item.key || item.id, columnKey, newValue);
-        }
-    }, [onCellEdit]);
+    const handleCellEdit = React.useCallback(
+        (item: any, columnKey: string, newValue: any) => {
+            if (onCellEdit) {
+                onCellEdit(item.key || item.id, columnKey, newValue);
+            }
+        },
+        [onCellEdit],
+    );
 
-    const handleCommitChanges = React.useCallback(async (changes: EditChange[]) => {
-        if (!onCommitChanges) return;
+    const handleCommitChanges = React.useCallback(
+        async (changes: EditChange[]) => {
+            if (!onCommitChanges) return;
 
-        setIsProcessingChanges(true);
-        try {
-            await onCommitChanges(changes);
-        } finally {
-            setIsProcessingChanges(false);
-        }
-    }, [onCommitChanges]);
+            setIsProcessingChanges(true);
+            try {
+                await onCommitChanges(changes);
+            } finally {
+                setIsProcessingChanges(false);
+            }
+        },
+        [onCommitChanges],
+    );
 
     // Get available values for dropdown fields
-    const getAvailableValues = React.useCallback((columnKey: string) => {
-        if (!records) return [];
-        
-        const values = new Set<string>();
-        Object.values(records).forEach(record => {
-            const value = record.getFormattedValue(columnKey);
-            if (value && value !== '') {
-                values.add(value.toString());
-            }
-        });
-        return Array.from(values).sort();
-    }, [records]);
+    const getAvailableValues = React.useCallback(
+        (columnKey: string) => {
+            if (!records) return [];
+
+            const values = new Set<string>();
+            Object.values(records).forEach((record) => {
+                const value = record.getFormattedValue(columnKey);
+                if (value && value !== '') {
+                    values.add(value.toString());
+                }
+            });
+            return Array.from(values).sort();
+        },
+        [records],
+    );
 
     if (itemsLoading) {
         return (
@@ -209,8 +213,8 @@ export const UnifiedGrid = React.memo((props: UnifiedGridProps) => {
                     </div>
                 );
             }
-            // Fall through to enhanced mode if inline editing is disabled
-            
+        // Fall through to enhanced mode if inline editing is disabled
+
         case 'enhanced':
             if (useEnhancedFeatures) {
                 return (
@@ -233,8 +237,8 @@ export const UnifiedGrid = React.memo((props: UnifiedGridProps) => {
                     />
                 );
             }
-            // Fall through to original mode if enhanced features are disabled
-            
+        // Fall through to original mode if enhanced features are disabled
+
         case 'original':
         default:
             return (

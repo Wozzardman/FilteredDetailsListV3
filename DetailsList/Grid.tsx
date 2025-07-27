@@ -81,7 +81,7 @@ export interface GridProps {
     enableFiltering?: boolean;
     filters?: IFilterState;
     onFilterChange?: (filters: IFilterState) => void;
-    
+
     // Enterprise features
     enablePerformanceMonitoring?: boolean;
     enableAIInsights?: boolean;
@@ -115,7 +115,7 @@ const onRenderDetailsHeader: IRenderFunction<IDetailsHeaderProps> = (props, defa
 
 export const Grid = React.memo((props: GridProps) => {
     const endMeasurement = performanceMonitor.startMeasure('grid-render');
-    
+
     const {
         records,
         sortedRecordIds,
@@ -707,12 +707,12 @@ function mapToGridColumn(
     if (!colWidth || colWidth === 0) {
         colWidth = 150; // Default width when test harness returns 0
     }
-    
+
     let colDisplayName = column.getFormattedValue(ColumnsColumns.ColDisplayName);
     if (!colDisplayName || colDisplayName === 'val') {
         colDisplayName = datasetColumn.displayName || datasetColumn.name || columnName;
     }
-    
+
     const colIsBold = column.getValue(ColumnsColumns.ColIsBold) === true;
     const horizontalAlign = (column.getFormattedValue(ColumnsColumns.ColHorizontalAlign) as string)?.toLowerCase();
     const showAsSubTextOf = column.getFormattedValue(ColumnsColumns.ColShowAsSubTextOf);

@@ -65,7 +65,7 @@ const performanceMonitor = {
             const end = performance.now();
             console.log(`⚡ PERFORMANCE: ${name} took ${(end - start).toFixed(2)}ms`);
         };
-    }
+    },
 };
 
 export interface GridProps {
@@ -97,7 +97,7 @@ export interface GridProps {
     selectionAlwaysVisible?: boolean;
     resources: ComponentFramework.Resources;
     columnDatasetNotDefined?: boolean;
-    
+
     // Enhanced features (optional)
     enableFiltering?: boolean;
     filters?: IFilterState;
@@ -132,9 +132,10 @@ const onRenderDetailsHeader: IRenderFunction<IDetailsHeaderProps> = (props, defa
 };
 
 export const GridEnhanced = React.memo((props: GridProps) => {
-    const endMeasurement = props.enablePerformanceMonitoring ? 
-        performanceMonitor.startMeasure('enhanced-grid-render') : () => {};
-    
+    const endMeasurement = props.enablePerformanceMonitoring
+        ? performanceMonitor.startMeasure('enhanced-grid-render')
+        : () => {};
+
     const {
         records,
         sortedRecordIds,
@@ -182,7 +183,7 @@ export const GridEnhanced = React.memo((props: GridProps) => {
         datasetColumns: datasetColumns?.length || 0,
         shimmer,
         itemsLoading,
-        selection: !!selection
+        selection: !!selection,
     });
 
     // Return early if not visible
@@ -195,7 +196,7 @@ export const GridEnhanced = React.memo((props: GridProps) => {
     const [isComponentLoading, setIsLoading] = React.useState<boolean>(false);
     const [filterMenuColumn, setFilterMenuColumn] = React.useState<string | null>(null);
     const [filterMenuTarget, setFilterMenuTarget] = React.useState<HTMLElement | null>(null);
-    
+
     // Enhanced features state
     const exportService = React.useMemo(() => new DataExportService(), []);
 
@@ -253,7 +254,7 @@ export const GridEnhanced = React.memo((props: GridProps) => {
             sortedRecords: sortedRecords.length,
             firstItem: sortedRecords[0] ? 'has data' : 'empty',
             enableFiltering,
-            filteredCount: filteredRecordIds?.length || 0
+            filteredCount: filteredRecordIds?.length || 0,
         });
 
         if (enablePerformanceMonitoring) {
@@ -263,48 +264,51 @@ export const GridEnhanced = React.memo((props: GridProps) => {
         return sortedRecords;
     }, [records, sortedRecordIds, filteredRecordIds, enableFiltering, setIsLoading, enablePerformanceMonitoring]);
 
-    // Export functionality 
-    const handleExport = React.useCallback((format: 'csv' | 'excel') => {
-        if (!enableDataExport) return;
-        
-        const exportData = items.map(record => {
-            if (!record) return {};
-            const row: any = {};
-            
-            // Export all visible columns
-            sortedColumnIds?.forEach(colId => {
-                const columnRecord = columns[colId];
-                if (columnRecord) {
-                    const colName = columnRecord.getFormattedValue(ColumnsColumns.ColName);
-                    const displayName = columnRecord.getFormattedValue(ColumnsColumns.ColDisplayName);
-                    row[displayName || colName] = record?.getFormattedValue(colName) || '';
-                }
+    // Export functionality
+    const handleExport = React.useCallback(
+        (format: 'csv' | 'excel') => {
+            if (!enableDataExport) return;
+
+            const exportData = items.map((record) => {
+                if (!record) return {};
+                const row: any = {};
+
+                // Export all visible columns
+                sortedColumnIds?.forEach((colId) => {
+                    const columnRecord = columns[colId];
+                    if (columnRecord) {
+                        const colName = columnRecord.getFormattedValue(ColumnsColumns.ColName);
+                        const displayName = columnRecord.getFormattedValue(ColumnsColumns.ColDisplayName);
+                        row[displayName || colName] = record?.getFormattedValue(colName) || '';
+                    }
+                });
+
+                return row;
             });
-            
-            return row;
-        });
 
-        const exportOptions = {
-            format: format === 'csv' ? 'CSV' as const : 'Excel' as const,
-            fileName: `grid-export-${new Date().toISOString().split('T')[0]}`,
-            includeHeaders: true,
-            includeFilters: false,
-            metadata: {
-                title: 'Grid Export',
-                description: 'Data exported from Enhanced Grid',
-                createdDate: new Date()
-            }
-        };
+            const exportOptions = {
+                format: format === 'csv' ? ('CSV' as const) : ('Excel' as const),
+                fileName: `grid-export-${new Date().toISOString().split('T')[0]}`,
+                includeHeaders: true,
+                includeFilters: false,
+                metadata: {
+                    title: 'Grid Export',
+                    description: 'Data exported from Enhanced Grid',
+                    createdDate: new Date(),
+                },
+            };
 
-        exportService.exportData(exportData, exportOptions).catch(error => {
-            console.error('Export failed:', error);
-        });
-    }, [enableDataExport, items, sortedColumnIds, columns, exportService]);
+            exportService.exportData(exportData, exportOptions).catch((error) => {
+                console.error('Export failed:', error);
+            });
+        },
+        [enableDataExport, items, sortedColumnIds, columns, exportService],
+    );
 
     // Enhanced command bar items
     const commandBarItems: ICommandBarItemProps[] = React.useMemo(() => {
         const items: ICommandBarItemProps[] = [];
-        
+
         if (enableDataExport) {
             items.push({
                 key: 'export',
@@ -319,7 +323,7 @@ export const GridEnhanced = React.memo((props: GridProps) => {
                             onClick: () => handleExport('csv'),
                         },
                         {
-                            key: 'excel', 
+                            key: 'excel',
                             text: 'Export to Excel',
                             iconProps: { iconName: 'ExcelDocument' },
                             onClick: () => handleExport('excel'),
@@ -398,7 +402,7 @@ export const GridEnhanced = React.memo((props: GridProps) => {
         }
     }, [onFilterChange]);
 
-    // Helper function to get filter type for a column  
+    // Helper function to get filter type for a column
     const getFilterTypeForColumn = React.useCallback(
         (columnName: string) => {
             const columnRecord = sortedColumnIds
@@ -430,7 +434,7 @@ export const GridEnhanced = React.memo((props: GridProps) => {
     const getAvailableValues = React.useCallback(
         (columnName: string) => {
             const valueMap = new Map<string, number>();
-            
+
             const recordIdsToProcess = filteredRecordIds;
             recordIdsToProcess.forEach((recordId) => {
                 const record = records[recordId];
@@ -463,20 +467,20 @@ export const GridEnhanced = React.memo((props: GridProps) => {
             columns: Object.keys(columns || {}).length,
             datasetColumns: datasetColumns?.length || 0,
             firstColumnId: sortedColumnIds?.[0],
-            firstColumn: sortedColumnIds?.[0] ? !!columns[sortedColumnIds[0]] : false
+            firstColumn: sortedColumnIds?.[0] ? !!columns[sortedColumnIds[0]] : false,
         });
 
         sortedColumnIds.forEach((id) => {
             const column = columns[id];
             const columnName = column.getValue(ColumnsColumns.ColName) as string;
             const datasetColumn = datasetColumns.find((c) => c.name === columnName);
-            
+
             console.log(`🔧 Processing column ${id}:`, {
                 columnName,
                 hasDatasetColumn: !!datasetColumn,
-                datasetColumnName: datasetColumn?.name
+                datasetColumnName: datasetColumn?.name,
             });
-            
+
             if (datasetColumn) {
                 const sortOn = getSortStatus(sorting, datasetColumn, column);
                 const col = mapToGridColumn(
@@ -516,7 +520,7 @@ export const GridEnhanced = React.memo((props: GridProps) => {
             gridColumns: gridColumns.length,
             subColumns: subColumns.length,
             expandColumn: !!expandColumn,
-            columnNames: gridColumns.map(c => c.fieldName)
+            columnNames: gridColumns.map((c) => c.fieldName),
         });
 
         return { gridColumns: gridColumns, expandColumn: expandColumn as IGridColumn | undefined };
@@ -617,15 +621,15 @@ export const GridEnhanced = React.memo((props: GridProps) => {
             {/* Enhanced Command Bar */}
             {(enableDataExport || enableAIInsights) && commandBarItems.length > 0 && (
                 <div className="enhanced-command-bar">
-                    <CommandBar 
+                    <CommandBar
                         items={commandBarItems}
                         styles={{
-                            root: { padding: '0 0 8px 0', borderBottom: '1px solid #edebe9' }
+                            root: { padding: '0 0 8px 0', borderBottom: '1px solid #edebe9' },
                         }}
                     />
                 </div>
             )}
-            
+
             {/* Original Filter Bar */}
             {enableFiltering && (
                 <FilterBar
@@ -636,7 +640,7 @@ export const GridEnhanced = React.memo((props: GridProps) => {
                     resources={resources}
                 />
             )}
-            
+
             {/* Original Grid Implementation */}
             <ScrollablePane scrollbarVisibility={ScrollbarVisibility.auto} scrollContainerFocus={false}>
                 <ShimmeredDetailsList
@@ -647,7 +651,7 @@ export const GridEnhanced = React.memo((props: GridProps) => {
                             gridColumnsLength: gridColumns.length,
                             setName,
                             hasGridProps: !!gridProps,
-                            hasSelection: !!selectionZoneProps?.selection
+                            hasSelection: !!selectionZoneProps?.selection,
                         });
                         return gridProps;
                     })()}
@@ -661,7 +665,7 @@ export const GridEnhanced = React.memo((props: GridProps) => {
                     componentRef={componentRef}
                 ></ShimmeredDetailsList>
             </ScrollablePane>
-            
+
             {/* Original Filter Menu */}
             {enableFiltering && filterMenuColumn && filterMenuTarget && (
                 <FilterMenu
@@ -676,7 +680,7 @@ export const GridEnhanced = React.memo((props: GridProps) => {
                     resources={resources}
                 />
             )}
-            
+
             {/* Original Loading Overlay */}
             {(itemsLoading || isComponentLoading) && <Overlay />}
             {columnDatasetNotDefined && !itemsLoading && <NoFields resources={resources} />}
@@ -746,7 +750,7 @@ function getKey(item: unknown, index?: number): string {
     return '';
 }
 
-// Maps a custom column to a Fluent UI column - Original implementation  
+// Maps a custom column to a Fluent UI column - Original implementation
 function mapToGridColumn(
     column: ComponentFramework.PropertyHelper.DataSetApi.EntityRecord,
     datasetColumn: ComponentFramework.PropertyHelper.DataSetApi.Column,
@@ -762,12 +766,12 @@ function mapToGridColumn(
     if (!colWidth || colWidth === 0) {
         colWidth = 150; // Default width when test harness returns 0
     }
-    
+
     let colDisplayName = column.getFormattedValue(ColumnsColumns.ColDisplayName);
     if (!colDisplayName || colDisplayName === 'val') {
         colDisplayName = datasetColumn.displayName || datasetColumn.name || columnName;
     }
-    
+
     const colIsBold = column.getValue(ColumnsColumns.ColIsBold) === true;
     const horizontalAlign = (column.getFormattedValue(ColumnsColumns.ColHorizontalAlign) as string)?.toLowerCase();
     const showAsSubTextOf = column.getFormattedValue(ColumnsColumns.ColShowAsSubTextOf);

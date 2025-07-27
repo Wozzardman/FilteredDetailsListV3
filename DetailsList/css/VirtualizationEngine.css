@@ -1,0 +1,183 @@
+/* Enterprise Virtualization Engine CSS */
+
+.enterprise-virtualized-container {
+    height: 100%;
+    width: 100%;
+    position: relative;
+    overflow: hidden;
+}
+
+.virtualized-row {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #e1e1e1;
+    background-color: #ffffff;
+    transition: background-color 0.1s ease;
+    cursor: pointer;
+}
+
+.virtualized-row:hover {
+    background-color: #f3f2f1;
+}
+
+.virtualized-row.selected {
+    background-color: #deecf9;
+    border-color: #106ebe;
+}
+
+.virtualized-cell {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-right: 1px solid #e1e1e1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.enterprise-virtualized-grid {
+    height: 100%;
+    width: 100%;
+    position: relative;
+}
+
+.virtualized-grid-cell {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-right: 1px solid #e1e1e1;
+    border-bottom: 1px solid #e1e1e1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    background-color: #ffffff;
+}
+
+.ultra-virtualized-container {
+    position: relative;
+    overflow: auto;
+}
+
+.ultra-virtualized-row {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #e1e1e1;
+    background-color: #ffffff;
+}
+
+.ultra-virtualized-cell {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-right: 1px solid #e1e1e1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.ultra-virtualized-content {
+    position: relative;
+    width: 100%;
+}
+
+.native-virtualized-container {
+    height: 100%;
+    width: 100%;
+    overflow: auto;
+    position: relative;
+}
+
+.native-virtualized-content {
+    position: relative;
+    width: 100%;
+}
+
+.native-virtualized-row {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #e1e1e1;
+    background-color: #ffffff;
+    transition: background-color 0.1s ease;
+    cursor: pointer;
+}
+
+.native-virtualized-row:hover {
+    background-color: #f3f2f1;
+}
+
+.native-virtualized-row.selected {
+    background-color: #deecf9;
+    border-color: #106ebe;
+}
+
+.native-virtualized-cell {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-right: 1px solid #e1e1e1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.virtualized-header-cell {
+    background-color: #f3f2f1;
+    border-right: 1px solid #e1dfdd;
+    padding: 8px 12px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+}
+}
+
+.virtualized-data-cell {
+    border-bottom: 1px solid #e1dfdd;
+    border-right: 1px solid #e1dfdd;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+    transition: background-color 0.1s ease;
+}
+
+.virtualized-data-cell:hover {
+    background-color: #f3f2f1;
+}
+
+.virtualized-data-cell--editable {
+    cursor: pointer;
+}
+
+.virtualized-data-cell--readonly {
+    cursor: default;
+}
+
+.virtualized-data-cell--even {
+    background-color: #ffffff;
+}
+
+.virtualized-data-cell--odd {
+    background-color: #faf9f8;
+}
+
+.virtualized-empty-cell {
+    background-color: transparent;
+}
+
+.virtualization-fallback-container {
+    overflow: auto;
+}
+
+.virtualization-fallback-grid {
+    display: grid;
+}

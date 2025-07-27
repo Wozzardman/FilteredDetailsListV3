@@ -54,7 +54,7 @@ export class AccessibilityManager {
             fontSize: 'medium',
             colorScheme: 'auto',
             language: 'en',
-            ...config
+            ...config,
         };
 
         this.initializeAccessibility();
@@ -110,7 +110,7 @@ export class AccessibilityManager {
         region.style.width = '1px';
         region.style.height = '1px';
         region.style.overflow = 'hidden';
-        
+
         document.body.appendChild(region);
         this.liveRegions.set(id, region);
     }
@@ -120,51 +120,51 @@ export class AccessibilityManager {
         this.registerShortcut('ArrowUp', {
             description: 'Move to previous row',
             category: 'navigation',
-            action: () => this.moveFocus('up')
+            action: () => this.moveFocus('up'),
         });
 
         this.registerShortcut('ArrowDown', {
             description: 'Move to next row',
             category: 'navigation',
-            action: () => this.moveFocus('down')
+            action: () => this.moveFocus('down'),
         });
 
         this.registerShortcut('Home', {
             description: 'Move to first row',
             category: 'navigation',
-            action: () => this.moveFocus('first')
+            action: () => this.moveFocus('first'),
         });
 
         this.registerShortcut('End', {
             description: 'Move to last row',
             category: 'navigation',
-            action: () => this.moveFocus('last')
+            action: () => this.moveFocus('last'),
         });
 
         this.registerShortcut('PageUp', {
             description: 'Move up one page',
             category: 'navigation',
-            action: () => this.moveFocus('pageUp')
+            action: () => this.moveFocus('pageUp'),
         });
 
         this.registerShortcut('PageDown', {
             description: 'Move down one page',
             category: 'navigation',
-            action: () => this.moveFocus('pageDown')
+            action: () => this.moveFocus('pageDown'),
         });
 
         // Selection shortcuts
         this.registerShortcut(' ', {
             description: 'Toggle row selection',
             category: 'selection',
-            action: () => this.toggleSelection()
+            action: () => this.toggleSelection(),
         });
 
         this.registerShortcut('a', {
             ctrlKey: true,
             description: 'Select all rows',
             category: 'selection',
-            action: () => this.selectAll()
+            action: () => this.selectAll(),
         });
 
         // Filtering shortcuts
@@ -172,13 +172,13 @@ export class AccessibilityManager {
             ctrlKey: true,
             description: 'Open filter menu',
             category: 'filtering',
-            action: () => this.openFilterMenu()
+            action: () => this.openFilterMenu(),
         });
 
         this.registerShortcut('Escape', {
             description: 'Close current dialog or clear selection',
             category: 'navigation',
-            action: () => this.handleEscape()
+            action: () => this.handleEscape(),
         });
 
         // Accessibility shortcuts
@@ -187,7 +187,7 @@ export class AccessibilityManager {
             altKey: true,
             description: 'Show keyboard shortcuts help',
             category: 'navigation',
-            action: () => this.showKeyboardHelp()
+            action: () => this.showKeyboardHelp(),
         });
     }
 
@@ -202,12 +202,7 @@ export class AccessibilityManager {
     }
 
     private handleKeyDown(event: KeyboardEvent) {
-        const shortcutKey = this.getShortcutKey(
-            event.key,
-            event.ctrlKey,
-            event.altKey,
-            event.shiftKey
-        );
+        const shortcutKey = this.getShortcutKey(event.key, event.ctrlKey, event.altKey, event.shiftKey);
 
         const shortcut = this.shortcuts.get(shortcutKey);
         if (shortcut) {
@@ -228,7 +223,7 @@ export class AccessibilityManager {
             id: `announcement-${Date.now()}`,
             priority: type === 'alerts' ? 'assertive' : 'polite',
             content: message,
-            timeout
+            timeout,
         };
 
         this.announceQueue.push(announcement);
@@ -243,17 +238,17 @@ export class AccessibilityManager {
         while (this.announceQueue.length > 0) {
             const announcement = this.announceQueue.shift()!;
             const region = this.liveRegions.get(announcement.priority === 'assertive' ? 'alerts' : 'announcements');
-            
+
             if (region) {
                 region.textContent = announcement.content;
-                
+
                 // Clear after timeout or default delay
                 const delay = announcement.timeout || 3000;
-                await new Promise(resolve => setTimeout(resolve, delay));
+                await new Promise((resolve) => setTimeout(resolve, delay));
                 region.textContent = '';
-                
+
                 // Brief pause between announcements
-                await new Promise(resolve => setTimeout(resolve, 500));
+                await new Promise((resolve) => setTimeout(resolve, 500));
             }
         }
 
@@ -264,7 +259,7 @@ export class AccessibilityManager {
         if (element instanceof HTMLElement) {
             this.focusHistory.push(element);
             element.focus();
-            
+
             if (announce) {
                 const label = this.getElementLabel(element);
                 this.announce(`Focused on ${label}`, 'status');
@@ -302,37 +297,43 @@ export class AccessibilityManager {
         return element.tagName.toLowerCase();
     }
 
-    public createAccessibleGrid(container: HTMLElement, options: {
-        rows: number;
-        columns: number;
-        rowHeaders?: boolean;
-        columnHeaders?: boolean;
-        caption?: string;
-    }) {
+    public createAccessibleGrid(
+        container: HTMLElement,
+        options: {
+            rows: number;
+            columns: number;
+            rowHeaders?: boolean;
+            columnHeaders?: boolean;
+            caption?: string;
+        },
+    ) {
         // Set grid role and properties
         container.setAttribute('role', 'grid');
         container.setAttribute('aria-rowcount', options.rows.toString());
         container.setAttribute('aria-colcount', options.columns.toString());
-        
+
         if (options.caption) {
             container.setAttribute('aria-label', options.caption);
         }
 
         // Enable keyboard navigation
         container.setAttribute('tabindex', '0');
-        
+
         // Add grid navigation event listeners
         container.addEventListener('keydown', (event) => {
             this.handleGridKeyNavigation(event, container);
         });
     }
 
-    public createAccessibleCell(cell: HTMLElement, options: {
-        rowIndex: number;
-        columnIndex: number;
-        isHeader?: boolean;
-        description?: string;
-    }) {
+    public createAccessibleCell(
+        cell: HTMLElement,
+        options: {
+            rowIndex: number;
+            columnIndex: number;
+            isHeader?: boolean;
+            description?: string;
+        },
+    ) {
         if (options.isHeader) {
             cell.setAttribute('role', 'columnheader');
         } else {
@@ -354,7 +355,7 @@ export class AccessibilityManager {
 
         const currentRow = parseInt(focusedCell.getAttribute('aria-rowindex') || '1') - 1;
         const currentCol = parseInt(focusedCell.getAttribute('aria-colindex') || '1') - 1;
-        
+
         let targetRow = currentRow;
         let targetCol = currentCol;
 
@@ -397,9 +398,9 @@ export class AccessibilityManager {
 
     private focusGridCell(grid: HTMLElement, rowIndex: number, columnIndex: number) {
         const cell = grid.querySelector(
-            `[aria-rowindex="${rowIndex + 1}"][aria-colindex="${columnIndex + 1}"]`
+            `[aria-rowindex="${rowIndex + 1}"][aria-colindex="${columnIndex + 1}"]`,
         ) as HTMLElement;
-        
+
         if (cell) {
             this.setFocus(cell);
         }
@@ -423,30 +424,30 @@ export class AccessibilityManager {
     private applyFontSize() {
         const root = document.documentElement;
         const sizeMap = {
-            'small': '0.875rem',
-            'medium': '1rem',
-            'large': '1.125rem',
-            'x-large': '1.25rem'
+            small: '0.875rem',
+            medium: '1rem',
+            large: '1.125rem',
+            'x-large': '1.25rem',
         };
-        
+
         root.style.setProperty('--font-size-base', sizeMap[this.config.fontSize]);
     }
 
     private applyColorScheme(scheme: 'light' | 'dark' | 'auto') {
         const root = document.documentElement;
-        
+
         if (scheme === 'auto') {
             const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             scheme = prefersDark ? 'dark' : 'light';
         }
-        
+
         root.setAttribute('data-color-scheme', scheme);
     }
 
     private applyReducedMotionSettings() {
         const root = document.documentElement;
         const prefersReduced = this.reducedMotionQuery?.matches || false;
-        
+
         if (this.config.enableReducedMotion && prefersReduced) {
             root.style.setProperty('--animation-duration', '0.01ms');
             root.style.setProperty('--transition-duration', '0.01ms');
@@ -459,7 +460,7 @@ export class AccessibilityManager {
     private applyHighContrastSettings() {
         const root = document.documentElement;
         const prefersHighContrast = this.highContrastQuery?.matches || false;
-        
+
         if (this.config.enableHighContrast && prefersHighContrast) {
             root.setAttribute('data-high-contrast', 'true');
         } else {
@@ -495,10 +496,8 @@ export class AccessibilityManager {
 
     private showKeyboardHelp() {
         const shortcuts = Array.from(this.shortcuts.values());
-        const helpText = shortcuts
-            .map(s => `${this.formatShortcutKey(s)}: ${s.description}`)
-            .join('\n');
-        
+        const helpText = shortcuts.map((s) => `${this.formatShortcutKey(s)}: ${s.description}`).join('\n');
+
         this.announce(`Keyboard shortcuts: ${helpText}`, 'announcements');
     }
 
@@ -526,7 +525,7 @@ export class AccessibilityManager {
         document.removeEventListener('keyup', this.handleKeyUp.bind(this));
 
         // Remove live regions
-        this.liveRegions.forEach(region => {
+        this.liveRegions.forEach((region) => {
             region.remove();
         });
 
@@ -574,6 +573,6 @@ export const useAccessibility = (config?: Partial<IAccessibilityConfig>) => {
         createAccessibleGrid: manager.createAccessibleGrid.bind(manager),
         createAccessibleCell: manager.createAccessibleCell.bind(manager),
         updateConfig: manager.updateConfig.bind(manager),
-        getKeyboardShortcuts: manager.getKeyboardShortcuts.bind(manager)
+        getKeyboardShortcuts: manager.getKeyboardShortcuts.bind(manager),
     };
 };

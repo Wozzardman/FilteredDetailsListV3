@@ -30,27 +30,28 @@ export const EnhancedGridWrapper: React.FC<IEnhancedGridWrapperProps> = ({
         console.log('columns object keys:', columns ? Object.keys(columns) : 'no columns');
         console.log('datasetColumns:', datasetColumns);
         console.log('datasetColumns length:', datasetColumns?.length || 0);
-        
+
         if (records && Object.keys(records).length > 0) {
             const firstRecordId = Object.keys(records)[0];
             const firstRecord = records[firstRecordId];
             console.log('First record sample:', firstRecordId);
             console.log('First record available columns:', Object.keys(columns || {}));
             console.log('First record column values:');
-            Object.keys(columns || {}).forEach(colId => {
+            Object.keys(columns || {}).forEach((colId) => {
                 const value = firstRecord?.getValue(colId);
                 console.log(`  ${colId}: ${value} (raw: ${(value as any)?.raw})`);
             });
         }
-        
+
         // 🚨 IMPROVED DATA DETECTION - Handle async loading properly
         const hasRecords = records && Object.keys(records).length > 0;
         const hasRecordIds = sortedRecordIds && sortedRecordIds.length > 0;
         const hasRealData = hasRecords && hasRecordIds;
-        
+
         // Also check if we have columns configured (this means PowerApps is connected)
-        const hasColumnsConfigured = (datasetColumns && datasetColumns.length > 0) || (columns && Object.keys(columns).length > 0);
-        
+        const hasColumnsConfigured =
+            (datasetColumns && datasetColumns.length > 0) || (columns && Object.keys(columns).length > 0);
+
         console.log('=== DATA DETECTION START ===');
         console.log('sortedRecordIds.length:', sortedRecordIds?.length || 0);
         console.log('records keys length:', records ? Object.keys(records).length : 0);
@@ -89,7 +90,7 @@ export const EnhancedGridWrapper: React.FC<IEnhancedGridWrapperProps> = ({
                     datasetColumns.forEach((datasetColumn) => {
                         const value = record.getValue(datasetColumn.name);
                         const processedValue = (value as any)?.raw || value;
-                        
+
                         // Store value under the dataset column name
                         item[datasetColumn.name] = processedValue;
                         item[datasetColumn.alias || datasetColumn.name] = processedValue;
@@ -100,10 +101,10 @@ export const EnhancedGridWrapper: React.FC<IEnhancedGridWrapperProps> = ({
                         const columnInfo = columns[columnId];
                         const value = record.getValue(columnId);
                         const processedValue = (value as any)?.raw || value;
-                        
+
                         // Store value under the column ID
                         item[columnId] = processedValue;
-                        
+
                         // Also try to get column name from column configuration
                         try {
                             const columnName = columnInfo.getFormattedValue('ColName') || columnId;
@@ -117,7 +118,7 @@ export const EnhancedGridWrapper: React.FC<IEnhancedGridWrapperProps> = ({
                 return item;
             })
             .filter(Boolean);
-            
+
         console.log('Transformed data sample (first 2 items):', result.slice(0, 2));
         console.log('=== END DATA DEBUG ===\n');
         return result;
@@ -132,29 +133,31 @@ export const EnhancedGridWrapper: React.FC<IEnhancedGridWrapperProps> = ({
         console.log('sortedColumnIds length:', sortedColumnIds?.length || 0);
         console.log('columns object:', columns);
         console.log('columns object keys:', columns ? Object.keys(columns) : []);
-        
+
         // 🚨 PRIORITY 1: Use datasetColumns if available (this is the real PowerApps data structure)
         if (datasetColumns && datasetColumns.length > 0) {
             console.log('✅ Using datasetColumns for column transformation');
-            
+
             // Filter out system columns and focus on business data columns
-            const businessColumns = datasetColumns.filter(column => {
+            const businessColumns = datasetColumns.filter((column) => {
                 const name = column.name || '';
                 // Skip system columns
-                return !['RecordKey', 'RecordCanSelect', 'RecordSelected'].includes(name) && 
-                       name !== '' && 
-                       name !== 'null';
+                return (
+                    !['RecordKey', 'RecordCanSelect', 'RecordSelected'].includes(name) && name !== '' && name !== 'null'
+                );
             });
-            
-            console.log(`Found ${businessColumns.length} business columns out of ${datasetColumns.length} total columns`);
-            
+
+            console.log(
+                `Found ${businessColumns.length} business columns out of ${datasetColumns.length} total columns`,
+            );
+
             const result = businessColumns.map((column, index) => {
                 // Use the column name directly - this should match the export CSV headers
                 const columnName = column.name || `column_${index}`;
                 const displayName = column.displayName || column.name || `Column ${index + 1}`;
-                
+
                 console.log(`Column [${index}]: ${columnName} -> ${displayName}`);
-                
+
                 return {
                     key: columnName,
                     name: displayName,
@@ -174,36 +177,36 @@ export const EnhancedGridWrapper: React.FC<IEnhancedGridWrapperProps> = ({
                     },
                 } as IColumn;
             });
-            
+
             console.log('✅ Business columns transformation complete:', result.length, 'columns');
             return result;
         }
-        
-        // 🚨 PRIORITY 2: Use sortedColumnIds + columns configuration 
+
+        // 🚨 PRIORITY 2: Use sortedColumnIds + columns configuration
         if (sortedColumnIds && sortedColumnIds.length > 0 && columns) {
             console.log('⚠️ Using sortedColumnIds + columns configuration');
             const derivedColumns = sortedColumnIds.map((columnId, index) => {
                 const columnConfig = columns[columnId];
-                
+
                 // Try to get column properties from configuration
                 let columnName = columnId;
                 let displayName = columnId;
                 let width = 150;
-                
+
                 try {
                     columnName = columnConfig?.getFormattedValue('ColName') || columnId;
                     displayName = columnConfig?.getFormattedValue('ColDisplayName') || columnName;
-                    width = columnConfig?.getValue('ColWidth') as number || 150;
+                    width = (columnConfig?.getValue('ColWidth') as number) || 150;
                 } catch (e) {
                     console.log(`Could not get config for column ${columnId}:`, e);
                 }
-                
+
                 console.log(`Creating column [${index}] from columnId "${columnId}":`, {
                     columnName,
                     displayName,
-                    width
+                    width,
                 });
-                
+
                 return {
                     key: columnId,
                     name: displayName,
@@ -216,16 +219,18 @@ export const EnhancedGridWrapper: React.FC<IEnhancedGridWrapperProps> = ({
                     isSortedDescending: false,
                     onRender: (item: any, index?: number) => {
                         const value = item[columnName] || item[columnId] || '';
-                        console.log(`Rendering config cell [${index}][${columnId}]: fieldName="${columnName}", value="${value}"`);
+                        console.log(
+                            `Rendering config cell [${index}][${columnId}]: fieldName="${columnName}", value="${value}"`,
+                        );
                         return value;
-                    }
+                    },
                 } as IColumn;
             });
-            
+
             console.log('✅ sortedColumnIds transformation complete:', derivedColumns.length, 'columns');
             return derivedColumns;
         }
-        
+
         // 🚨 FALLBACK: No columns available
         console.log('❌ NO COLUMNS AVAILABLE - creating empty array');
         return [];

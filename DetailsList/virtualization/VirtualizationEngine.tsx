@@ -1,254 +1,329 @@
 import * as React from 'react';
-import { FixedSizeGrid as Grid, VariableSizeGrid } from 'react-window';
-import { areEqual } from 'react-window';
-import AutoSizer from 'react-virtualized-auto-sizer';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { BehaviorSubject, debounceTime } from 'rxjs';
 import { IColumn } from '@fluentui/react';
-import memoizeOne from 'memoize-one';
+import '../css/VirtualizationEngine.css';
 
-export interface VirtualizationConfig {
-    enableVirtualization: boolean;
-    rowHeight: number | ((index: number) => number);
-    columnWidth: number | ((index: number) => number);
-    overscanRowCount: number;
-    overscanColumnCount: number;
-    useVariableSize: boolean;
-    enableScrollSync: boolean;
-    bufferSize: number;
-    estimatedRowHeight: number;
-    estimatedColumnWidth: number;
-}
+// Enterprise-grade performance monitoring
+export class PerformanceMetrics {
+    private renderTimes: number[] = [];
+    private scrollEvents = new BehaviorSubject<{ scrollTop: number; timestamp: number }>({
+        scrollTop: 0,
+        timestamp: Date.now(),
+    });
+    private memoryUsage: number[] = [];
 
-export interface VirtualizedCellProps {
-    columnIndex: number;
-    rowIndex: number;
-    style: React.CSSProperties;
-    data: {
-        items: any[];
-        columns: IColumn[];
-        onCellClick?: (item: any, column: IColumn) => void;
-        onCellEdit?: (item: any, columnKey: string, newValue: any) => void;
-        readOnlyColumns?: string[];
-        getRowId: (item: any) => string;
-    };
-}
-
-// Memoized cell component for optimal performance
-const VirtualizedCell = React.memo<VirtualizedCellProps>(({ columnIndex, rowIndex, style, data }) => {
-    const { items, columns, onCellClick, onCellEdit, readOnlyColumns = [], getRowId } = data;
-    
-    // Header row
-    if (rowIndex === 0) {
-        const column = columns[columnIndex];
-        return (
-            <div
-                style={{
-                    ...style,
-                    backgroundColor: '#f3f2f1',
-                    borderBottom: '1px solid #e1dfdd',
-                    borderRight: '1px solid #e1dfdd',
-                    padding: '8px 12px',
-                    fontWeight: 600,
-                    display: 'flex',
-                    alignItems: 'center',
-                    fontSize: '12px',
-                    textOverflow: 'ellipsis',
-                    overflow: 'hidden',
-                    whiteSpace: 'nowrap'
-                }}
-                title={column?.name}
-            >
-                {column?.name || ''}
-            </div>
-        );
+    startMeasurement(): { end: () => number } {
+        const start = performance.now();
+        return {
+            end: () => {
+                const duration = performance.now() - start;
+                this.renderTimes.push(duration);
+                if (this.renderTimes.length > 100) {
+                    this.renderTimes = this.renderTimes.slice(-50);
+                }
+                return duration;
+            },
+        };
     }
 
-    // Data row
-    const item = items[rowIndex - 1];
-    const column = columns[columnIndex];
-    
-    if (!item || !column) {
-        return <div style={style} />;
+    trackScrollPerformance(scrollTop: number) {
+        this.scrollEvents.next({ scrollTop, timestamp: Date.now() });
     }
 
-    const cellValue = item[column.key] || '';
-    const isReadOnly = readOnlyColumns.includes(column.key);
-    const rowId = getRowId(item);
+    getMetrics() {
+        const avgRenderTime = this.renderTimes.reduce((a, b) => a + b, 0) / this.renderTimes.length;
+        const p95RenderTime = this.renderTimes.sort((a, b) => a - b)[Math.floor(this.renderTimes.length * 0.95)];
 
-    const handleCellClick = React.useCallback(() => {
-        if (onCellClick) {
-            onCellClick(item, column);
+        // Memory usage tracking (if available)
+        const memInfo = (performance as any).memory;
+        if (memInfo) {
+            this.memoryUsage.push(memInfo.usedJSHeapSize);
         }
-    }, [item, column, onCellClick]);
 
-    return (
-        <div
-            style={{
-                ...style,
-                borderBottom: '1px solid #e1dfdd',
-                borderRight: '1px solid #e1dfdd',
-                padding: '8px 12px',
-                display: 'flex',
-                alignItems: 'center',
-                cursor: !isReadOnly ? 'pointer' : 'default',
-                backgroundColor: rowIndex % 2 === 0 ? '#ffffff' : '#faf9f8',
-                fontSize: '13px',
-                textOverflow: 'ellipsis',
-                overflow: 'hidden',
-                whiteSpace: 'nowrap'
-            }}
-            onClick={handleCellClick}
-            title={cellValue?.toString() || ''}
-            data-row-id={rowId}
-            data-column-key={column.key}
-        >
-            {cellValue?.toString() || ''}
-        </div>
-    );
-}, areEqual);
+        return {
+            avgRenderTime: avgRenderTime || 0,
+            p95RenderTime: p95RenderTime || 0,
+            renderCount: this.renderTimes.length,
+            memoryTrend: this.memoryUsage.slice(-10),
+            currentMemory: memInfo?.usedJSHeapSize || 0,
+        };
+    }
+}
 
-VirtualizedCell.displayName = 'VirtualizedCell';
+// Advanced virtualization configuration
+export interface VirtualizationConfig {
+    itemHeight: number | ((index: number) => number);
+    overscan: number;
+    enableScrollDebounce: boolean;
+    scrollDebounceMs: number;
+    bufferSize: number;
+    recycleThreshold: number;
+    enableInfiniteLoading: boolean;
+    loadMoreThreshold: number;
+}
 
-export interface VirtualizationEngineProps {
+// Enterprise Virtualization Hook
+export const useEnterpriseVirtualization = (items: any[], config: Partial<VirtualizationConfig> = {}) => {
+    const [metrics] = React.useState(() => new PerformanceMetrics());
+    const [isLoading, setIsLoading] = React.useState(false);
+    const [selectedKeys, setSelectedKeys] = React.useState<Set<string>>(new Set());
+
+    const defaultConfig: VirtualizationConfig = {
+        itemHeight: 42,
+        overscan: 5,
+        enableScrollDebounce: true,
+        scrollDebounceMs: 16,
+        bufferSize: 10,
+        recycleThreshold: 1000,
+        enableInfiniteLoading: false,
+        loadMoreThreshold: 10,
+        ...config,
+    };
+
+    // Selection management
+    const handleSelectionChange = React.useCallback((key: string, selected: boolean) => {
+        setSelectedKeys((prev) => {
+            const newSet = new Set(prev);
+            if (selected) {
+                newSet.add(key);
+            } else {
+                newSet.delete(key);
+            }
+            return newSet;
+        });
+    }, []);
+
+    // Load more data for infinite scrolling
+    const loadMoreData = React.useCallback(async (startIndex: number, stopIndex: number): Promise<void> => {
+        setIsLoading(true);
+        try {
+            // This would typically be an API call
+            await new Promise((resolve) => setTimeout(resolve, 100));
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    return {
+        config: defaultConfig,
+        metrics,
+        isLoading,
+        selectedKeys,
+        handleSelectionChange,
+        loadMoreData,
+    };
+};
+
+// High-performance TanStack Virtual implementation
+export const UltraVirtualizedList: React.FC<{
     items: any[];
     columns: IColumn[];
-    config: VirtualizationConfig;
-    onCellClick?: (item: any, column: IColumn) => void;
-    onCellEdit?: (item: any, columnKey: string, newValue: any) => void;
-    readOnlyColumns?: string[];
-    getRowId: (item: any) => string;
     height: number;
-    width: number;
-}
+    estimateSize?: (index: number) => number;
+    onRenderItemColumn?: (item: any, index: number, column: IColumn) => React.ReactNode;
+    enableSelection?: boolean;
+    onSelectionChange?: (selectedKeys: Set<string>) => void;
+    config?: Partial<VirtualizationConfig>;
+}> = ({
+    items,
+    columns,
+    height,
+    estimateSize = () => 42,
+    onRenderItemColumn,
+    enableSelection = false,
+    onSelectionChange,
+    config = {},
+}) => {
+    const parentRef = React.useRef<HTMLDivElement>(null);
+    const { selectedKeys, handleSelectionChange, metrics } = useEnterpriseVirtualization(items, config);
 
-export const VirtualizationEngine = React.memo<VirtualizationEngineProps>((props) => {
-    const {
-        items,
-        columns,
-        config,
-        onCellClick,
-        onCellEdit,
-        readOnlyColumns,
-        getRowId,
-        height,
-        width
-    } = props;
+    const virtualizer = useVirtualizer({
+        count: items.length,
+        getScrollElement: () => parentRef.current,
+        estimateSize,
+        overscan: 5,
+    });
 
-    // Memoize the data object to prevent unnecessary re-renders
-    const cellData = React.useMemo(() => ({
-        items,
-        columns,
-        onCellClick,
-        onCellEdit,
-        readOnlyColumns,
-        getRowId
-    }), [items, columns, onCellClick, onCellEdit, readOnlyColumns, getRowId]);
-
-    // Calculate dynamic row heights if variable size is enabled
-    const getRowHeight = React.useCallback((index: number) => {
-        if (index === 0) return 32; // Header height
-        
-        if (typeof config.rowHeight === 'function') {
-            return config.rowHeight(index - 1);
+    // Notify parent of selection changes
+    React.useEffect(() => {
+        if (onSelectionChange) {
+            onSelectionChange(selectedKeys);
         }
-        return typeof config.rowHeight === 'number' ? config.rowHeight : config.estimatedRowHeight;
-    }, [config.rowHeight, config.estimatedRowHeight]);
+    }, [selectedKeys, onSelectionChange]);
 
-    // Calculate dynamic column widths
-    const getColumnWidth = React.useCallback((index: number) => {
-        const column = columns[index];
-        if (!column) return config.estimatedColumnWidth;
+    // Performance monitoring
+    React.useEffect(() => {
+        const measurement = metrics.startMeasurement();
+        return () => {
+            measurement.end();
+        };
+    });
 
-        if (typeof config.columnWidth === 'function') {
-            return config.columnWidth(index);
-        }
-        
-        // Auto-calculate based on column content
-        if (column.calculatedWidth) return column.calculatedWidth;
-        if (column.minWidth) return Math.max(column.minWidth, 120);
-        
-        return typeof config.columnWidth === 'number' ? config.columnWidth : 150;
-    }, [columns, config.columnWidth, config.estimatedColumnWidth]);
+    const handleRowClick = React.useCallback(
+        (item: any, index: number) => {
+            if (enableSelection) {
+                const key = item.key || `row-${index}`;
+                const isSelected = selectedKeys.has(key);
+                handleSelectionChange(key, !isSelected);
+            }
+        },
+        [enableSelection, selectedKeys, handleSelectionChange],
+    );
 
-    const rowCount = items.length + 1; // +1 for header
-    const columnCount = columns.length;
+    return (
+        <div ref={parentRef} className="ultra-virtualized-container">
+            <div className="ultra-virtualized-content">
+                {virtualizer.getVirtualItems().map((virtualItem) => {
+                    const item = items[virtualItem.index];
+                    if (!item) return null;
 
-    if (!config.enableVirtualization || items.length < 50) {
-        // Fallback to non-virtualized rendering for small datasets
-        return (
-            <div style={{ height, width, overflow: 'auto' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columnCount}, 1fr)` }}>
-                    {/* Render all cells directly for small datasets */}
-                    {Array.from({ length: rowCount }, (_, rowIndex) =>
-                        Array.from({ length: columnCount }, (_, columnIndex) => (
-                            <VirtualizedCell
-                                key={`${rowIndex}-${columnIndex}`}
-                                rowIndex={rowIndex}
-                                columnIndex={columnIndex}
-                                style={{}}
-                                data={cellData}
-                            />
-                        ))
-                    )}
-                </div>
+                    const key = item.key || `row-${virtualItem.index}`;
+                    const isSelected = selectedKeys.has(key);
+
+                    return (
+                        <div
+                            key={String(virtualItem.key)}
+                            className={`ultra-virtualized-row ${isSelected ? 'selected' : ''}`}
+                            onClick={() => handleRowClick(item, virtualItem.index)}
+                            role="row"
+                            aria-selected={isSelected ? 'true' : 'false'}
+                            tabIndex={0}
+                        >
+                            {columns.map((column) => (
+                                <div key={column.key} className="ultra-virtualized-cell" role="gridcell">
+                                    {onRenderItemColumn
+                                        ? onRenderItemColumn(item, virtualItem.index, column)
+                                        : item[column.fieldName || column.key]}
+                                </div>
+                            ))}
+                        </div>
+                    );
+                })}
             </div>
-        );
-    }
+        </div>
+    );
+};
 
-    // Use variable size grid for dynamic heights/widths
-    if (config.useVariableSize) {
-        return (
-            <VariableSizeGrid
-                height={height}
-                width={width}
-                rowCount={rowCount}
-                columnCount={columnCount}
-                rowHeight={getRowHeight}
-                columnWidth={getColumnWidth}
-                overscanRowCount={config.overscanRowCount}
-                overscanColumnCount={config.overscanColumnCount}
-                itemData={cellData}
-                style={{ outline: 'none' }}
-            >
-                {VirtualizedCell}
-            </VariableSizeGrid>
-        );
-    }
+// Native React virtualization for maximum compatibility
+export const NativeVirtualizedList: React.FC<{
+    items: any[];
+    columns: IColumn[];
+    height: number;
+    itemHeight?: number;
+    onRenderItemColumn?: (item: any, index: number, column: IColumn) => React.ReactNode;
+    enableSelection?: boolean;
+    onSelectionChange?: (selectedKeys: Set<string>) => void;
+}> = ({ items, columns, height, itemHeight = 42, onRenderItemColumn, enableSelection = false, onSelectionChange }) => {
+    const [scrollTop, setScrollTop] = React.useState(0);
+    const { selectedKeys, handleSelectionChange, metrics } = useEnterpriseVirtualization(items);
 
-    // Use fixed size grid for better performance with uniform cells
-    const fixedRowHeight = typeof config.rowHeight === 'number' ? config.rowHeight : config.estimatedRowHeight;
-    const fixedColumnWidth = typeof config.columnWidth === 'number' ? config.columnWidth : config.estimatedColumnWidth;
+    const containerRef = React.useRef<HTMLDivElement>(null);
+
+    // Calculate visible range
+    const startIndex = Math.floor(scrollTop / itemHeight);
+    const endIndex = Math.min(startIndex + Math.ceil(height / itemHeight) + 1, items.length);
+
+    // Visible items with buffer
+    const visibleItems = React.useMemo(() => {
+        const buffer = 5;
+        const start = Math.max(0, startIndex - buffer);
+        const end = Math.min(items.length, endIndex + buffer);
+
+        return items.slice(start, end).map((item, index) => ({
+            item,
+            index: start + index,
+        }));
+    }, [items, startIndex, endIndex]);
+
+    const handleScroll = React.useCallback(
+        (e: React.UIEvent<HTMLDivElement>) => {
+            const newScrollTop = e.currentTarget.scrollTop;
+            setScrollTop(newScrollTop);
+            metrics.trackScrollPerformance(newScrollTop);
+        },
+        [metrics],
+    );
+
+    // Notify parent of selection changes
+    React.useEffect(() => {
+        if (onSelectionChange) {
+            onSelectionChange(selectedKeys);
+        }
+    }, [selectedKeys, onSelectionChange]);
+
+    const handleRowClick = React.useCallback(
+        (item: any, index: number) => {
+            if (enableSelection) {
+                const key = item.key || `row-${index}`;
+                const isSelected = selectedKeys.has(key);
+                handleSelectionChange(key, !isSelected);
+            }
+        },
+        [enableSelection, selectedKeys, handleSelectionChange],
+    );
 
     return (
-        <Grid
-            height={height}
-            width={width}
-            rowCount={rowCount}
-            columnCount={columnCount}
-            rowHeight={fixedRowHeight}
-            columnWidth={fixedColumnWidth}
-            overscanRowCount={config.overscanRowCount}
-            overscanColumnCount={config.overscanColumnCount}
-            itemData={cellData}
-            style={{ outline: 'none' }}
-        >
-            {VirtualizedCell}
-        </Grid>
-    );
-});
+        <div ref={containerRef} className="native-virtualized-container" onScroll={handleScroll}>
+            <div className="native-virtualized-content">
+                {visibleItems.map(({ item, index }) => {
+                    const key = item.key || `row-${index}`;
+                    const isSelected = selectedKeys.has(key);
 
-VirtualizationEngine.displayName = 'VirtualizationEngine';
-
-// Auto-sizing wrapper for responsive behavior
-export const AutoSizedVirtualizationEngine: React.FC<Omit<VirtualizationEngineProps, 'height' | 'width'>> = (props) => {
-    return (
-        <AutoSizer>
-            {({ height, width }) => (
-                <VirtualizationEngine
-                    {...props}
-                    height={height}
-                    width={width}
-                />
-            )}
-        </AutoSizer>
+                    return (
+                        <div
+                            key={key}
+                            className={`native-virtualized-row ${isSelected ? 'selected' : ''}`}
+                            onClick={() => handleRowClick(item, index)}
+                            role="row"
+                            aria-selected={isSelected ? 'true' : 'false'}
+                            tabIndex={0}
+                        >
+                            {columns.map((column) => (
+                                <div key={column.key} className="native-virtualized-cell" role="gridcell">
+                                    {onRenderItemColumn
+                                        ? onRenderItemColumn(item, index, column)
+                                        : item[column.fieldName || column.key]}
+                                </div>
+                            ))}
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
     );
+};
+
+// Adaptive virtualization that chooses the best implementation
+export const AdaptiveVirtualizedGrid: React.FC<{
+    items: any[];
+    columns: IColumn[];
+    height: number;
+    width?: number;
+    onRenderItemColumn?: (item: any, index: number, column: IColumn) => React.ReactNode;
+    enableSelection?: boolean;
+    onSelectionChange?: (selectedKeys: Set<string>) => void;
+    config?: Partial<VirtualizationConfig>;
+}> = (props) => {
+    const { items } = props;
+
+    // Choose virtualization strategy based on data size and device capabilities
+    const virtualizationStrategy = React.useMemo(() => {
+        const itemCount = items.length;
+        const isLargeDataset = itemCount > 1000;
+        const isMobile = window.innerWidth < 768;
+        const hasAdvancedFeatures = 'IntersectionObserver' in window;
+
+        if (isLargeDataset && hasAdvancedFeatures && !isMobile) {
+            return 'ultra'; // TanStack Virtual for best performance
+        } else {
+            return 'native'; // Native React for better compatibility
+        }
+    }, [items.length]);
+
+    if (virtualizationStrategy === 'ultra') {
+        return <UltraVirtualizedList {...props} />;
+    }
+
+    return <NativeVirtualizedList {...props} />;
 };

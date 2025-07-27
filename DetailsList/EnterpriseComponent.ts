@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { IInputs, IOutputs } from './generated/ManifestTypes';
 import { SimpleEnhancedGridWrapper } from './components/SimpleEnhancedGridWrapper';
-import { AdvancedVirtualizedGrid } from './virtualization/AdvancedVirtualization';
+import { HighPerformanceVirtualGrid } from './virtualization/HighPerformanceVirtualGrid';
 import { performanceMonitor } from './performance/PerformanceMonitor';
 import { useAccessibility } from './accessibility/AccessibilityManager';
 import { useCollaboration } from './collaboration/CollaborationEngine';
@@ -20,8 +20,8 @@ export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.React
     private static readonly COLUMN_LIMIT: number = 125;
     private static readonly PERFORMANCE_THRESHOLDS = {
         renderTime: 16.67, // 60fps
-        memoryUsage: 0.8,   // 80% of available memory
-        frameRate: 55       // Minimum acceptable FPS
+        memoryUsage: 0.8, // 80% of available memory
+        frameRate: 55, // Minimum acceptable FPS
     };
 
     // Core PCF properties
@@ -32,9 +32,9 @@ export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.React
 
     // Data management
     sortedRecordsIds: string[] = [];
-    records: { [id: string]: ComponentFramework.PropertyHelper.DataSetApi.EntityRecord; };
+    records: { [id: string]: ComponentFramework.PropertyHelper.DataSetApi.EntityRecord };
     sortedColumnsIds: string[] = [];
-    columns: { [id: string]: ComponentFramework.PropertyHelper.DataSetApi.EntityRecord; };
+    columns: { [id: string]: ComponentFramework.PropertyHelper.DataSetApi.EntityRecord };
     datasetColumns: ComponentFramework.PropertyHelper.DataSetApi.Column[];
 
     // Event handling
@@ -75,27 +75,26 @@ export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.React
 
     public init(context: ComponentFramework.Context<IInputs>, notifyOutputChanged: () => void): void {
         const endMeasurement = this.performanceMonitor.startMeasure('component-init');
-        
+
         try {
             this.notifyOutputChanged = notifyOutputChanged;
             this.context = context;
             this.resources = context.resources;
-            
+
             // Enable container resize tracking
             context.mode.trackContainerResize(true);
-            
+
             // Initialize enterprise features based on configuration
             this.initializeEnterpriseFeatures(context);
-            
+
             // Initialize selection
             this.initializeSelection();
-            
+
             // Set column limit
             this.setColumnLimit(context);
-            
+
             // Log initialization
             console.log('🚀 Enterprise FilteredDetailsListV2 initialized with advanced features');
-            
         } finally {
             endMeasurement();
         }
@@ -104,22 +103,22 @@ export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.React
     private initializeEnterpriseFeatures(context: ComponentFramework.Context<IInputs>) {
         // Check for feature flags or configuration
         const enableAdvancedFeatures = true; // Could be based on license or configuration
-        
+
         if (enableAdvancedFeatures) {
             this.enhancedFeaturesEnabled = true;
-            
+
             // Initialize performance monitoring
             // Performance monitor records metrics automatically through its monitoring systems
-            
+
             // Enable virtualization for large datasets
             this.virtualizedMode = this.shouldUseVirtualization();
-            
+
             console.log('✅ Enterprise features enabled:', {
                 virtualization: this.virtualizedMode,
                 performance: true,
                 accessibility: true,
                 aiInsights: this.aiInsightsEnabled,
-                collaboration: this.collaborationEnabled
+                collaboration: this.collaborationEnabled,
             });
         }
     }
@@ -128,7 +127,7 @@ export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.React
         // Enable virtualization for datasets > 1000 items or mobile devices
         const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         const hasLargeDataset = this.context.parameters.records.paging.totalResultCount > 1000;
-        
+
         return hasLargeDataset || isMobile;
     }
 
@@ -136,7 +135,7 @@ export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.React
         this.selection = {
             count: 0,
             onSelectionChanged: () => this.onSelectionChanged(),
-            canSelectItem: () => this.canSelectItem()
+            canSelectItem: () => this.canSelectItem(),
         };
     }
 
@@ -150,7 +149,7 @@ export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.React
 
     public updateView(context: ComponentFramework.Context<IInputs>): React.ReactElement {
         const endMeasurement = this.performanceMonitor.startMeasure('component-update');
-        
+
         try {
             const dataset = context.parameters.records;
             const columns = context.parameters.columns;
@@ -163,7 +162,7 @@ export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.React
 
             // Check for data changes
             const datasetChanged = this.hasDatasetChanged(context, dataset, columns);
-            
+
             if (datasetChanged) {
                 this.updateDataset(dataset, columns, context);
             }
@@ -178,17 +177,12 @@ export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.React
             this.handlePaginationChanges(dataset);
 
             return gridComponent;
-            
         } finally {
             endMeasurement();
         }
     }
 
-    private logPerformanceMetrics(
-        dataset: any, 
-        columns: any, 
-        context: ComponentFramework.Context<IInputs>
-    ) {
+    private logPerformanceMetrics(dataset: any, columns: any, context: ComponentFramework.Context<IInputs>) {
         if (process.env.NODE_ENV === 'development') {
             console.log('=== ENTERPRISE PCF PERFORMANCE METRICS ===');
             console.log('Dataset loading:', dataset.loading);
@@ -196,7 +190,7 @@ export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.React
             console.log('Dataset columns count:', columns.sortedRecordIds?.length || 0);
             console.log('Allocated dimensions:', {
                 width: context.mode.allocatedWidth,
-                height: context.mode.allocatedHeight
+                height: context.mode.allocatedHeight,
             });
             console.log('Memory usage:', this.getMemoryUsage());
             console.log('Virtualization enabled:', this.virtualizedMode);
@@ -214,25 +208,21 @@ export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.React
         return 'Not available';
     }
 
-    private hasDatasetChanged(
-        context: ComponentFramework.Context<IInputs>,
-        dataset: any,
-        columns: any
-    ): boolean {
+    private hasDatasetChanged(context: ComponentFramework.Context<IInputs>, dataset: any, columns: any): boolean {
         const datasetNotInitialized = this.records === undefined;
-        const datasetChanged = 
+        const datasetChanged =
             !dataset.loading &&
             !columns.loading &&
             (context.updatedProperties.indexOf('dataset') > -1 ||
-             context.updatedProperties.indexOf('records_dataset') > -1 ||
-             context.updatedProperties.indexOf('columns_dataset') > -1);
+                context.updatedProperties.indexOf('records_dataset') > -1 ||
+                context.updatedProperties.indexOf('columns_dataset') > -1);
 
         return datasetChanged || datasetNotInitialized;
     }
 
     private updateDataset(dataset: any, columns: any, context: ComponentFramework.Context<IInputs>) {
         const endMeasurement = this.performanceMonitor.startMeasure('dataset-update');
-        
+
         try {
             // Clear selection if first time setting records
             if (!this.records) {
@@ -255,7 +245,6 @@ export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.React
             }
 
             this.pagingEventPending = false;
-            
         } finally {
             endMeasurement();
         }
@@ -300,10 +289,14 @@ export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.React
 
     private renderGridItem({ item, index, columns }: any): React.ReactElement {
         // Custom item renderer for virtualized grid
-        return React.createElement('div', {
-            className: 'virtualized-grid-item',
-            key: index
-        }, `Item ${index}: ${JSON.stringify(item)}`);
+        return React.createElement(
+            'div',
+            {
+                className: 'virtualized-grid-item',
+                key: index,
+            },
+            `Item ${index}: ${JSON.stringify(item)}`,
+        );
     }
 
     private handleItemsRendered({ startIndex, stopIndex }: any) {
@@ -321,12 +314,12 @@ export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.React
 
     private getDataItems(): any[] {
         // Convert PCF dataset to array format for virtualization
-        return this.sortedRecordsIds.map(id => this.records[id]);
+        return this.sortedRecordsIds.map((id) => this.records[id]);
     }
 
     private getColumnDefinitions(): any[] {
         // Convert PCF columns to array format for virtualization
-        return this.sortedColumnsIds.map(id => this.columns[id]);
+        return this.sortedColumnsIds.map((id) => this.columns[id]);
     }
 
     private handlePaginationChanges(dataset: any) {
@@ -391,18 +384,18 @@ export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.React
         // Reset events
         this.eventName = '';
         this.filterEventName = '';
-        
+
         return { ...defaultOutputs, ...eventOutputs };
     }
 
     public destroy(): void {
         // Clean up enterprise features
         this.performanceMonitor.destroy();
-        
+
         if (this.accessibilityManager) {
             this.accessibilityManager.destroy();
         }
-        
+
         console.log('🧹 Enterprise FilteredDetailsListV2 destroyed and cleaned up');
     }
 

@@ -59,16 +59,16 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     private enablePerformanceMonitoring = true;
     private enableInlineEditing = true;
     private enableDragFill = true;
-    
+
     // Inline editing state
     private pendingChanges: Map<string, Map<string, any>> = new Map();
-    
+
     // Legacy compatibility mode flag
     private isLegacyMode = false; // Always use modern mode
 
     public init(context: ComponentFramework.Context<IInputs>, notifyOutputChanged: () => void): void {
         const endMeasurement = performanceMonitor.startMeasure('component-init');
-        
+
         try {
             this.notifyOutputChanged = notifyOutputChanged;
             this.context = context;
@@ -78,10 +78,9 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 onSelectionChanged: this.onSelectionChanged,
                 canSelectItem: this.canSelectItem,
             });
-            
+
             // Initialize enterprise features
             this.initializeEnterpriseFeatures();
-            
         } finally {
             endMeasurement();
         }
@@ -92,14 +91,14 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         if (this.enableAIInsights) {
             console.log('🤖 AI insights enabled');
         }
-        
+
         // Performance monitoring is enabled by default
         if (this.enablePerformanceMonitoring) {
             console.log('📊 Performance monitoring enabled');
             const endComponentInit = performanceMonitor.startMeasure('component-initialization');
             endComponentInit();
         }
-        
+
         console.log('🚀 Enterprise features initialized');
     }
 
@@ -120,10 +119,10 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         sortedRecordIds: string[];
     } {
         console.log('🔄 Converting legacy fields to modern columns format');
-        
+
         const convertedRecords: { [id: string]: ComponentFramework.PropertyHelper.DataSetApi.EntityRecord } = {};
         const sortedIds: string[] = [];
-        
+
         if (fieldsDataset?.sortedRecordIds) {
             fieldsDataset.sortedRecordIds.forEach((fieldId) => {
                 const fieldRecord = fieldsDataset.records[fieldId];
@@ -133,48 +132,48 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                         ...fieldRecord,
                         getValue: (propertyName: string) => {
                             const legacyMapping: { [key: string]: string } = {
-                                'ColDisplayName': 'DisplayName',
-                                'ColName': 'Name',
-                                'ColWidth': 'Width',
-                                'ColCellType': 'CellType',
-                                'ColHorizontalAlign': 'HorizontalAlign',
-                                'ColVerticalAlign': 'VerticalAlign',
-                                'ColMultiLine': 'MultiLine',
-                                'ColResizable': 'Resizable',
-                                'ColSortable': 'Sortable',
-                                'ColSortBy': 'SortBy',
-                                'ColFilterable': 'Filterable',
+                                ColDisplayName: 'DisplayName',
+                                ColName: 'Name',
+                                ColWidth: 'Width',
+                                ColCellType: 'CellType',
+                                ColHorizontalAlign: 'HorizontalAlign',
+                                ColVerticalAlign: 'VerticalAlign',
+                                ColMultiLine: 'MultiLine',
+                                ColResizable: 'Resizable',
+                                ColSortable: 'Sortable',
+                                ColSortBy: 'SortBy',
+                                ColFilterable: 'Filterable',
                             };
-                            
+
                             const legacyPropertyName = legacyMapping[propertyName] || propertyName;
                             return fieldRecord.getValue(legacyPropertyName);
                         },
                         getFormattedValue: (propertyName: string) => {
                             const legacyMapping: { [key: string]: string } = {
-                                'ColDisplayName': 'DisplayName',
-                                'ColName': 'Name',
-                                'ColWidth': 'Width',
-                                'ColCellType': 'CellType',
-                                'ColHorizontalAlign': 'HorizontalAlign',
-                                'ColVerticalAlign': 'VerticalAlign',
-                                'ColMultiLine': 'MultiLine',
-                                'ColResizable': 'Resizable',
-                                'ColSortable': 'Sortable',
-                                'ColSortBy': 'SortBy',
-                                'ColFilterable': 'Filterable',
+                                ColDisplayName: 'DisplayName',
+                                ColName: 'Name',
+                                ColWidth: 'Width',
+                                ColCellType: 'CellType',
+                                ColHorizontalAlign: 'HorizontalAlign',
+                                ColVerticalAlign: 'VerticalAlign',
+                                ColMultiLine: 'MultiLine',
+                                ColResizable: 'Resizable',
+                                ColSortable: 'Sortable',
+                                ColSortBy: 'SortBy',
+                                ColFilterable: 'Filterable',
                             };
-                            
+
                             const legacyPropertyName = legacyMapping[propertyName] || propertyName;
                             return fieldRecord.getFormattedValue(legacyPropertyName);
-                        }
+                        },
                     };
-                    
+
                     convertedRecords[fieldId] = convertedRecord;
                     sortedIds.push(fieldId);
                 }
             });
         }
-        
+
         console.log(`✅ Converted ${sortedIds.length} legacy fields to modern columns`);
         return { records: convertedRecords, sortedRecordIds: sortedIds };
     }
@@ -183,24 +182,26 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
      * Gets the correct property names based on legacy vs modern mode
      */
     private getRecordPropertyNames() {
-        return this.isLegacyMode ? {
-            key: ItemsColumns.ItemKey,
-            canSelect: ItemsColumns.ItemCanSelect,
-            selected: ItemsColumns.ItemSelected
-        } : {
-            key: RecordsColumns.RecordKey,
-            canSelect: RecordsColumns.RecordCanSelect,
-            selected: RecordsColumns.RecordSelected
-        };
+        return this.isLegacyMode
+            ? {
+                  key: ItemsColumns.ItemKey,
+                  canSelect: ItemsColumns.ItemCanSelect,
+                  selected: ItemsColumns.ItemSelected,
+              }
+            : {
+                  key: RecordsColumns.RecordKey,
+                  canSelect: RecordsColumns.RecordCanSelect,
+                  selected: RecordsColumns.RecordSelected,
+              };
     }
 
     public updateView(context: ComponentFramework.Context<IInputs>): React.ReactElement {
         // Detect legacy vs modern mode
         this.isLegacyMode = this.detectLegacyMode(context);
-        
+
         let dataset: ComponentFramework.PropertyTypes.DataSet;
         let columns: ComponentFramework.PropertyTypes.DataSet;
-        
+
         if (this.isLegacyMode) {
             console.log('🔄 LEGACY MODE DETECTED - Using Items + Fields datasets');
             // Legacy mode removed - this should never execute
@@ -225,7 +226,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         console.log('Dataset columns count:', columns.sortedRecordIds?.length || 0);
         console.log('Allocated width:', context.mode.allocatedWidth);
         console.log('Allocated height:', context.mode.allocatedHeight);
-        
+
         if (dataset.sortedRecordIds && dataset.sortedRecordIds.length > 0) {
             console.log('First 3 record IDs:', dataset.sortedRecordIds.slice(0, 3));
             const firstRecord = dataset.records[dataset.sortedRecordIds[0]];
@@ -235,7 +236,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 // Check dataset columns instead
                 if (columns.sortedRecordIds && columns.sortedRecordIds.length > 0) {
                     console.log('Available column definitions:', columns.sortedRecordIds.slice(0, 5));
-                    columns.sortedRecordIds.slice(0, 5).forEach(colId => {
+                    columns.sortedRecordIds.slice(0, 5).forEach((colId) => {
                         const value = firstRecord.getValue(colId);
                         console.log(`  ${colId}: ${value}`);
                     });
@@ -261,20 +262,23 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             console.log('Columns loading:', columns.loading);
             console.log('Dataset records count:', Object.keys(dataset.records || {}).length);
             console.log('Dataset columns count:', dataset.columns?.length || 0);
-            console.log('Dataset column details:', dataset.columns?.map(col => ({
-                name: col.name,
-                displayName: col.displayName,
-                dataType: col.dataType,
-                alias: (col as any).alias
-            })));
+            console.log(
+                'Dataset column details:',
+                dataset.columns?.map((col) => ({
+                    name: col.name,
+                    displayName: col.displayName,
+                    dataType: col.dataType,
+                    alias: (col as any).alias,
+                })),
+            );
             console.log('Columns records count:', Object.keys(columns.records || {}).length);
             console.log('sortedRecordIds sample:', dataset.sortedRecordIds?.slice(0, 3));
             console.log('sortedColumnIds:', columns.sortedRecordIds);
-            
+
             // Check if we're in test harness with placeholder data
             const isTestHarnessData = this.isTestHarnessData(dataset, columns);
             console.log('Test harness detected:', isTestHarnessData);
-            
+
             // Sample record data
             if (dataset.records && dataset.sortedRecordIds?.length > 0) {
                 const firstRecordId = dataset.sortedRecordIds[0];
@@ -283,24 +287,28 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                     console.log('First record ID:', firstRecordId);
                     console.log('First record methods available:', typeof firstRecord.getFormattedValue === 'function');
                     console.log('Available columns for first record:');
-                    dataset.columns?.forEach(col => {
+                    dataset.columns?.forEach((col) => {
                         const value = firstRecord.getValue(col.name);
                         const formattedValue = firstRecord.getFormattedValue(col.name);
                         const rawValue = (value as any)?.raw;
-                        console.log(`  ${col.name}: value="${value}", formatted="${formattedValue}", raw="${rawValue}"`);
+                        console.log(
+                            `  ${col.name}: value="${value}", formatted="${formattedValue}", raw="${rawValue}"`,
+                        );
                     });
-                    
+
                     // Also check column configuration
                     if (columns.sortedRecordIds && columns.sortedRecordIds.length > 0) {
                         console.log('Column configuration details:');
-                        columns.sortedRecordIds.slice(0, 3).forEach(colId => {
+                        columns.sortedRecordIds.slice(0, 3).forEach((colId) => {
                             const colConfig = columns.records[colId];
                             if (colConfig) {
                                 try {
                                     const colName = colConfig.getFormattedValue('ColName');
                                     const colDisplayName = colConfig.getFormattedValue('ColDisplayName');
                                     const colWidth = colConfig.getValue('ColWidth');
-                                    console.log(`  Config [${colId}]: name="${colName}", display="${colDisplayName}", width="${colWidth}"`);
+                                    console.log(
+                                        `  Config [${colId}]: name="${colName}", display="${colDisplayName}", width="${colWidth}"`,
+                                    );
                                 } catch (e) {
                                     console.log(`  Config [${colId}]: Error reading config -`, e);
                                 }
@@ -310,7 +318,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 }
             }
             console.log('=== END PCF DATASET DEBUG ===\n');
-            
+
             // If this is the first time we are setting the records, clear the selection in case there is state from a previous
             // time the screen was shown
             if (!this.records) {
@@ -319,7 +327,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
 
             this.records = dataset.records;
             this.sortedRecordsIds = dataset.sortedRecordIds;
-            
+
             // Handle legacy vs modern column configuration
             if (this.isLegacyMode) {
                 console.log('🔄 Processing legacy fields dataset');
@@ -331,7 +339,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 this.columns = columns.records;
                 this.sortedColumnsIds = columns.sortedRecordIds;
             }
-            
+
             this.datasetColumns = dataset.columns;
 
             // Initialize filters from input if provided
@@ -358,8 +366,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         const useEnhancedFeatures = true; // Enable enterprise-grade features
 
         const grid = React.createElement(UnifiedGrid, {
-            gridMode: this.enableInlineEditing ? 'editable' : 
-                     useEnhancedFeatures ? 'enhanced' : 'original',
+            gridMode: this.enableInlineEditing ? 'editable' : useEnhancedFeatures ? 'enhanced' : 'original',
             ...this.getGridProps(context),
             enableInlineEditing: this.enableInlineEditing,
             enableDragFill: this.enableDragFill,
@@ -449,7 +456,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         // PowerApps may provide -1 for dynamic sizing, so we need fallbacks
         let allocatedWidth = parseInt(context.mode.allocatedWidth as unknown as string);
         let allocatedHeight = parseInt(context.mode.allocatedHeight as unknown as string);
-        
+
         // Handle PowerApps dynamic sizing (-1 values)
         if (allocatedWidth <= 0 || isNaN(allocatedWidth)) {
             allocatedWidth = 1366; // Use a reasonable default width
@@ -457,8 +464,10 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         if (allocatedHeight <= 0 || isNaN(allocatedHeight)) {
             allocatedHeight = 768; // Use a reasonable default height
         }
-        
-        console.log(`PCF Sizing: allocated(${context.mode.allocatedWidth}, ${context.mode.allocatedHeight}) -> parsed(${allocatedWidth}, ${allocatedHeight})`);
+
+        console.log(
+            `PCF Sizing: allocated(${context.mode.allocatedWidth}, ${context.mode.allocatedHeight}) -> parsed(${allocatedWidth}, ${allocatedHeight})`,
+        );
 
         const sorting = this.datasetSupportsSorting()
             ? dataset.sorting
@@ -519,7 +528,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             enableFiltering: context.parameters.EnableFiltering?.raw === true,
             filters: this.filters,
             onFilterChange: this.onFilterChange,
-            
+
             // Enterprise features
             enablePerformanceMonitoring: this.enablePerformanceMonitoring,
             enableAIInsights: this.enableAIInsights,
@@ -799,16 +808,23 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     /**
      * Check if we're in test harness with placeholder data
      */
-    isTestHarnessData(dataset: ComponentFramework.PropertyTypes.DataSet, columns: ComponentFramework.PropertyTypes.DataSet): boolean {
+    isTestHarnessData(
+        dataset: ComponentFramework.PropertyTypes.DataSet,
+        columns: ComponentFramework.PropertyTypes.DataSet,
+    ): boolean {
         // Check for typical test harness indicators
-        const hasPlaceholderRecords = dataset.records && Object.values(dataset.records).some(record => 
-            Object.values(record.getValue('raw') || {}).some(value => value === 'val')
-        );
-        
-        const hasPlaceholderColumns = columns.records && Object.values(columns.records).some(record =>
-            Object.values(record.getValue('raw') || {}).some(value => value === 'val')
-        );
-        
+        const hasPlaceholderRecords =
+            dataset.records &&
+            Object.values(dataset.records).some((record) =>
+                Object.values(record.getValue('raw') || {}).some((value) => value === 'val'),
+            );
+
+        const hasPlaceholderColumns =
+            columns.records &&
+            Object.values(columns.records).some((record) =>
+                Object.values(record.getValue('raw') || {}).some((value) => value === 'val'),
+            );
+
         return hasPlaceholderRecords || hasPlaceholderColumns;
     }
 
@@ -829,15 +845,15 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
      */
     private handleCellEdit = (recordId: string, columnName: string, newValue: any): void => {
         console.log(`🖊️ Cell edit: Record ${recordId}, Column ${columnName}, New value:`, newValue);
-        
+
         // Store the change in pending changes
         if (!this.pendingChanges.has(recordId)) {
             this.pendingChanges.set(recordId, new Map());
         }
-        
+
         const recordChanges = this.pendingChanges.get(recordId)!;
         recordChanges.set(columnName, newValue);
-        
+
         console.log(`📝 Pending changes for record ${recordId}:`, Object.fromEntries(recordChanges));
     };
 
@@ -846,11 +862,11 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
      */
     private handleCommitChanges = async (changes: EditChange[]): Promise<void> => {
         console.log(`💾 Committing ${changes.length} changes to data source...`);
-        
+
         try {
             // Group changes by record for batch processing
             const changesByRecord = new Map<string, EditChange[]>();
-            changes.forEach(change => {
+            changes.forEach((change) => {
                 if (!changesByRecord.has(change.itemId)) {
                     changesByRecord.set(change.itemId, []);
                 }
@@ -866,31 +882,30 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 }
 
                 console.log(`🔄 Updating record ${recordId} with ${recordChanges.length} changes`);
-                
+
                 // In a real implementation, you would call the Power Platform API here
                 // For now, we'll just log the changes and update our local state
                 const updateData: any = {};
-                recordChanges.forEach(change => {
+                recordChanges.forEach((change) => {
                     updateData[change.columnKey] = change.newValue;
                 });
 
                 // TODO: Implement actual data source update
                 // await this.context.webAPI.updateRecord(entityName, recordId, updateData);
-                
+
                 console.log(`✅ Record ${recordId} updated successfully:`, updateData);
             }
 
             // Clear pending changes after successful commit
             this.pendingChanges.clear();
-            
+
             // Refresh the dataset to get updated data
             const dataset = this.context.parameters.records;
             dataset.refresh();
-            
-            console.log(`✨ All changes committed successfully!`);
-            
+
+            console.log('✨ All changes committed successfully!');
         } catch (error) {
-            console.error(`❌ Error committing changes:`, error);
+            console.error('❌ Error committing changes:', error);
             throw error;
         }
     };
@@ -901,23 +916,23 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     private getReadOnlyColumns = (): string[] => {
         // Define which columns should be read-only
         const readOnlyColumns: string[] = [];
-        
+
         // You can make this configurable via the manifest or context
         // For now, we'll make primary key columns read-only
-        this.sortedColumnsIds.forEach(colId => {
+        this.sortedColumnsIds.forEach((colId) => {
             const columnRecord = this.columns[colId];
             if (columnRecord) {
                 const columnName = columnRecord.getValue('ColName') as string;
                 const cellType = columnRecord.getFormattedValue('ColCellType');
-                
+
                 // Make certain cell types read-only
                 if (cellType === 'expand' || cellType === 'key' || columnName.toLowerCase().includes('id')) {
                     readOnlyColumns.push(columnName);
                 }
             }
         });
-        
-        console.log(`🔒 Read-only columns:`, readOnlyColumns);
+
+        console.log('🔒 Read-only columns:', readOnlyColumns);
         return readOnlyColumns;
     };
 }

@@ -35,7 +35,7 @@ export const InlineEditor: React.FC<InlineEditorProps> = ({
     onFocus,
     onBlur,
     style,
-    className
+    className,
 }) => {
     const [editValue, setEditValue] = React.useState<any>(value);
     const [isInvalid, setIsInvalid] = React.useState(false);
@@ -66,34 +66,40 @@ export const InlineEditor: React.FC<InlineEditorProps> = ({
         onCancelEdit();
     }, [value, onCancelEdit]);
 
-    const handleKeyDown = React.useCallback((e: React.KeyboardEvent) => {
-        switch (e.key) {
-            case 'Enter':
-                e.preventDefault();
-                e.stopPropagation();
-                handleCommit();
-                break;
-            case 'Escape':
-                e.preventDefault();
-                e.stopPropagation();
-                handleCancel();
-                break;
-            case 'Tab':
-                e.preventDefault();
-                e.stopPropagation();
-                handleCommit();
-                if (onKeyDown) onKeyDown(e);
-                break;
-            default:
-                if (onKeyDown) onKeyDown(e);
-                break;
-        }
-    }, [handleCommit, handleCancel, onKeyDown]);
+    const handleKeyDown = React.useCallback(
+        (e: React.KeyboardEvent) => {
+            switch (e.key) {
+                case 'Enter':
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleCommit();
+                    break;
+                case 'Escape':
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleCancel();
+                    break;
+                case 'Tab':
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleCommit();
+                    if (onKeyDown) onKeyDown(e);
+                    break;
+                default:
+                    if (onKeyDown) onKeyDown(e);
+                    break;
+            }
+        },
+        [handleCommit, handleCancel, onKeyDown],
+    );
 
-    const handleChange = React.useCallback((newValue: any) => {
-        setEditValue(newValue);
-        setIsInvalid(!validateValue(newValue, cellType));
-    }, [cellType]);
+    const handleChange = React.useCallback(
+        (newValue: any) => {
+            setEditValue(newValue);
+            setIsInvalid(!validateValue(newValue, cellType));
+        },
+        [cellType],
+    );
 
     const validateValue = (val: any, type?: string): boolean => {
         if (val === null || val === undefined || val === '') return true;
@@ -127,12 +133,12 @@ export const InlineEditor: React.FC<InlineEditorProps> = ({
             onBlur,
             componentRef: inputRef,
             styles: {
-                field: { 
+                field: {
                     fontSize: '14px',
                     border: isInvalid ? '2px solid #d13438' : '2px solid #0078d4',
-                    borderRadius: '2px'
-                }
-            }
+                    borderRadius: '2px',
+                },
+            },
         };
 
         switch (cellType?.toLowerCase()) {
@@ -145,7 +151,7 @@ export const InlineEditor: React.FC<InlineEditorProps> = ({
                         onChange={(_, checked) => handleChange(checked)}
                         onKeyDown={handleKeyDown}
                         styles={{
-                            root: { marginTop: '4px' }
+                            root: { marginTop: '4px' },
                         }}
                     />
                 );
@@ -156,10 +162,10 @@ export const InlineEditor: React.FC<InlineEditorProps> = ({
                     <DatePicker
                         value={editValue ? new Date(editValue) : undefined}
                         onSelectDate={(date) => handleChange(date?.toISOString())}
-                        formatDate={(date) => date ? date.toLocaleDateString() : ''}
+                        formatDate={(date) => (date ? date.toLocaleDateString() : '')}
                         placeholder="Select date..."
                         styles={{
-                            textField: commonProps.styles
+                            textField: commonProps.styles,
                         }}
                     />
                 );
@@ -168,11 +174,11 @@ export const InlineEditor: React.FC<InlineEditorProps> = ({
             case 'choice':
             case 'optionset':
                 if (availableValues && availableValues.length > 0) {
-                    const options: IDropdownOption[] = availableValues.map(val => ({
+                    const options: IDropdownOption[] = availableValues.map((val) => ({
                         key: val,
-                        text: val
+                        text: val,
                     }));
-                    
+
                     return (
                         <Dropdown
                             selectedKey={editValue}
@@ -180,7 +186,7 @@ export const InlineEditor: React.FC<InlineEditorProps> = ({
                             onChange={(_, option) => handleChange(option?.key)}
                             placeholder="Select option..."
                             styles={{
-                                dropdown: commonProps.styles.field
+                                dropdown: commonProps.styles.field,
                             }}
                         />
                     );
@@ -189,14 +195,20 @@ export const InlineEditor: React.FC<InlineEditorProps> = ({
 
             case 'multichoice':
                 if (availableValues && availableValues.length > 0) {
-                    const options: IDropdownOption[] = availableValues.map(val => ({
+                    const options: IDropdownOption[] = availableValues.map((val) => ({
                         key: val,
-                        text: val
+                        text: val,
                     }));
-                    
-                    const selectedKeys = Array.isArray(editValue) ? editValue : 
-                        (editValue ? editValue.toString().split(',').map((s: string) => s.trim()) : []);
-                    
+
+                    const selectedKeys = Array.isArray(editValue)
+                        ? editValue
+                        : editValue
+                          ? editValue
+                                .toString()
+                                .split(',')
+                                .map((s: string) => s.trim())
+                          : [];
+
                     return (
                         <Dropdown
                             multiSelect
@@ -204,7 +216,7 @@ export const InlineEditor: React.FC<InlineEditorProps> = ({
                             options={options}
                             onChange={(_, option) => {
                                 if (option) {
-                                    const newSelection = option.selected 
+                                    const newSelection = option.selected
                                         ? [...selectedKeys, option.key]
                                         : selectedKeys.filter((k: any) => k !== option.key);
                                     handleChange(newSelection);
@@ -212,7 +224,7 @@ export const InlineEditor: React.FC<InlineEditorProps> = ({
                             }}
                             placeholder="Select options..."
                             styles={{
-                                dropdown: commonProps.styles.field
+                                dropdown: commonProps.styles.field,
                             }}
                         />
                     );
@@ -262,15 +274,13 @@ export const InlineEditor: React.FC<InlineEditorProps> = ({
                     minHeight: '32px',
                     display: 'flex',
                     alignItems: 'center',
-                    position: 'relative'
+                    position: 'relative',
                 }}
                 className={className}
                 onClick={onStartEdit}
                 onDoubleClick={onStartEdit}
             >
-                <span style={{ flex: 1, wordBreak: 'break-word' }}>
-                    {formatDisplayValue(value, cellType)}
-                </span>
+                <span style={{ flex: 1, wordBreak: 'break-word' }}>{formatDisplayValue(value, cellType)}</span>
             </div>
         );
     }
@@ -281,7 +291,7 @@ export const InlineEditor: React.FC<InlineEditorProps> = ({
                 ...style,
                 padding: '4px',
                 position: 'relative',
-                zIndex: 1000
+                zIndex: 1000,
             }}
             className={className}
         >
@@ -293,7 +303,7 @@ export const InlineEditor: React.FC<InlineEditorProps> = ({
                     onClick={handleCommit}
                     styles={{
                         root: { minWidth: '24px', height: '24px' },
-                        icon: { fontSize: '12px', color: '#107c10' }
+                        icon: { fontSize: '12px', color: '#107c10' },
                     }}
                 />
                 <IconButton
@@ -302,7 +312,7 @@ export const InlineEditor: React.FC<InlineEditorProps> = ({
                     onClick={handleCancel}
                     styles={{
                         root: { minWidth: '24px', height: '24px' },
-                        icon: { fontSize: '12px', color: '#d13438' }
+                        icon: { fontSize: '12px', color: '#d13438' },
                     }}
                 />
             </div>
@@ -312,7 +322,7 @@ export const InlineEditor: React.FC<InlineEditorProps> = ({
 
 const formatDisplayValue = (value: any, cellType?: string): string => {
     if (value === null || value === undefined) return '';
-    
+
     switch (cellType?.toLowerCase()) {
         case FilterTypes.Boolean:
         case 'boolean':
