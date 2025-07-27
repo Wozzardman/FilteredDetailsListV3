@@ -1,0 +1,446 @@
+/* VirtualizedEditableGrid - Ultimate Performance CSS */
+/* META/Google competitive virtualized grid with inline editing */
+
+.virtualized-editable-grid-container {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Header Styles */
+.virtualized-header {
+    display: flex;
+    height: 48px;
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #e1dfdd;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.virtualized-header-cell {
+    height: 100%;
+    padding: 0 8px;
+    display: flex;
+    align-items: center;
+    border-right: 1px solid #e1dfdd;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.virtualized-header-cell:hover {
+    background-color: #f3f2f1;
+}
+
+.virtualized-header-cell:last-child {
+    border-right: none;
+}
+
+/* Virtualized Grid Body */
+.virtualized-grid-body {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+    background-color: #ffffff;
+}
+
+/* Custom scrollbar for performance */
+.virtualized-grid-body::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+.virtualized-grid-body::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 6px;
+}
+
+.virtualized-grid-body::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 6px;
+    transition: background-color 0.2s ease;
+}
+
+.virtualized-grid-body::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
+}
+
+/* Row Styles */
+.virtualized-row {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #e1dfdd;
+    transition: background-color 0.1s ease;
+    cursor: pointer;
+}
+
+.virtualized-row:hover {
+    background-color: #f3f2f1 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.virtualized-row.even {
+    background-color: #ffffff;
+}
+
+.virtualized-row.odd {
+    background-color: #faf9f8;
+}
+
+/* Cell Styles */
+.virtualized-cell {
+    height: 100%;
+    padding: 0 8px;
+    display: flex;
+    align-items: center;
+    border-right: 1px solid #e1dfdd;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    position: relative;
+    transition: all 0.15s ease;
+}
+
+.virtualized-cell:last-child {
+    border-right: none;
+}
+
+.virtualized-cell.editable {
+    cursor: pointer;
+}
+
+.virtualized-cell.read-only {
+    cursor: default;
+    background-color: #f8f8f8;
+    color: #605e5c;
+}
+
+/* Change Indicator */
+.virtualized-cell.has-changes {
+    background-color: #fff4ce !important;
+    border-left: 3px solid #ffb900;
+    animation: highlightChange 0.3s ease-in-out;
+}
+
+@keyframes highlightChange {
+    0% {
+        background-color: #ffd700;
+    }
+    100% {
+        background-color: #fff4ce;
+    }
+}
+
+/* Drag Fill Handle */
+.drag-fill-handle {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 6px;
+    height: 6px;
+    background-color: #0078d4;
+    border: 1px solid white;
+    cursor: crosshair;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 10;
+}
+
+.virtualized-cell:hover .drag-fill-handle {
+    opacity: 0.8;
+}
+
+.drag-fill-handle:hover {
+    opacity: 1;
+    width: 8px;
+    height: 8px;
+    bottom: -1px;
+    right: -1px;
+}
+
+/* Inline Editing Styles */
+.virtualized-cell.editing {
+    background-color: #ffffff !important;
+    border: 2px solid #0078d4;
+    box-shadow: 0 0 8px rgba(0, 120, 212, 0.3);
+    z-index: 1000;
+}
+
+.virtualized-cell .inline-editor {
+    width: 100%;
+    border: none;
+    background: transparent;
+    outline: none;
+    font-size: inherit;
+    font-family: inherit;
+    color: inherit;
+}
+
+/* Command Bar Customization */
+.virtualized-editable-grid-container .ms-CommandBar {
+    min-height: 40px;
+    margin-bottom: 8px;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #e1dfdd;
+}
+
+/* Message Bar Customization */
+.virtualized-editable-grid-container .ms-MessageBar {
+    margin-bottom: 8px;
+    border-radius: 4px;
+}
+
+/* Performance Optimizations */
+.virtualized-row,
+.virtualized-cell {
+    will-change: transform;
+    contain: layout style paint;
+}
+
+/* Loading States */
+.virtualized-row.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.virtualized-cell.loading {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* Error States */
+.virtualized-cell.error {
+    background-color: #fdf3f4 !important;
+    border-color: #d13438;
+    color: #d13438;
+}
+
+/* Selection States */
+.virtualized-row.selected {
+    background-color: #deecf9 !important;
+    border-color: #0078d4;
+}
+
+.virtualized-row.selected .virtualized-cell {
+    background-color: transparent;
+}
+
+/* Accessibility */
+.virtualized-row:focus {
+    outline: 2px solid #0078d4;
+    outline-offset: -2px;
+}
+
+.virtualized-cell:focus {
+    outline: 1px solid #0078d4;
+    outline-offset: -1px;
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+    .virtualized-row {
+        border-bottom: 2px solid;
+    }
+    
+    .virtualized-cell {
+        border-right: 2px solid;
+    }
+    
+    .virtualized-cell.has-changes {
+        border-left: 4px solid;
+    }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+    .virtualized-row,
+    .virtualized-cell,
+    .drag-fill-handle {
+        transition: none;
+    }
+    
+    .virtualized-cell.has-changes {
+        animation: none;
+    }
+}
+
+/* Dark Theme Support */
+[data-theme="dark"] .virtualized-editable-grid-container {
+    background-color: #1e1e1e;
+    color: #ffffff;
+}
+
+[data-theme="dark"] .virtualized-header {
+    background-color: #2d2d30;
+    border-bottom-color: #3e3e42;
+}
+
+[data-theme="dark"] .virtualized-row.even {
+    background-color: #1e1e1e;
+}
+
+[data-theme="dark"] .virtualized-row.odd {
+    background-color: #252526;
+}
+
+[data-theme="dark"] .virtualized-cell {
+    border-right-color: #3e3e42;
+}
+
+[data-theme="dark"] .virtualized-row {
+    border-bottom-color: #3e3e42;
+}
+
+[data-theme="dark"] .virtualized-row:hover {
+    background-color: #2d2d30 !important;
+}
+
+/* Print Styles */
+@media print {
+    .virtualized-editable-grid-container .ms-CommandBar,
+    .drag-fill-handle {
+        display: none;
+    }
+    
+    .virtualized-row {
+        break-inside: avoid;
+        position: static;
+    }
+    
+    .virtualized-grid-body {
+        overflow: visible;
+        height: auto;
+    }
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .virtualized-header-cell,
+    .virtualized-cell {
+        padding: 0 4px;
+        font-size: 12px;
+    }
+    
+    .drag-fill-handle {
+        width: 8px;
+        height: 8px;
+        opacity: 1;
+    }
+}
+
+/* Ultra-wide screens optimization */
+@media (min-width: 2560px) {
+    .virtualized-cell {
+        min-height: 48px;
+    }
+    
+    .virtualized-header {
+        height: 56px;
+    }
+}
+
+/* Excel-like Column Filter Styles */
+.excel-column-filter-callout {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.excel-filter-container {
+    background: white;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.excel-filter-header {
+    padding: 12px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e1e5e9;
+}
+
+.excel-filter-search {
+    padding: 4px 0;
+}
+
+.excel-filter-select-all {
+    padding: 4px 0;
+}
+
+.excel-filter-values {
+    height: 200px;
+    overflow: auto;
+    border-bottom: 1px solid #e1e5e9;
+}
+
+.excel-filter-value-item {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    border-bottom: 1px solid #f3f2f1;
+}
+
+.excel-filter-value-item:hover {
+    background: #f3f2f1;
+}
+
+.excel-filter-value-checkbox {
+    width: 100%;
+}
+
+.excel-filter-value-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.excel-filter-value-count {
+    color: #666;
+    margin-left: 8px;
+    font-size: 12px;
+}
+
+.excel-filter-actions {
+    padding: 12px;
+    gap: 8px;
+}
+
+/* Filter Button in Header */
+.virtualized-header-filter-button {
+    margin-left: auto;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.virtualized-header-cell:hover .virtualized-header-filter-button {
+    opacity: 1;
+}
+
+.virtualized-header-filter-button.active {
+    opacity: 1;
+    color: #0078d4;
+}

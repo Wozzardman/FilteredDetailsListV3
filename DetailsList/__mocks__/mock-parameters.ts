@@ -18,6 +18,12 @@ export function getMockParameters(): IInputs {
         EnableFiltering: new MockTwoOptionsProperty(),
         FilterConfiguration: new MockStringProperty(),
         AppliedFilters: new MockStringProperty(),
+        // New change management properties
+        CommitTrigger: new MockStringProperty(),
+        CancelChangesTrigger: new MockStringProperty(),
+        PerformanceMode: new MockEnumProperty(0),
+        EnableVirtualization: new MockTwoOptionsProperty(true),
+        VirtualizationThreshold: new MockWholeNumberProperty(),
         records: new MockDataSet([]),
         columns: new MockDataSet([]),
     };

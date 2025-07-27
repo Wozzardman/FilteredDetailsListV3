@@ -751,7 +751,7 @@ function mapToGridColumn(
                     <span>{props.column.name}</span>
                     {isFilterable && onFilterClick && (
                         <IconButton
-                            iconProps={{ iconName: isFiltered ? 'FilterSolid' : 'Filter' }}
+                            iconProps={{ iconName: isFiltered ? 'Filter' : 'Filter' }}
                             title={isFiltered ? 'Filter applied - click to edit' : 'Click to filter'}
                             onClick={(ev: React.MouseEvent<HTMLElement>) => {
                                 ev.stopPropagation();

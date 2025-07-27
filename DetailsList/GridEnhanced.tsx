@@ -325,7 +325,7 @@ export const GridEnhanced = React.memo((props: GridProps) => {
                         {
                             key: 'excel',
                             text: 'Export to Excel',
-                            iconProps: { iconName: 'ExcelDocument' },
+                            iconProps: { iconName: 'Table' },
                             onClick: () => handleExport('excel'),
                         },
                     ],
@@ -337,7 +337,7 @@ export const GridEnhanced = React.memo((props: GridProps) => {
             items.push({
                 key: 'insights',
                 text: 'AI Insights',
-                iconProps: { iconName: 'Lightbulb' },
+                iconProps: { iconName: 'Info' },
                 onClick: () => {
                     console.log('🤖 AI Insights: Analyzing data patterns...');
                     // Future: Implement AI insights functionality
@@ -810,7 +810,7 @@ function mapToGridColumn(
                     <span>{props.column.name}</span>
                     {isFilterable && onFilterClick && (
                         <IconButton
-                            iconProps={{ iconName: isFiltered ? 'FilterSolid' : 'Filter' }}
+                            iconProps={{ iconName: isFiltered ? 'Filter' : 'Filter' }}
                             title={isFiltered ? 'Filter applied - click to edit' : 'Click to filter'}
                             onClick={(ev: React.MouseEvent<HTMLElement>) => {
                                 ev.stopPropagation();

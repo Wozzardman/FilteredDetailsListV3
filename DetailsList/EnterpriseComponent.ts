@@ -3,10 +3,10 @@
  * Integrates all advanced features for industry-competitive performance
  */
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React from 'react';
 import { IInputs, IOutputs } from './generated/ManifestTypes';
 import { SimpleEnhancedGridWrapper } from './components/SimpleEnhancedGridWrapper';
-import { HighPerformanceVirtualGrid } from './virtualization/HighPerformanceVirtualGrid';
+import { VirtualizedEditableGrid } from './components/VirtualizedEditableGrid';
 import { performanceMonitor } from './performance/PerformanceMonitor';
 import { useAccessibility } from './accessibility/AccessibilityManager';
 import { useCollaboration } from './collaboration/CollaborationEngine';

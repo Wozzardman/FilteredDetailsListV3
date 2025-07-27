@@ -27,7 +27,7 @@ export const EnterpriseDemo: React.FC = () => {
         enableVirtualization: 'auto',
         performanceMode: 'enterprise',
         enableTestMode: true,
-        showPerformancePanel: false
+        showPerformancePanel: false,
     });
 
     const { metrics, alerts } = useEnterpriseGridPerformance();
@@ -37,24 +37,24 @@ export const EnterpriseDemo: React.FC = () => {
         { key: 'small', text: 'Small (1K records)' },
         { key: 'medium', text: 'Medium (25K records)' },
         { key: 'large', text: 'Large (100K records)' },
-        { key: 'massive', text: 'Massive (500K records)' }
+        { key: 'massive', text: 'Massive (500K records)' },
     ];
 
     const performanceModeOptions: IDropdownOption[] = [
         { key: 'standard', text: 'Standard Mode' },
         { key: 'enterprise', text: 'Enterprise Mode' },
-        { key: 'meta-scale', text: 'Meta-Scale Mode' }
+        { key: 'meta-scale', text: 'Meta-Scale Mode' },
     ];
 
     const virtualizationOptions: IDropdownOption[] = [
         { key: 'auto', text: 'Auto-detect' },
         { key: 'true', text: 'Always On' },
-        { key: 'false', text: 'Always Off' }
+        { key: 'false', text: 'Always Off' },
     ];
 
     // Event handlers
     const handleStateChange = useCallback((key: keyof DemoState, value: any) => {
-        setState(prev => ({ ...prev, [key]: value }));
+        setState((prev) => ({ ...prev, [key]: value }));
     }, []);
 
     const handlePerformanceAlert = useCallback((alert: any) => {
@@ -79,8 +79,8 @@ export const EnterpriseDemo: React.FC = () => {
                 enableVirtualization: false,
                 performanceMode: 'standard' as const,
                 enableInlineEditing: true,
-                enableBulkOperations: true
-            }
+                enableBulkOperations: true,
+            },
         },
         {
             title: 'Enterprise Scale Demo',
@@ -90,8 +90,8 @@ export const EnterpriseDemo: React.FC = () => {
                 enableVirtualization: true,
                 performanceMode: 'enterprise' as const,
                 enableAdvancedFiltering: true,
-                enableRealTimeUpdates: true
-            }
+                enableRealTimeUpdates: true,
+            },
         },
         {
             title: 'Meta-Scale Performance',
@@ -100,16 +100,16 @@ export const EnterpriseDemo: React.FC = () => {
                 testDataSize: 'massive' as const,
                 enableVirtualization: true,
                 performanceMode: 'meta-scale' as const,
-                enablePerformanceMonitoring: true
-            }
-        }
+                enablePerformanceMonitoring: true,
+            },
+        },
     ];
 
     const loadDemoConfiguration = (config: any) => {
-        setState(prev => ({
+        setState((prev) => ({
             ...prev,
             ...config,
-            enableTestMode: true
+            enableTestMode: true,
         }));
     };
 
@@ -157,10 +157,7 @@ export const EnterpriseDemo: React.FC = () => {
                             <div key={index} className="demo-card">
                                 <h4>{demo.title}</h4>
                                 <p>{demo.description}</p>
-                                <PrimaryButton 
-                                    text="Load Demo"
-                                    onClick={() => loadDemoConfiguration(demo.config)}
-                                />
+                                <PrimaryButton text="Load Demo" onClick={() => loadDemoConfiguration(demo.config)} />
                             </div>
                         ))}
                     </div>
@@ -187,7 +184,13 @@ export const EnterpriseDemo: React.FC = () => {
                             label="Virtualization"
                             options={virtualizationOptions}
                             selectedKey={state.enableVirtualization.toString()}
-                            onChange={(_, option) => option && handleStateChange('enableVirtualization', parseVirtualizationValue(option.key as string))}
+                            onChange={(_, option) =>
+                                option &&
+                                handleStateChange(
+                                    'enableVirtualization',
+                                    parseVirtualizationValue(option.key as string),
+                                )
+                            }
                         />
 
                         <div className="slider-control">
@@ -235,31 +238,33 @@ export const EnterpriseDemo: React.FC = () => {
                     // Core configuration
                     enableTestMode={state.enableTestMode}
                     testDataSize={state.testDataSize}
-                    customTestConfig={state.enableTestMode ? {
-                        recordCount: state.customRecordCount,
-                        columnCount: state.customColumnCount,
-                        complexity: 'enterprise'
-                    } : undefined}
-                    
+                    customTestConfig={
+                        state.enableTestMode
+                            ? {
+                                  recordCount: state.customRecordCount,
+                                  columnCount: state.customColumnCount,
+                                  complexity: 'enterprise',
+                              }
+                            : undefined
+                    }
                     // Performance configuration
-                    enableVirtualization={typeof state.enableVirtualization === 'boolean' ? state.enableVirtualization : undefined}
+                    enableVirtualization={
+                        typeof state.enableVirtualization === 'boolean' ? state.enableVirtualization : undefined
+                    }
                     virtualizationThreshold={10000}
                     performanceMode={state.performanceMode}
-                    
                     // Advanced features
                     enableInlineEditing={true}
                     enableAdvancedFiltering={true}
                     enableRealTimeUpdates={true}
                     enableBulkOperations={true}
-                    
                     // Performance monitoring
                     enablePerformanceMonitoring={true}
                     performanceThresholds={{
                         frameRate: 55,
                         memoryUsage: 500,
-                        renderTime: 16
+                        renderTime: 16,
                     }}
-                    
                     // Event handlers
                     onPerformanceAlert={handlePerformanceAlert}
                     onDataLoadComplete={handleDataLoadComplete}
@@ -276,7 +281,7 @@ export const EnterpriseDemo: React.FC = () => {
                 isLightDismiss={true}
             >
                 {renderPerformanceMetrics()}
-                
+
                 <div className="performance-alerts">
                     <h4>Recent Alerts</h4>
                     {alerts.length === 0 ? (

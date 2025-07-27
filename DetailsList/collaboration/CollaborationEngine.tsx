@@ -61,7 +61,11 @@ export class CollaborationEngine {
     }
 
     private initializeWebSocket(url?: string) {
-        if (!url) return;
+        // Skip WebSocket in Canvas Apps to avoid HTTP method errors
+        if (!url || typeof window === 'undefined' || window.location?.href?.includes('powerapps.com')) {
+            console.log('WebSocket disabled in Canvas Apps environment');
+            return;
+        }
 
         try {
             this.websocket = new WebSocket(url);

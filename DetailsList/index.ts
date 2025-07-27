@@ -2,13 +2,12 @@ import { IDetailsList, IObjectWithKey, SelectionMode, Selection, getWindow, ICol
 import * as React from 'react';
 import { IInputs, IOutputs } from './generated/ManifestTypes';
 import { getRecordKey, GridProps } from './Grid';
-import { UnifiedGrid } from './components/UnifiedGrid';
+import { UltimateEnterpriseGrid } from './components/UltimateEnterpriseGrid';
 import { EditChange } from './components/EditableGrid';
 import { InputEvents, OutputEvents, RecordsColumns, ItemsColumns, SortDirection } from './ManifestConstants';
 import { IFilterState } from './Filter.types';
 import { FilterUtils } from './FilterUtils';
 import { performanceMonitor } from './performance/PerformanceMonitor';
-import { useAIInsights } from './ai/AIEngine';
 type DataSet = ComponentFramework.PropertyHelper.DataSetApi.EntityRecord & IObjectWithKey;
 
 const SelectionTypes: Record<'0' | '1' | '2', SelectionMode> = {
@@ -365,14 +364,43 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         // Check if enhanced features should be enabled
         const useEnhancedFeatures = true; // Enable enterprise-grade features
 
-        const grid = React.createElement(UnifiedGrid, {
-            gridMode: this.enableInlineEditing ? 'editable' : useEnhancedFeatures ? 'enhanced' : 'original',
-            ...this.getGridProps(context),
+        // Convert records to items for UltimateEnterpriseGrid
+        const items = this.sortedRecordsIds.map(recordId => this.records[recordId]);
+        
+        // Convert columns to UltimateEnterpriseGrid format
+        const gridColumns = this.datasetColumns.map(col => ({
+            key: col.name,
+            name: col.displayName,
+            fieldName: col.name,
+            minWidth: col.visualSizeFactor > 0 ? col.visualSizeFactor * 100 : 100,
+            maxWidth: 300,
+            isResizable: true,
+            filterable: true,
+            sortable: true,
+            editable: this.enableInlineEditing,
+            dataType: (col.dataType === 'DateAndTime.DateOnly' ? 'date' : 
+                      col.dataType === 'Whole.None' ? 'number' : 
+                      col.dataType === 'TwoOptions' ? 'boolean' : 'string') as 'string' | 'number' | 'date' | 'boolean'
+        }));
+
+        // Create a wrapper for handleCellEdit to match the expected signature
+        const onCellEditWrapper = (item: any, column: any, newValue: any) => {
+            const recordId = getRecordKey(item);
+            this.handleCellEdit(recordId, column.fieldName, newValue);
+        };
+
+        const grid = React.createElement(UltimateEnterpriseGrid, {
+            items,
+            columns: gridColumns,
+            height: 600,
+            enableVirtualization: true,
+            virtualizationThreshold: 100,
             enableInlineEditing: this.enableInlineEditing,
-            enableDragFill: this.enableDragFill,
-            onCellEdit: this.handleCellEdit.bind(this),
-            onCommitChanges: this.handleCommitChanges.bind(this),
-            readOnlyColumns: this.getReadOnlyColumns(),
+            enableFiltering: true,
+            enableExport: true,
+            enablePerformanceMonitoring: this.enablePerformanceMonitoring,
+            enableChangeTracking: true,
+            onCellEdit: onCellEditWrapper,
         });
 
         const pagingChanged =

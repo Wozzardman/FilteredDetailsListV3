@@ -78,6 +78,10 @@ export class MockEnumProperty<T> implements ComponentFramework.PropertyTypes.Enu
     }
     type: string;
     raw: T;
+    error: boolean = false;
+    errorMessage: string = '';
+    security?: ComponentFramework.PropertyHelper.SecurityValues | undefined;
+    attributes?: ComponentFramework.PropertyHelper.FieldPropertyMetadata.OptionSetMetadata | undefined;
 }
 
 export class MockTwoOptionsProperty implements ComponentFramework.PropertyTypes.TwoOptionsProperty {

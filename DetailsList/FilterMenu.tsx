@@ -144,7 +144,7 @@ export const FilterMenu: React.FC<IFilterMenuProps> = ({
                                     root: { width: '100%' },
                                     field: { fontSize: '14px' },
                                 }}
-                                iconProps={{ iconName: 'Search' }}
+                                iconProps={{ iconName: 'Filter' }}
                             />
                         </div>
 

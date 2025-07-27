@@ -1,51 +1,44 @@
 import * as React from 'react';
-import {
-    DetailsList,
-    IColumn,
-    IDetailsListProps,
-    SelectionMode,
-    IObjectWithKey,
-    DetailsRow,
-    IDetailsRowProps,
-    IDetailsRowStyles,
-    CommandBar,
-    ICommandBarItemProps,
-    MessageBar,
-    MessageBarType,
-} from '@fluentui/react';
+import { 
+    DetailsList, 
+    IColumn, 
+    SelectionMode, 
+    DetailsListLayoutMode, 
+    ConstrainMode,
+    CheckboxVisibility,
+    IDetailsListProps
+} from '@fluentui/react/lib/DetailsList';
+import { CommandBar, ICommandBarItemProps } from '@fluentui/react/lib/CommandBar';
+import { MessageBar, MessageBarType } from '@fluentui/react/lib/MessageBar';
+import { Spinner, SpinnerSize } from '@fluentui/react/lib/Spinner';
 import { InlineEditor } from './InlineEditor';
-import { DragFillManager, DragFillHandle, useDragFill } from './DragFillManager';
-
-export interface EditableGridProps extends Omit<IDetailsListProps, 'items' | 'columns'> {
-    items: any[];
-    columns: IColumn[];
-    onCellEdit?: (item: any, columnKey: string, newValue: any) => void;
-    onCommitChanges?: (changes: EditChange[]) => void;
-    onCancelChanges?: () => void;
-    enableInlineEditing?: boolean;
-    enableDragFill?: boolean;
-    readOnlyColumns?: string[];
-    getAvailableValues?: (columnKey: string) => string[];
-}
+import { DragFillManager } from './DragFillManager';
+import { EnterpriseChangeManager } from '../services/EnterpriseChangeManager';
 
 export interface EditChange {
     itemId: string;
     columnKey: string;
-    oldValue: any;
     newValue: any;
-    rowIndex: number;
+    oldValue?: any;
 }
 
-interface CellEditState {
+export interface EditableGridProps extends Partial<IDetailsListProps> {
+    items: any[];
+    columns: IColumn[];
+    onCellEdit?: (itemId: string, columnKey: string, newValue: any) => void;
+    onCommitChanges?: (changes: EditChange[]) => Promise<void>;
+    enableInlineEditing?: boolean;
+    enableDragFill?: boolean;
+    readOnlyColumns?: string[];
+    getAvailableValues?: (columnKey: string) => string[];
+    changeManager?: EnterpriseChangeManager;
+    enablePerformanceMonitoring?: boolean;
+}
+
+interface EditingState {
     itemId: string;
     columnKey: string;
-    isEditing: boolean;
-}
-
-interface PendingChanges {
-    [itemId: string]: {
-        [columnKey: string]: any;
-    };
+    originalValue: any;
 }
 
 export const EditableGrid: React.FC<EditableGridProps> = ({
@@ -53,295 +46,270 @@ export const EditableGrid: React.FC<EditableGridProps> = ({
     columns,
     onCellEdit,
     onCommitChanges,
-    onCancelChanges,
     enableInlineEditing = true,
-    enableDragFill = true,
+    enableDragFill = false,
     readOnlyColumns = [],
     getAvailableValues,
-    ...detailsListProps
+    changeManager,
+    enablePerformanceMonitoring = false,
+    selectionMode = SelectionMode.none,
+    checkboxVisibility = CheckboxVisibility.hidden,
+    layoutMode = DetailsListLayoutMode.fixedColumns,
+    constrainMode = ConstrainMode.unconstrained,
+    ...otherProps
 }) => {
-    const [editingCell, setEditingCell] = React.useState<CellEditState | null>(null);
-    const [pendingChanges, setPendingChanges] = React.useState<PendingChanges>({});
-    const [hasChanges, setHasChanges] = React.useState(false);
+    const [editingState, setEditingState] = React.useState<EditingState | null>(null);
+    const [pendingChanges, setPendingChanges] = React.useState<Map<string, EditChange>>(new Map());
+    const [isCommitting, setIsCommitting] = React.useState<boolean>(false);
+    const [errorMessage, setErrorMessage] = React.useState<string>('');
 
-    // Track items with pending changes for visual feedback
-    const itemsWithChanges = React.useMemo(() => {
-        return items.map((item) => {
-            const itemId = item.key || item.id || item.getRecordId?.();
-            const changes = pendingChanges[itemId];
-            if (changes) {
-                return { ...item, ...changes, _hasChanges: true };
+    const startMeasurement = enablePerformanceMonitoring ? 
+        () => console.time('EditableGrid-Render') : 
+        () => {};
+    const endMeasurement = enablePerformanceMonitoring ? 
+        () => console.timeEnd('EditableGrid-Render') : 
+        () => {};
+
+    React.useEffect(() => {
+        startMeasurement();
+        return () => endMeasurement();
+    });
+
+    const getCellKey = (itemId: string, columnKey: string) => `${itemId}-${columnKey}`;
+
+    const startEdit = React.useCallback((item: any, column: IColumn) => {
+        if (!enableInlineEditing) return;
+        
+        const itemId = item.key || item.id || item.getRecordId?.();
+        const columnKey = column.fieldName || column.key;
+        
+        if (readOnlyColumns.includes(columnKey)) return;
+
+        const originalValue = item[columnKey];
+        setEditingState({ itemId, columnKey, originalValue });
+    }, [enableInlineEditing, readOnlyColumns]);
+
+    const commitEdit = React.useCallback((newValue: any) => {
+        if (!editingState) return;
+
+        const { itemId, columnKey, originalValue } = editingState;
+        
+        if (newValue !== originalValue) {
+            const changeKey = getCellKey(itemId, columnKey);
+            const change: EditChange = {
+                itemId,
+                columnKey,
+                newValue,
+                oldValue: originalValue
+            };
+
+            setPendingChanges(prev => new Map(prev.set(changeKey, change)));
+            
+            // Notify parent of the edit
+            onCellEdit?.(itemId, columnKey, newValue);
+            
+            // Update change manager if available
+            if (changeManager) {
+                changeManager.addChange(itemId, columnKey, originalValue, newValue);
             }
-            return { ...item, _hasChanges: false };
-        });
-    }, [items, pendingChanges]);
+        }
 
-    const handleCellEdit = React.useCallback(
-        (item: any, columnKey: string, newValue: any) => {
-            const itemId = item.key || item.id || item.getRecordId?.();
-            if (!itemId) return;
+        setEditingState(null);
+    }, [editingState, onCellEdit, changeManager]);
 
-            // Update pending changes
-            setPendingChanges((prev) => ({
-                ...prev,
-                [itemId]: {
-                    ...prev[itemId],
-                    [columnKey]: newValue,
-                },
-            }));
+    const cancelEdit = React.useCallback(() => {
+        setEditingState(null);
+    }, []);
 
-            setHasChanges(true);
+    const commitAllChanges = React.useCallback(async () => {
+        if (pendingChanges.size === 0 || !onCommitChanges) return;
 
-            // Call external handler if provided
-            if (onCellEdit) {
-                onCellEdit(item, columnKey, newValue);
+        setIsCommitting(true);
+        setErrorMessage('');
+
+        try {
+            const changesArray = Array.from(pendingChanges.values());
+            await onCommitChanges(changesArray);
+            setPendingChanges(new Map());
+            
+            if (changeManager) {
+                await changeManager.commitAllChanges();
             }
+        } catch (error) {
+            setErrorMessage(`Failed to save changes: ${error}`);
+        } finally {
+            setIsCommitting(false);
+        }
+    }, [pendingChanges, onCommitChanges, changeManager]);
 
-            // Exit edit mode
-            setEditingCell(null);
-        },
-        [onCellEdit],
-    );
+    const cancelAllChanges = React.useCallback(() => {
+        setPendingChanges(new Map());
+        setEditingState(null);
+        
+        if (changeManager) {
+            changeManager.cancelAllChanges();
+        }
+    }, [changeManager]);
 
-    const handleDragFill = React.useCallback(
-        (startCell: { row: number; column: string }, endCell: { row: number; column: string }, value: any) => {
-            if (!enableDragFill) return;
-
-            const startRow = Math.min(startCell.row, endCell.row);
-            const endRow = Math.max(startCell.row, endCell.row);
-            const columnKey = startCell.column;
-
-            // Apply the value to all cells in the range
-            for (let rowIndex = startRow; rowIndex <= endRow; rowIndex++) {
-                if (rowIndex < items.length) {
-                    const item = items[rowIndex];
-                    handleCellEdit(item, columnKey, value);
+    const handleDragFill = React.useCallback((
+        startCell: { row: number; column: string },
+        endCell: { row: number; column: string },
+        value: any,
+        fillType: 'copy' | 'series' | 'pattern'
+    ) => {
+        const startRow = Math.min(startCell.row, endCell.row);
+        const endRow = Math.max(startCell.row, endCell.row);
+        
+        for (let row = startRow; row <= endRow; row++) {
+            if (row < items.length) {
+                const item = items[row];
+                const itemId = item.key || item.id || item.getRecordId?.();
+                
+                if (itemId) {
+                    let fillValue = value;
+                    
+                    if (fillType === 'series' && typeof value === 'number') {
+                        fillValue = value + (row - startCell.row);
+                    }
+                    
+                    commitEdit(fillValue);
                 }
             }
-        },
-        [enableDragFill, items, handleCellEdit],
-    );
-
-    const handleCommitChanges = React.useCallback(() => {
-        if (!onCommitChanges || !hasChanges) return;
-
-        const changes: EditChange[] = [];
-        Object.entries(pendingChanges).forEach(([itemId, itemChanges]) => {
-            const item = items.find((i) => (i.key || i.id || i.getRecordId?.()) === itemId);
-            if (item) {
-                const rowIndex = items.indexOf(item);
-                Object.entries(itemChanges).forEach(([columnKey, newValue]) => {
-                    const oldValue = item[columnKey];
-                    if (oldValue !== newValue) {
-                        changes.push({
-                            itemId,
-                            columnKey,
-                            oldValue,
-                            newValue,
-                            rowIndex,
-                        });
-                    }
-                });
-            }
-        });
-
-        onCommitChanges(changes);
-        setPendingChanges({});
-        setHasChanges(false);
-    }, [onCommitChanges, hasChanges, pendingChanges, items]);
-
-    const handleCancelChanges = React.useCallback(() => {
-        setPendingChanges({});
-        setHasChanges(false);
-        setEditingCell(null);
-
-        if (onCancelChanges) {
-            onCancelChanges();
         }
-    }, [onCancelChanges]);
-
-    const commandBarItems: ICommandBarItemProps[] = React.useMemo(() => {
-        if (!hasChanges) return [];
-
-        return [
-            {
-                key: 'commit',
-                text: 'Commit Changes',
-                iconProps: { iconName: 'Save' },
-                onClick: handleCommitChanges,
-                buttonStyles: {
-                    root: { backgroundColor: '#107c10', color: 'white' },
-                    rootHovered: { backgroundColor: '#0e6e0e' },
-                },
-            },
-            {
-                key: 'cancel',
-                text: 'Cancel Changes',
-                iconProps: { iconName: 'Cancel' },
-                onClick: handleCancelChanges,
-                buttonStyles: {
-                    root: { backgroundColor: '#d13438', color: 'white' },
-                    rootHovered: { backgroundColor: '#b52b30' },
-                },
-            },
-        ];
-    }, [hasChanges, handleCommitChanges, handleCancelChanges]);
+    }, [items, commitEdit]);
 
     const enhancedColumns = React.useMemo(() => {
-        return columns.map((column) => ({
+        return columns.map(column => ({
             ...column,
             onRender: (item: any, index?: number) => {
                 const itemId = item.key || item.id || item.getRecordId?.();
                 const columnKey = column.fieldName || column.key;
+                const cellKey = getCellKey(itemId, columnKey);
+                const isEditing = editingState?.itemId === itemId && editingState?.columnKey === columnKey;
+                const hasChanges = pendingChanges.has(cellKey);
                 const isReadOnly = readOnlyColumns.includes(columnKey);
-                const isCurrentlyEditing = editingCell?.itemId === itemId && editingCell?.columnKey === columnKey;
+                
+                const cellValue = pendingChanges.get(cellKey)?.newValue ?? item[columnKey];
+                const dataType = column.data?.dataType || 'string';
+                const availableValues = getAvailableValues?.(columnKey) || [];
 
-                // Get the current value (from pending changes or original item)
-                const currentValue = pendingChanges[itemId]?.[columnKey] ?? item[columnKey];
+                const cellClassName = `editable-grid-cell ${hasChanges ? 'has-changes' : ''} ${isEditing ? 'is-editing' : ''} ${isReadOnly ? 'read-only' : ''}`;
 
-                if (!enableInlineEditing || isReadOnly) {
-                    // Read-only cell
+                if (isEditing && enableInlineEditing) {
                     return (
-                        <div className={`grid-cell ${item._hasChanges ? 'has-changes' : ''}`}>
-                            {column.onRender ? column.onRender(item, index, column) : currentValue}
+                        <div className={cellClassName}>
+                            <InlineEditor
+                                value={editingState.originalValue}
+                                column={column}
+                                dataType={dataType}
+                                availableValues={availableValues}
+                                isReadOnly={isReadOnly}
+                                onCommit={commitEdit}
+                                onCancel={cancelEdit}
+                                className="inline-editor"
+                            />
                         </div>
                     );
                 }
 
                 return (
-                    <EditableGridCell
-                        item={item}
-                        column={column}
-                        rowIndex={index || 0}
-                        value={currentValue}
-                        isEditing={isCurrentlyEditing}
-                        onStartEdit={() => setEditingCell({ itemId, columnKey, isEditing: true })}
-                        onCommitEdit={(newValue) => handleCellEdit(item, columnKey, newValue)}
-                        onCancelEdit={() => setEditingCell(null)}
-                        availableValues={getAvailableValues?.(columnKey)}
-                        hasChanges={item._hasChanges}
-                        enableDragFill={enableDragFill}
-                    />
+                    <div 
+                        className={cellClassName}
+                        onClick={() => !isReadOnly && startEdit(item, column)}
+                        title={hasChanges ? `Changed from: ${pendingChanges.get(cellKey)?.oldValue}` : ''}
+                    >
+                        {column.onRender ? 
+                            column.onRender(item, index, column) : 
+                            String(cellValue || '')
+                        }
+                        {!isReadOnly && enableDragFill && (
+                            <div 
+                                className="drag-fill-handle"
+                                onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    // Handle drag fill start
+                                }}
+                            />
+                        )}
+                    </div>
                 );
-            },
+            }
         }));
-    }, [
-        columns,
-        readOnlyColumns,
-        enableInlineEditing,
-        editingCell,
-        pendingChanges,
-        handleCellEdit,
-        getAvailableValues,
-        enableDragFill,
-    ]);
+    }, [columns, editingState, pendingChanges, readOnlyColumns, enableInlineEditing, enableDragFill, startEdit, commitEdit, cancelEdit, getAvailableValues]);
 
-    const onRenderRow = React.useCallback((props?: IDetailsRowProps) => {
-        if (!props) return null;
+    const commandBarItems: ICommandBarItemProps[] = React.useMemo(() => {
+        const items: ICommandBarItemProps[] = [];
 
-        const customStyles: Partial<IDetailsRowStyles> = {
-            root: {
-                backgroundColor: props.item._hasChanges ? '#fff4ce' : undefined, // Light yellow for changed rows
-            },
-        };
+        if (pendingChanges.size > 0) {
+            items.push(
+                {
+                    key: 'save',
+                    text: `Save Changes (${pendingChanges.size})`,
+                    iconProps: { iconName: 'CheckMark' },
+                    onClick: () => { commitAllChanges(); },
+                    disabled: isCommitting,
+                },
+                {
+                    key: 'cancel',
+                    text: 'Cancel Changes',
+                    iconProps: { iconName: 'Cancel' },
+                    onClick: cancelAllChanges,
+                    disabled: isCommitting,
+                }
+            );
+        }
 
-        return <DetailsRow {...props} styles={customStyles} />;
-    }, []);
+        return items;
+    }, [pendingChanges.size, commitAllChanges, cancelAllChanges, isCommitting]);
+
+    const gridContent = (
+        <DetailsList
+            items={items}
+            columns={enhancedColumns}
+            selectionMode={selectionMode}
+            checkboxVisibility={checkboxVisibility}
+            layoutMode={layoutMode}
+            constrainMode={constrainMode}
+            isHeaderVisible={true}
+            compact={false}
+            {...otherProps}
+        />
+    );
 
     return (
-        <DragFillManager onDragFill={handleDragFill}>
-            <div className="editable-grid-container">
-                {hasChanges && (
-                    <MessageBar messageBarType={MessageBarType.info} isMultiline={false}>
-                        You have unsaved changes. Click "Commit Changes" to save or "Cancel Changes" to discard.
-                    </MessageBar>
-                )}
-
+        <div className="editable-grid-container">
+            {pendingChanges.size > 0 && (
                 <CommandBar
                     items={commandBarItems}
-                    styles={{
-                        root: {
-                            padding: 0,
-                            backgroundColor: 'transparent',
-                            borderBottom: hasChanges ? '1px solid #edebe9' : 'none',
-                        },
-                    }}
+                    className="editable-grid-command-bar"
                 />
+            )}
+            
+            {errorMessage && (
+                <MessageBar 
+                    messageBarType={MessageBarType.error}
+                    onDismiss={() => setErrorMessage('')}
+                >
+                    {errorMessage}
+                </MessageBar>
+            )}
+            
+            {isCommitting && (
+                <MessageBar messageBarType={MessageBarType.info}>
+                    <Spinner size={SpinnerSize.small} style={{ marginRight: '8px' }} />
+                    Saving changes...
+                </MessageBar>
+            )}
 
-                <DetailsList
-                    {...detailsListProps}
-                    items={itemsWithChanges}
-                    columns={enhancedColumns}
-                    onRenderRow={onRenderRow}
-                    selectionMode={SelectionMode.none} // Disable selection to avoid conflicts with editing
-                />
-            </div>
-        </DragFillManager>
-    );
-};
-
-interface EditableGridCellProps {
-    item: any;
-    column: IColumn;
-    rowIndex: number;
-    value: any;
-    isEditing: boolean;
-    onStartEdit: () => void;
-    onCommitEdit: (newValue: any) => void;
-    onCancelEdit: () => void;
-    availableValues?: string[];
-    hasChanges: boolean;
-    enableDragFill: boolean;
-}
-
-const EditableGridCell: React.FC<EditableGridCellProps> = ({
-    item,
-    column,
-    rowIndex,
-    value,
-    isEditing,
-    onStartEdit,
-    onCommitEdit,
-    onCancelEdit,
-    availableValues,
-    hasChanges,
-    enableDragFill,
-}) => {
-    const { updateDragFill } = useDragFill();
-    const cellRef = React.useRef<HTMLDivElement>(null);
-
-    const handleMouseEnter = React.useCallback(() => {
-        updateDragFill(rowIndex, column.fieldName || column.key);
-    }, [updateDragFill, rowIndex, column.fieldName, column.key]);
-
-    return (
-        <div
-            ref={cellRef}
-            className={`editable-grid-cell ${hasChanges ? 'has-changes' : ''} ${isEditing ? 'is-editing' : ''}`}
-            onMouseEnter={handleMouseEnter}
-        >
-            <InlineEditor
-                value={value}
-                cellType={column.data?.cellType}
-                column={column}
-                rowIndex={rowIndex}
-                columnKey={column.fieldName || column.key}
-                availableValues={availableValues}
-                isEditing={isEditing}
-                onStartEdit={onStartEdit}
-                onCommitEdit={onCommitEdit}
-                onCancelEdit={onCancelEdit}
-                className="inline-editor"
-            />
-
-            {enableDragFill && !isEditing && (
-                <DragFillHandle
-                    row={rowIndex}
-                    column={column.fieldName || column.key}
-                    value={value}
-                    className="drag-fill-handle"
-                />
+            {enableDragFill ? (
+                <DragFillManager onDragFill={handleDragFill}>
+                    {gridContent}
+                </DragFillManager>
+            ) : (
+                gridContent
             )}
         </div>
     );
 };
+
+export default EditableGrid;

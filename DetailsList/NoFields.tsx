@@ -13,7 +13,7 @@ export const NoFields = React.memo((props: NoFieldsProps): React.ReactElement =>
                 style={{ color: '#575757', textAlign: 'center' }}
                 horizontalAlign={'center'}
             >
-                <Icon iconName="CheckList" style={{ fontSize: 40 }} />
+                <Icon iconName="List" style={{ fontSize: 40 }} />
                 <Stack.Item>{resources.getString('Message_NoFieldsConfigured')}</Stack.Item>
                 <Stack.Item>{resources.getString('Message_ChooseFields')}</Stack.Item>
             </Stack>

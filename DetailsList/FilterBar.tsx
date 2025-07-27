@@ -72,13 +72,13 @@ export const FilterBar: React.FC<IFilterBarProps> = ({ filters, onRemoveFilter, 
                                 <strong>{filter.columnName}:</strong> {getFilterDisplayText(filter)}
                             </Text>
                             <IconButton
-                                iconProps={{ iconName: 'Edit' }}
+                                iconProps={{ iconName: 'Settings' }}
                                 onClick={() => onEditFilter(filter.columnName)}
                                 title={`Edit filter for ${filter.columnName}`}
                                 styles={{ root: { minWidth: '16px', height: '16px' } }}
                             />
                             <IconButton
-                                iconProps={{ iconName: 'Cancel' }}
+                                iconProps={{ iconName: 'Clear' }}
                                 onClick={() => onRemoveFilter(filter.columnName)}
                                 title={`Remove filter for ${filter.columnName}`}
                                 styles={{ root: { minWidth: '16px', height: '16px' } }}
