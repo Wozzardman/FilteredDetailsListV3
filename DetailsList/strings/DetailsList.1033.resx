@@ -368,5 +368,33 @@
     <value>Column filter type</value>
     <comment/>
   </data>
+  <data name="HeaderTextSize" xml:space="preserve">
+    <value>Header text size</value>
+    <comment>Controls the font size of column headers</comment>
+  </data>
+  <data name="ColumnTextSize" xml:space="preserve">
+    <value>Column text size</value>
+    <comment>Controls the font size of column data</comment>
+  </data>
+  <data name="EditedRecords" xml:space="preserve">
+    <value>Edited records</value>
+    <comment>JSON array of all edited records with changes</comment>
+  </data>
+  <data name="EditedRecordsCount" xml:space="preserve">
+    <value>Edited records count</value>
+    <comment>Number of records that have been edited</comment>
+  </data>
+  <data name="PatchFormula" xml:space="preserve">
+    <value>Patch formula</value>
+    <comment>Ready-to-use Patch formula for saving changes</comment>
+  </data>
+  <data name="ForAllFormula" xml:space="preserve">
+    <value>ForAll formula</value>
+    <comment>Ready-to-use ForAll formula for batch operations</comment>
+  </data>
+  <data name="EditedRecordKeys" xml:space="preserve">
+    <value>Edited record keys</value>
+    <comment>Comma-separated list of edited record IDs</comment>
+  </data>
   
 </root>

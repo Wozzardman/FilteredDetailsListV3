@@ -199,7 +199,7 @@ export class HighPerformanceVirtualGrid extends React.PureComponent<VirtualGridP
 
         this.scrollingResetTimeoutId = window.setTimeout(() => {
             this.setState({ isScrolling: false });
-        }, 150);
+        }, 150) as unknown as number;
     };
 
     private updateVisibleRange = () => {

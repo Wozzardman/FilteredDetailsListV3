@@ -10,6 +10,9 @@ import { EnterpriseChangeManager } from '../services/EnterpriseChangeManager';
 import { DataExportService } from '../services/DataExportService';
 import { IExportOptions } from '../types/Advanced.types';
 import { VirtualizedEditableGrid } from './VirtualizedEditableGrid';
+import { ColumnEditorMapping } from '../types/ColumnEditor.types';
+import { HeaderSelectionCheckbox, RowSelectionCheckbox } from './SelectionCheckbox';
+import '../css/SelectionMode.css';
 
 export interface IUltimateEnterpriseGridColumn extends IColumn {
     filterable?: boolean;
@@ -33,14 +36,29 @@ export interface IUltimateEnterpriseGridProps {
     enableExport?: boolean;
     enablePerformanceMonitoring?: boolean;
     enableChangeTracking?: boolean;
+    useEnhancedEditors?: boolean;
+    columnEditorMapping?: ColumnEditorMapping;
     onItemsChanged?: (items: any[]) => void;
     onCellEdit?: (item: any, column: IUltimateEnterpriseGridColumn, newValue: any) => void;
     onExport?: (format: 'CSV' | 'Excel' | 'PDF' | 'JSON', data: any[]) => void;
     getColumnDataType?: (columnKey: string) => 'text' | 'number' | 'date' | 'boolean' | 'choice';
     selectionMode?: SelectionMode;
+    
+    // Selection mode properties
+    enableSelectionMode?: boolean;
+    selectedItems?: Set<string>;
+    selectAllState?: 'none' | 'some' | 'all';
+    onItemSelection?: (itemId: string) => void;
+    onSelectAll?: () => void;
+    onClearAllSelections?: () => void;
+    
     className?: string;
     theme?: 'light' | 'dark' | 'high-contrast';
     locale?: string;
+    
+    // Text sizing properties
+    headerTextSize?: number; // Font size for column headers in px
+    columnTextSize?: number; // Font size for column data in px
 }
 
 /**
@@ -59,14 +77,29 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     enableExport = true,
     enablePerformanceMonitoring = true,
     enableChangeTracking = true,
+    useEnhancedEditors = false,
+    columnEditorMapping = {},
     onItemsChanged,
     onCellEdit,
     onExport,
     getColumnDataType,
     selectionMode = SelectionMode.multiple,
+    
+    // Selection mode props
+    enableSelectionMode = false,
+    selectedItems = new Set(),
+    selectAllState = 'none',
+    onItemSelection,
+    onSelectAll,
+    onClearAllSelections,
+    
     className = '',
     theme = 'light',
-    locale = 'en-US'
+    locale = 'en-US',
+    
+    // Text sizing props with defaults
+    headerTextSize = 14, // Default 14px for headers
+    columnTextSize = 13  // Default 13px for column data
 }) => {
     // State management
     const [filteredItems, setFilteredItems] = useState<any[]>(items);
@@ -145,7 +178,8 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
 
     // Get available values for column filters using proper PCF data access pattern
     const getAvailableValues = useCallback((columnKey: string) => {
-        const uniqueValues = new Set<string>();
+        // Use a Map to track values and their counts efficiently
+        const valueCountMap = new Map<any, number>();
         
         items.forEach(item => {
             let value;
@@ -168,17 +202,25 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                 value = item[columnKey];
             }
             
-            // Add non-null, non-undefined values to the set
-            if (value !== null && value !== undefined && value !== '') {
-                const stringValue = value.toString().trim();
-                if (stringValue.length > 0) {
-                    uniqueValues.add(stringValue);
-                }
+            // Count occurrences of each value (preserve original data type)
+            if (value !== null && value !== undefined) {
+                // Don't convert to string - keep original value for proper counting
+                const currentCount = valueCountMap.get(value) || 0;
+                valueCountMap.set(value, currentCount + 1);
             }
         });
         
-        // Convert to sorted array
-        return Array.from(uniqueValues).sort();
+        // Convert to array of objects with value and count
+        const result = Array.from(valueCountMap.entries()).map(([value, count]) => ({
+            value,
+            displayValue: value?.toString() || '(Blank)',
+            count
+        }));
+        
+        // Sort by display value
+        result.sort((a, b) => (a.displayValue || '').localeCompare(b.displayValue || ''));
+        
+        return result;
     }, [items]);
 
     // Handle export functionality
@@ -237,15 +279,12 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     const shouldUseVirtualization = enableVirtualization && 
         (filteredItems.length >= virtualizationThreshold || shouldVirtualize);
 
-    // Performance metrics display
-    const performanceDisplay = enablePerformanceMonitoring && performanceMetrics ? (
+    // Performance metrics display - simplified to show only total items
+    const performanceDisplay = (
         <div className="performance-metrics" data-theme={theme}>
-            <span>{filteredItems.length} items</span>
-            <span>{performanceMetrics.renderTime}ms</span>
-            <span>{performanceMetrics.memoryUsage}MB</span>
-            <span>{isOptimized ? 'Optimized' : 'Loading'}</span>
+            <span>Total Items: {filteredItems.length}</span>
         </div>
-    ) : null;
+    );
 
     // Change tracking display (status only - no duplicate buttons)
     const pendingChangesCount = changeManager?.getPendingChanges().length || 0;
@@ -260,12 +299,14 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
             className={`ultimate-enterprise-grid ${className}`} 
             data-theme={theme}
             style={{
-                width: typeof width === 'number' ? `${width}px` : width,
-                height: typeof height === 'number' ? `${height}px` : height,
-                maxWidth: typeof width === 'number' ? `${width}px` : width,
-                maxHeight: typeof height === 'number' ? `${height}px` : height,
+                width: (typeof width === 'number' && width > 0) ? `${width}px` : (typeof width === 'string' ? width : '100%'),
+                height: (typeof height === 'number' && height > 0) ? `${height}px` : (typeof height === 'string' ? height : '400px'),
+                maxWidth: (typeof width === 'number' && width > 0) ? `${width}px` : (typeof width === 'string' ? width : '100%'),
+                maxHeight: (typeof height === 'number' && height > 0) ? `${height}px` : (typeof height === 'string' ? height : '400px'),
                 overflow: 'hidden',
-                boxSizing: 'border-box'
+                boxSizing: 'border-box',
+                display: 'flex',
+                flexDirection: 'column'
             }}
         >
             {/* Control Bar */}
@@ -293,10 +334,6 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                             onClick={() => handleExport('Excel')}
                         />
                         <DefaultButton 
-                            text="Export PDF" 
-                            onClick={() => handleExport('PDF')}
-                        />
-                        <DefaultButton 
                             text="Export JSON" 
                             onClick={() => handleExport('JSON')}
                         />
@@ -314,7 +351,8 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                 className="grid-container"
                 style={{
                     width: '100%',
-                    height: typeof height === 'number' ? `${height - 120}px` : 'calc(100% - 120px)',
+                    flex: 1, // Take remaining height
+                    minHeight: 0, // Allow flex shrinking
                     overflow: 'hidden',
                     boxSizing: 'border-box'
                 }}
@@ -322,11 +360,21 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                 <VirtualizedEditableGrid
                     items={filteredItems}
                     columns={columns}
-                    height={typeof height === 'number' ? height - 120 : 400}
-                    width={typeof width === 'number' ? width : '100%'}
+                    height="100%" // Let the grid flex with its container
+                    width={(typeof width === 'number' && width > 0) ? width : '100%'}
                     enableInlineEditing={enableInlineEditing}
-                    enableDragFill={true}
+                    enableDragFill={!enableSelectionMode}
+                    useEnhancedEditors={useEnhancedEditors}
+                    columnEditorMapping={columnEditorMapping}
                     getAvailableValues={getAvailableValues}
+                    
+                    // Selection mode props
+                    enableSelectionMode={enableSelectionMode}
+                    selectedItems={selectedItems}
+                    selectAllState={selectAllState}
+                    onItemSelection={onItemSelection}
+                    onSelectAll={onSelectAll}
+                    onClearAllSelections={onClearAllSelections}
                     onCellEdit={(itemId: string, columnKey: string, newValue: any) => {
                         const item = filteredItems.find(i => (i.key || i.id) === itemId);
                         const column = columns.find(c => (c.fieldName || c.key) === columnKey);
@@ -341,6 +389,10 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                     overscan={10}
                     enableMemoryPooling={true}
                     enablePrefetching={true}
+                    
+                    // Text sizing props
+                    headerTextSize={headerTextSize}
+                    columnTextSize={columnTextSize}
                 />
             </div>
         </div>

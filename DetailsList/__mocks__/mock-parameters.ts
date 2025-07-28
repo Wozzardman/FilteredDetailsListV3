@@ -26,9 +26,18 @@ export function getMockParameters(): IInputs {
         VirtualizationThreshold: new MockWholeNumberProperty(),
         DefaultColumnWidth: new MockWholeNumberProperty(),
         EnableColumnResizing: new MockTwoOptionsProperty(true),
+        HeaderTextSize: new MockWholeNumberProperty(14),
+        ColumnTextSize: new MockWholeNumberProperty(13),
         EnableFiltering: new MockTwoOptionsProperty(),
         FilterConfiguration: new MockStringProperty(),
         AppliedFilters: new MockStringProperty(),
+        // Enhanced Editor Properties
+        UseEnhancedEditors: new MockTwoOptionsProperty(false),
+        ColumnEditorConfig: new MockStringProperty(),
+        
+        // Selection Mode Properties
+        EnableSelectionMode: new MockTwoOptionsProperty(false),
+        
         records: new MockDataSet([]),
         columns: new MockDataSet([]),
     };

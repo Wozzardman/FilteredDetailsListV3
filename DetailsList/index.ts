@@ -1,4 +1,4 @@
-import { IDetailsList, IObjectWithKey, SelectionMode, Selection, getWindow, IColumn } from '@fluentui/react';
+import { IDetailsList, IObjectWithKey, SelectionMode, Selection, IColumn } from '@fluentui/react';
 import * as React from 'react';
 import { IInputs, IOutputs } from './generated/ManifestTypes';
 import { getRecordKey } from './Grid';
@@ -7,7 +7,15 @@ import { InputEvents, OutputEvents, RecordsColumns, ItemsColumns, SortDirection 
 import { IFilterState } from './Filter.types';
 import { FilterUtils } from './FilterUtils';
 import { performanceMonitor } from './performance/PerformanceMonitor';
+import { AutoUpdateManager, RecordIdentity } from './services/AutoUpdateManager';
 type DataSet = ComponentFramework.PropertyHelper.DataSetApi.EntityRecord & IObjectWithKey;
+
+// Native Power Apps selection state (similar to ComboBox.SelectedItems)
+interface NativeSelectionState {
+    selectedItems: Set<string>;
+    selectAllState: 'none' | 'some' | 'all';
+    selectedCount: number;
+}
 
 const SelectionTypes: Record<'0' | '1' | '2', SelectionMode> = {
     '0': SelectionMode.none,
@@ -60,6 +68,25 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
 
     // Inline editing state
     private pendingChanges: Map<string, Map<string, any>> = new Map();
+    
+    // Auto-update manager for record identity and smart updates
+    private autoUpdateManager: AutoUpdateManager = new AutoUpdateManager();
+    
+    // Native Power Apps selection state (like ComboBox.SelectedItems)
+    private isSelectionMode: boolean = false;
+    private nativeSelectionState: NativeSelectionState = {
+        selectedItems: new Set(),
+        selectAllState: 'none',
+        selectedCount: 0
+    };
+    
+    // Current change tracking for output properties
+    private currentChangedRecordKey: string = '';
+    private currentChangedColumn: string = '';
+    private currentOldValue: string = '';
+    private currentNewValue: string = '';
+    private lastCommitTrigger: string = '';
+    private lastCancelTrigger: string = '';
 
     // Legacy compatibility mode flag
     private isLegacyMode = false; // Always use modern mode
@@ -72,15 +99,158 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             this.context = context;
             context.mode.trackContainerResize(true);
             this.resources = context.resources;
-            this.selection = new Selection({
-                onSelectionChanged: this.onSelectionChanged,
-                canSelectItem: this.canSelectItem,
-            });
+            
+            // Initialize native Power Apps selection (like ComboBox.SelectedItems)
+            this.initializeNativeSelection();
 
             // Initialize enterprise features
             this.initializeEnterpriseFeatures();
         } finally {
             endMeasurement();
+        }
+    }
+
+    private initializeNativeSelection(): void {
+        // Initialize native Power Apps selection (similar to ComboBox.SelectedItems)
+        // This uses the built-in PCF dataset selection APIs
+        this.updateNativeSelectionState();
+        console.log('✅ Native Power Apps selection initialized');
+    }
+
+    /**
+     * Update native selection state based on Power Apps dataset.getSelectedRecordIds()
+     * This works like ComboBox.SelectedItems - Power Apps handles the selection logic
+     */
+    private updateNativeSelectionState(): void {
+        try {
+            const dataset = this.context?.parameters?.records;
+            if (!dataset) {
+                console.log(`⚠️ updateNativeSelectionState: No dataset available`);
+                return;
+            }
+
+            // Safely get selected IDs, handling undefined/null cases
+            const selectedIds = dataset.getSelectedRecordIds() || [];
+            
+            console.log(`📊 updateNativeSelectionState: selectedIds from dataset:`, selectedIds);
+            
+            this.nativeSelectionState.selectedItems = new Set(selectedIds);
+            this.nativeSelectionState.selectedCount = selectedIds.length;
+            
+            const totalItems = this.sortedRecordsIds?.length || 0;
+            if (selectedIds.length === 0) {
+                this.nativeSelectionState.selectAllState = 'none';
+            } else if (selectedIds.length === totalItems && totalItems > 0) {
+                this.nativeSelectionState.selectAllState = 'all';
+            } else {
+                this.nativeSelectionState.selectAllState = 'some';
+            }
+        } catch (error) {
+            console.error('❌ Error in updateNativeSelectionState:', error);
+            // Initialize with safe defaults
+            this.nativeSelectionState = {
+                selectedItems: new Set(),
+                selectAllState: 'none',
+                selectedCount: 0
+            };
+        }
+        
+        console.log(`📋 Updated nativeSelectionState:`, {
+            selectedCount: this.nativeSelectionState.selectedCount,
+            selectAllState: this.nativeSelectionState.selectAllState,
+            selectedItems: Array.from(this.nativeSelectionState.selectedItems)
+        });
+    }
+
+    /**
+     * Get the first selected item as a JSON object (for Form Item compatibility)
+     * This mimics how the original PowerCAT DetailsList works with .Selected
+     */
+    private getFirstSelectedItemJson(): string {
+        try {
+            const dataset = this.context?.parameters?.records;
+            if (!dataset) {
+                return '{}';
+            }
+
+            const selectedIds = dataset.getSelectedRecordIds() || [];
+            if (selectedIds.length === 0) {
+                return '{}';
+            }
+
+            // Get the first selected record
+            const firstId = selectedIds[0];
+            const record = dataset.records?.[firstId];
+            if (!record) {
+                return '{}';
+            }
+
+            // Return single record data in Power Apps format
+            const item: any = {
+                recordId: firstId,
+            };
+            
+            // Add all column values to the selected item
+            if (this.datasetColumns) {
+                this.datasetColumns.forEach(col => {
+                    try {
+                        item[col.name] = record.getValue(col.name);
+                    } catch (e) {
+                        item[col.name] = null;
+                    }
+                });
+            }
+            
+            return JSON.stringify(item);
+        } catch (error) {
+            console.error('❌ Error in getFirstSelectedItemJson:', error);
+            return '{}';
+        }
+    }
+
+    /**
+     * Get selected items in Power Apps format (for internal use only - not exposed as output)
+     * Power Apps automatically provides .SelectedItems through dataset selection mechanism
+     */
+    private getNativeSelectedItemsJson(): string {
+        try {
+            const dataset = this.context?.parameters?.records;
+            if (!dataset) {
+                console.log(`⚠️ getNativeSelectedItemsJson: No dataset available`);
+                return '[]';
+            }
+
+            // Safely get selected IDs, handling undefined/null cases
+            const selectedIds = dataset.getSelectedRecordIds() || [];
+            
+            const selectedItems = selectedIds.map(id => {
+                const record = dataset.records?.[id];
+                if (!record) return null;
+            
+                // Return record data in Power Apps format
+                const item: any = {
+                    recordId: id,
+                    // Add all field values
+                };
+                
+                // Add all column values to the selected item
+                if (this.datasetColumns) {
+                    this.datasetColumns.forEach(col => {
+                        try {
+                            item[col.name] = record.getValue(col.name);
+                        } catch (e) {
+                            item[col.name] = null;
+                        }
+                    });
+                }
+                
+                return item;
+            }).filter(item => item !== null);
+            
+            return JSON.stringify(selectedItems);
+        } catch (error) {
+            console.error('❌ Error in getNativeSelectedItemsJson:', error);
+            return '[]';
         }
     }
 
@@ -195,6 +365,17 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     }
 
     public updateView(context: ComponentFramework.Context<IInputs>): React.ReactElement {
+        // Handle selection mode toggle
+        this.handleSelectionModeToggle(context);
+        
+        // Handle commit trigger input
+        this.handleCommitTrigger(context);
+        
+        // Update native selection state from Power Apps dataset
+        if (this.isSelectionMode) {
+            this.updateNativeSelectionState();
+        }
+        
         // Detect legacy vs modern mode
         this.isLegacyMode = this.detectLegacyMode(context);
 
@@ -227,7 +408,10 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         console.log('Allocated height:', context.mode.allocatedHeight);
         console.log('📐 SIZING DEBUG - Using dimensions:', {
             width: context.mode.allocatedWidth > 0 ? context.mode.allocatedWidth : '100%',
-            height: context.mode.allocatedHeight > 0 ? context.mode.allocatedHeight : 400
+            height: context.mode.allocatedHeight > 0 ? context.mode.allocatedHeight : 400,
+            allocatedWidth: context.mode.allocatedWidth,
+            allocatedHeight: context.mode.allocatedHeight,
+            isSelectionMode: this.isSelectionMode
         });
 
         if (dataset.sortedRecordIds && dataset.sortedRecordIds.length > 0) {
@@ -456,11 +640,13 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         const gridColumns = actualDataColumns
             .filter(col => !metadataColumns.includes(col.name as any))
             .map(col => {
-                console.log(`🔧 Processing column: ${col.name} (${col.displayName}) - Type: ${col.dataType}`);
-                
                 // Get default column width from manifest property, fallback to visualSizeFactor or default
                 const defaultWidth = context.parameters.DefaultColumnWidth?.raw || 150;
-                const columnWidth = col.visualSizeFactor > 0 ? col.visualSizeFactor * 100 : defaultWidth;
+                const visualSizeFactor = typeof col.visualSizeFactor === 'number' && !isNaN(col.visualSizeFactor) ? col.visualSizeFactor : 0;
+                // Fix: visualSizeFactor should be used directly, not multiplied by 100
+                const columnWidth = visualSizeFactor > 0 ? Math.min(visualSizeFactor, 500) : defaultWidth;
+                
+                console.log(`🔧 Processing column: ${col.name} (${col.displayName}) - Type: ${col.dataType}, VisualSizeFactor: ${col.visualSizeFactor}, Calculated Width: ${columnWidth}`);
                 
                 // Check if column resizing is enabled globally and per-column
                 const globalResizeEnabled = context.parameters.EnableColumnResizing?.raw ?? true;
@@ -470,7 +656,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                     key: col.name,
                     name: col.displayName,
                     fieldName: col.name,
-                    minWidth: Math.max(columnWidth * 0.5, 50), // Minimum 50px or half the default width
+                    minWidth: columnWidth, // Use calculated width as the default (not minimum)
                     maxWidth: columnWidth * 3, // Maximum 3x the default width
                     isResizable: columnResizable,
                     filterable: true,
@@ -496,18 +682,47 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             this.handleCellEdit(recordId, column.fieldName, newValue);
         };
 
+        // Parse column editor configuration from app
+        const useEnhancedEditors = context.parameters.UseEnhancedEditors?.raw ?? false;
+        let columnEditorMapping = {};
+        
+        if (useEnhancedEditors && context.parameters.ColumnEditorConfig?.raw) {
+            try {
+                columnEditorMapping = JSON.parse(context.parameters.ColumnEditorConfig.raw);
+                console.log('📝 Column editor configuration loaded:', columnEditorMapping);
+            } catch (error) {
+                console.warn('⚠️ Invalid column editor configuration JSON:', error);
+            }
+        }
+
         const grid = React.createElement(UltimateEnterpriseGrid, {
             items,
             columns: gridColumns,
-            height: context.mode.allocatedHeight > 0 ? context.mode.allocatedHeight : 400,
-            width: context.mode.allocatedWidth > 0 ? context.mode.allocatedWidth : '100%',
+            height: (context.mode.allocatedHeight && context.mode.allocatedHeight > 0) ? context.mode.allocatedHeight : 400,
+            width: (context.mode.allocatedWidth && context.mode.allocatedWidth > 0) ? context.mode.allocatedWidth : '100%', // Always provide a valid width
             enableVirtualization: true,
             virtualizationThreshold: 100,
-            enableInlineEditing: this.enableInlineEditing,
+            // Mode configuration - Selection mode disables inline editing
+            enableInlineEditing: this.isSelectionMode ? false : this.enableInlineEditing,
             enableFiltering: true,
             enableExport: true,
             enablePerformanceMonitoring: this.enablePerformanceMonitoring,
-            enableChangeTracking: true,
+            enableChangeTracking: !this.isSelectionMode, // Disable change tracking in selection mode
+            useEnhancedEditors: this.isSelectionMode ? false : useEnhancedEditors,
+            columnEditorMapping: columnEditorMapping,
+            
+            // Text size configuration from Power Apps properties
+            headerTextSize: context.parameters.HeaderTextSize?.raw || 14,
+            columnTextSize: context.parameters.ColumnTextSize?.raw || 13,
+            
+            // Selection mode props - using native Power Apps selection
+            enableSelectionMode: this.isSelectionMode,
+            selectedItems: this.nativeSelectionState.selectedItems,
+            selectAllState: this.nativeSelectionState.selectAllState,
+            onItemSelection: this.handleItemSelection,
+            onSelectAll: this.handleSelectAll,
+            onClearAllSelections: this.handleClearAllSelections,
+            
             onCellEdit: onCellEditWrapper,
             getColumnDataType: (columnKey: string) => {
                 const column = gridColumns.find(col => col.key === columnKey);
@@ -583,10 +798,56 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 } as IOutputs;
                 break;
         }
+        
+        // Add change event outputs
+        const changeOutputs = {
+            ChangedRecordKey: this.currentChangedRecordKey,
+            ChangedColumn: this.currentChangedColumn,
+            OldValue: this.currentOldValue,
+            NewValue: this.currentNewValue,
+            HasPendingChanges: this.pendingChanges.size > 0,
+            ChangeCount: Array.from(this.pendingChanges.values())
+                .reduce((total, recordChanges) => total + recordChanges.size, 0),
+            PendingChanges: JSON.stringify(Array.from(this.pendingChanges.entries()).map(([recordId, changes]) => ({
+                recordId,
+                changes: Object.fromEntries(changes)
+            })))
+        } as IOutputs;
+
+        // Add auto-update outputs
+        const autoUpdateOutputs = {
+            AutoUpdateFormula: this.currentChangedRecordKey ? 
+                this.autoUpdateManager.generateUpdateFormula(this.currentChangedRecordKey) : '',
+            RecordIdentityData: JSON.stringify(this.autoUpdateManager.getPendingChangesSummary()),
+            PendingChangesSummary: JSON.stringify(this.autoUpdateManager.getPendingChangesSummary()),
+            ValidationErrors: this.currentChangedRecordKey ? 
+                JSON.stringify(this.autoUpdateManager.getRowContext(this.currentChangedRecordKey)?.validationErrors || {}) : '{}'
+        } as IOutputs;
+
+        // Add selection outputs using native Power Apps APIs - let Power Apps handle .Selected and .SelectedItems natively
+        const selectionOutputs = {
+            // Remove custom Selected and SelectedItems properties - Power Apps will automatically provide:
+            // - dataset.Selected (single selection, direct field access like Gallery.Selected.FieldName)
+            // - dataset.SelectedItems (multiple selection, direct field access like Gallery.SelectedItems.FieldName)
+            SelectedCount: this.nativeSelectionState.selectedCount,
+            SelectAllState: this.nativeSelectionState.selectAllState === 'none' ? '0' : 
+                           this.nativeSelectionState.selectAllState === 'some' ? '1' : '2',
+            SelectionChangedTrigger: this.isSelectionMode ? Date.now().toString() : ''
+        } as IOutputs;
+        
+        // Add Power Apps integration outputs for enhanced inline editing
+        const powerAppsIntegrationOutputs = {
+            EditedRecords: JSON.stringify(this.getEditedRecordsForPowerApps()),
+            EditedRecordsCount: this.pendingChanges.size,
+            PatchFormula: this.generatePatchFormula(),
+            ForAllFormula: this.generateForAllFormula(),
+            EditedRecordKeys: JSON.stringify(Array.from(this.pendingChanges.keys()))
+        } as any;
+        
         // Reset the event so that it does not re-trigger
         this.eventName = '';
         this.filterEventName = '';
-        return { ...defaultOutputs, ...eventOutputs };
+        return { ...defaultOutputs, ...eventOutputs, ...changeOutputs, ...autoUpdateOutputs, ...selectionOutputs, ...powerAppsIntegrationOutputs };
     }
 
     public destroy(): void {
@@ -656,13 +917,30 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         }
     }
 
+    /**
+     * Safe window access that avoids cross-origin issues
+     */
+    private getSafeWindow(): Window | null {
+        try {
+            // Try to access the current window safely
+            return window;
+        } catch (e) {
+            // If there's a security error, return null
+            console.warn('Window access blocked due to cross-origin policy:', e);
+            return null;
+        }
+    }
+
     private asyncOperations(callback: () => void) {
         // Used to ensure setFocus gets executed after the dom is updated
-        const win = getWindow(this.container);
-        if (win) {
+        const win = this.getSafeWindow();
+        if (win && win.requestAnimationFrame) {
             win.requestAnimationFrame(() => {
                 setTimeout(callback, 0);
             });
+        } else {
+            // Fallback for when window access is blocked
+            setTimeout(callback, 0);
         }
     }
 
@@ -911,12 +1189,23 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     // ===== INLINE EDITING METHODS =====
 
     /**
-     * Handle individual cell edits
+     * Handle individual cell edits with auto-update tracking
      */
     private handleCellEdit = (recordId: string, columnName: string, newValue: any): void => {
         console.log(`🖊️ Cell edit: Record ${recordId}, Column ${columnName}, New value:`, newValue);
 
-        // Store the change in pending changes
+        // Get the original value before making changes
+        const dataset = this.context.parameters.records;
+        const currentRecord = dataset.records[recordId];
+        const oldValue = currentRecord ? currentRecord.getValue(columnName) : '';
+
+        // Ensure record is registered with AutoUpdateManager
+        this.ensureRecordRegistered(recordId, currentRecord);
+
+        // Update the field through AutoUpdateManager
+        this.autoUpdateManager.updateField(recordId, columnName, newValue);
+
+        // Store the change in pending changes (legacy support)
         if (!this.pendingChanges.has(recordId)) {
             this.pendingChanges.set(recordId, new Map());
         }
@@ -924,6 +1213,432 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         const recordChanges = this.pendingChanges.get(recordId)!;
         recordChanges.set(columnName, newValue);
 
+        // Update current change tracking for output properties
+        this.currentChangedRecordKey = recordId;
+        this.currentChangedColumn = columnName;
+        this.currentOldValue = oldValue ? oldValue.toString() : '';
+        this.currentNewValue = newValue ? newValue.toString() : '';
+
         console.log(`📝 Pending changes for record ${recordId}:`, Object.fromEntries(recordChanges));
+        console.log(`🔄 Change event: ${recordId}.${columnName}: ${this.currentOldValue} → ${this.currentNewValue}`);
+        
+        // Auto-select the edited record for Power Apps .Selected integration
+        this.autoSelectEditedRecord(recordId);
+        
+        // Notify PowerApps of the change
+        this.notifyOutputChanged();
+    };
+
+    /**
+     * Ensure a record is registered with the AutoUpdateManager
+     */
+    private ensureRecordRegistered = (recordId: string, record: any): void => {
+        const context = this.autoUpdateManager.getRowContext(recordId);
+        if (context) return; // Already registered
+
+        // Get dataset information
+        const dataset = this.context.parameters.records;
+        
+        // Build original values from current record
+        const originalValues: Record<string, any> = {};
+        const currentValues: Record<string, any> = {};
+        
+        if (record) {
+            // Get all column values from the record
+            const columns = this.context.parameters.columns;
+            if (columns && columns.sortedRecordIds) {
+                for (const columnId of columns.sortedRecordIds) {
+                    try {
+                        const value = record.getValue(columnId);
+                        originalValues[columnId] = value;
+                        currentValues[columnId] = value;
+                    } catch (e) {
+                        // Skip columns that can't be read
+                    }
+                }
+            }
+        }
+
+        // Register the record with smart defaults
+        const identity: Partial<RecordIdentity> = {
+            recordId,
+            entityName: dataset.getTitle() || 'Records',
+            primaryKeyField: 'ID',
+            dataSourceName: dataset.getTitle() || 'Records',
+            originalValues,
+            currentValues,
+            updateMethod: 'patch',
+            requiredFields: [], // You can customize this based on your needs
+            fieldValidators: {
+                // Add custom validators here
+                'VTDate': (value: any) => {
+                    if (value && isNaN(Date.parse(value))) {
+                        return 'Invalid date format';
+                    }
+                    return null;
+                },
+                'Size': (value: any) => {
+                    if (value && isNaN(Number(value))) {
+                        return 'Must be a valid number';
+                    }
+                    return null;
+                }
+            },
+            lookupFields: {
+                // Define lookup relationships here
+                'WeldType': {
+                    targetEntity: 'PWeldTypes',
+                    targetField: 'ID',
+                    displayField: 'PWT'
+                }
+            }
+        };
+
+        this.autoUpdateManager.registerRecord(recordId, identity);
+        console.log(`✅ Registered record ${recordId} with AutoUpdateManager`);
+    };
+
+    /**
+     * Clear current change tracking (call this after processing a change)
+     */
+    private clearCurrentChange = (): void => {
+        this.currentChangedRecordKey = '';
+        this.currentChangedColumn = '';
+        this.currentOldValue = '';
+        this.currentNewValue = '';
+    };
+
+    /**
+     * Get edited records formatted for Power Apps consumption
+     */
+    private getEditedRecordsForPowerApps = (): any[] => {
+        const editedRecords: any[] = [];
+        
+        this.pendingChanges.forEach((changes, recordId) => {
+            const record: any = { id: recordId };
+            changes.forEach((newValue, columnName) => {
+                record[columnName] = newValue;
+            });
+            editedRecords.push(record);
+        });
+        
+        return editedRecords;
+    };
+
+    /**
+     * Generate Patch formula for Power Apps integration
+     */
+    private generatePatchFormula = (): string => {
+        if (this.pendingChanges.size === 0) {
+            return '';
+        }
+
+        // Generate formula like: Patch(DataSource, MyGrid.Selected, {Field1: MyGrid.Selected.Field1_Modified, Field2: MyGrid.Selected.Field2_Modified})
+        const controlName = 'MyGrid'; // This could be made configurable
+        const changes: string[] = [];
+        
+        // For the current changed record, generate the patch formula
+        if (this.currentChangedRecordKey && this.pendingChanges.has(this.currentChangedRecordKey)) {
+            const recordChanges = this.pendingChanges.get(this.currentChangedRecordKey);
+            if (recordChanges) {
+                recordChanges.forEach((newValue, columnName) => {
+                    // Escape string values properly for Power Apps
+                    const valueStr = typeof newValue === 'string' ? `"${newValue.replace(/"/g, '""')}"` : newValue;
+                    changes.push(`${columnName}: ${valueStr}`);
+                });
+            }
+        }
+
+        if (changes.length === 0) {
+            return '';
+        }
+
+        return `Patch(DataSource, ${controlName}.Selected, {${changes.join(', ')}})`;
+    };
+
+    /**
+     * Generate ForAll formula for Power Apps integration
+     */
+    private generateForAllFormula = (): string => {
+        if (this.pendingChanges.size === 0) {
+            return '';
+        }
+
+        const controlName = 'MyGrid'; // This could be made configurable
+        const allChanges: string[] = [];
+        
+        // Get all unique column names being changed
+        const changedColumns = new Set<string>();
+        this.pendingChanges.forEach((changes) => {
+            changes.forEach((_, columnName) => {
+                changedColumns.add(columnName);
+            });
+        });
+
+        // Build the record update object
+        const updateFields: string[] = [];
+        changedColumns.forEach(columnName => {
+            updateFields.push(`${columnName}: ThisRecord.${columnName}_Modified`);
+        });
+
+        if (updateFields.length === 0) {
+            return '';
+        }
+
+        return `ForAll(${controlName}.SelectedItems, Patch(DataSource, ThisRecord, {${updateFields.join(', ')}}))`;
+    };
+
+    /**
+     * Auto-select an edited record for Power Apps .Selected integration
+     */
+    private autoSelectEditedRecord = (recordId: string): void => {
+        try {
+            const dataset = this.context.parameters.records;
+            
+            // Check if the record exists in the dataset
+            if (!dataset.records[recordId]) {
+                console.log(`⚠️ Record ${recordId} not found in dataset for auto-selection`);
+                return;
+            }
+
+            // Set the record as selected in the dataset
+            // This makes it accessible via MyGrid.Selected in Power Apps
+            dataset.setSelectedRecordIds([recordId]);
+            
+            // Update our internal selection state to stay in sync
+            this.updateNativeSelectionState();
+            
+            console.log(`✅ Auto-selected edited record: ${recordId} for Power Apps .Selected integration`);
+        } catch (error) {
+            console.error('❌ Error auto-selecting edited record:', error);
+        }
+    };
+
+    /**
+     * Handle commit and cancel triggers with auto-update management
+     */
+    private handleCommitTrigger = (context: ComponentFramework.Context<IInputs>): void => {
+        // Handle commit trigger
+        const commitTrigger = context.parameters.CommitTrigger?.raw;
+        if (commitTrigger && commitTrigger !== this.lastCommitTrigger) {
+            console.log('🔄 CommitTrigger received:', commitTrigger);
+            
+            // Instead of just clearing changes, trigger the auto-save workflow
+            this.executeAutoSave();
+            
+            console.log('✅ Auto-save executed and changes cleared');
+            
+            this.lastCommitTrigger = commitTrigger;
+            this.notifyOutputChanged();
+        }
+
+        // Handle cancel trigger
+        const cancelTrigger = context.parameters.CancelChangesTrigger?.raw;
+        if (cancelTrigger && cancelTrigger !== this.lastCancelTrigger) {
+            console.log('❌ CancelChangesTrigger received:', cancelTrigger);
+            
+            // Clear all pending changes without committing
+            this.pendingChanges.clear();
+            this.autoUpdateManager.clearAllChanges();
+            this.clearCurrentChange();
+            
+            // Force a UI refresh to clear any visual pending change indicators
+            if (this.ref) {
+                this.ref.forceUpdate();
+            }
+            
+            console.log('🚫 All pending changes have been cancelled and cleared');
+            
+            this.lastCancelTrigger = cancelTrigger;
+            this.notifyOutputChanged();
+        }
+    };
+
+    /**
+     * Execute auto-save workflow when built-in Save Changes button is clicked
+     */
+    private executeAutoSave = (): void => {
+        try {
+            // Get all pending changes from AutoUpdateManager
+            const pendingChangesSummary = this.autoUpdateManager.getPendingChangesSummary();
+            
+            if (pendingChangesSummary.totalChanges === 0) {
+                console.log('ℹ️ No pending changes to save');
+                return;
+            }
+
+            console.log(`💾 Auto-saving ${pendingChangesSummary.totalChanges} changes across ${pendingChangesSummary.totalRecords} records`);
+
+            // For each changed record, set it as the current change and trigger PowerApps
+            pendingChangesSummary.recordSummaries.forEach((recordSummary, index) => {
+                const modifiedFields = this.autoUpdateManager.getModifiedFields(recordSummary.recordId);
+                
+                if (recordSummary.modifiedFields.length > 0) {
+                    // Set the first changed field as current (PowerApps will handle all fields)
+                    const firstField = recordSummary.modifiedFields[0];
+                    const newValue = modifiedFields[firstField];
+                    
+                    // Set this as the current change for PowerApps to process
+                    this.currentChangedRecordKey = recordSummary.recordId;
+                    this.currentChangedColumn = firstField;
+                    this.currentNewValue = String(newValue || '');
+                    
+                    console.log(`📤 Triggering auto-save for record ${recordSummary.recordId}, field ${firstField} = ${this.currentNewValue}`);
+                }
+            });
+
+            // Clear all pending changes after triggering saves
+            this.pendingChanges.clear();
+            this.autoUpdateManager.clearAllChanges();
+            
+        } catch (error) {
+            console.error('❌ Error during auto-save:', error);
+        }
+    };
+
+    /**
+     * Handle mode switching between Grid Edit Mode and Selection Mode
+     */
+    private handleSelectionModeToggle = (context: ComponentFramework.Context<IInputs>): void => {
+        const enableSelectionMode = context.parameters.EnableSelectionMode?.raw;
+        const selectionType = context.parameters.SelectionType?.raw;
+        
+        // Selection mode is enabled when EnableSelectionMode is true AND SelectionType is not None
+        const isSelectionModeActive = !!enableSelectionMode && selectionType !== '0';
+        
+        if (isSelectionModeActive !== this.isSelectionMode) {
+            this.isSelectionMode = isSelectionModeActive;
+            
+            if (this.isSelectionMode) {
+                console.log('✅ Selection mode enabled - Grid editing disabled, row selection active');
+                console.log(`   Selection type: ${selectionType === '1' ? 'Single' : 'Multiple'}`);
+                // Update selection state from native Power Apps APIs
+                this.updateNativeSelectionState();
+            } else {
+                console.log('❌ Grid edit mode enabled - Selection mode disabled, inline editing active');
+                // Clear all selections using native Power Apps API
+                const dataset = this.context.parameters.records;
+                dataset.setSelectedRecordIds([]);
+                this.updateNativeSelectionState();
+            }
+            
+            this.notifyOutputChanged();
+        }
+    };
+
+    /**
+     * Handle selection events - ensure Power Apps' native .Selected property works
+     */
+    private handleItemSelection = (itemId: string): void => {
+        console.log(`🔄 handleItemSelection called with itemId: ${itemId}, isSelectionMode: ${this.isSelectionMode}`);
+        
+        try {
+            if (!this.isSelectionMode) {
+                console.log(`⚠️ Selection mode not enabled, ignoring selection event`);
+                return;
+            }
+
+            const dataset = this.context?.parameters?.records;
+            if (!dataset) {
+                console.log(`⚠️ No dataset available for selection`);
+                return;
+            }
+
+            // Safely get current selection
+            const currentSelected = dataset.getSelectedRecordIds() || [];
+            const selectionType = this.context.parameters.SelectionType?.raw;
+            
+            console.log(`📊 Current selection:`, currentSelected, `Selection type: ${selectionType}`);
+            
+            if (selectionType === '1') {
+                // Single selection mode - this enables Power Apps' native .Selected property
+                if (currentSelected.includes(itemId)) {
+                    // Deselect if already selected
+                    dataset.setSelectedRecordIds([]);
+                    console.log(`✅ Deselected item: ${itemId}`);
+                } else {
+                    // Select only this item - this will populate Power Apps' native .Selected property
+                    dataset.setSelectedRecordIds([itemId]);
+                    console.log(`✅ Selected item: ${itemId} - Power Apps .Selected should now work`);
+                }
+            } else {
+                // Multiple selection mode
+                if (currentSelected.includes(itemId)) {
+                    // Remove from selection
+                    const newSelection = currentSelected.filter(id => id !== itemId);
+                    dataset.setSelectedRecordIds(newSelection);
+                    console.log(`✅ Removed from selection: ${itemId}, new selection:`, newSelection);
+                } else {
+                    // Add to selection
+                    const newSelection = [...currentSelected, itemId];
+                    dataset.setSelectedRecordIds(newSelection);
+                    console.log(`✅ Added to selection: ${itemId}, new selection:`, newSelection);
+                }
+            }
+            
+            // Update our internal state to reflect the change
+            this.updateNativeSelectionState();
+            
+            // Trigger Power Apps to update - this ensures .Selected property updates
+            this.notifyOutputChanged();
+            
+            console.log(`🔄 Native selection updated for item: ${itemId} - Power Apps .Selected should be available`);
+        } catch (error) {
+            console.error(`❌ Error in handleItemSelection for item ${itemId}:`, error);
+        }
+    };
+
+    private handleSelectAll = (): void => {
+        try {
+            if (!this.isSelectionMode) {
+                console.log(`⚠️ Selection mode not enabled, ignoring select all`);
+                return;
+            }
+
+            const dataset = this.context?.parameters?.records;
+            if (!dataset) {
+                console.log(`⚠️ No dataset available for select all`);
+                return;
+            }
+
+            const currentSelected = dataset.getSelectedRecordIds() || [];
+            const allItems = this.sortedRecordsIds || [];
+            
+            if (currentSelected.length === allItems.length && allItems.length > 0) {
+                // All selected - clear all
+                dataset.setSelectedRecordIds([]);
+            } else {
+                // Not all selected - select all
+                dataset.setSelectedRecordIds(allItems);
+            }
+            
+            this.updateNativeSelectionState();
+            this.notifyOutputChanged();
+            console.log('🔄 Native select all toggled');
+        } catch (error) {
+            console.error('❌ Error in handleSelectAll:', error);
+        }
+    };
+
+    private handleClearAllSelections = (): void => {
+        try {
+            if (!this.isSelectionMode) {
+                console.log(`⚠️ Selection mode not enabled, ignoring clear all`);
+                return;
+            }
+
+            const dataset = this.context?.parameters?.records;
+            if (!dataset) {
+                console.log(`⚠️ No dataset available for clear all selections`);
+                return;
+            }
+
+            dataset.setSelectedRecordIds([]);
+            this.updateNativeSelectionState();
+            this.notifyOutputChanged();
+            console.log('🗑️ All selections cleared using native Power Apps API');
+        } catch (error) {
+            console.error('❌ Error in handleClearAllSelections:', error);
+        }
     };
 }

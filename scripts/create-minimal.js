@@ -24,11 +24,9 @@ const originalSize = bundleContent.length;
 
 // Remove enterprise features that Canvas Apps might not need
 const enterpriseFeatures = [
-    // AI and collaboration features
+    // AI features
     /AI.*Engine/g,
-    /Collaboration.*Engine/g,
     /ai\/.*\.ts/g,
-    /collaboration\/.*\.tsx/g,
     
     // Advanced performance monitoring
     /PerformanceMetrics/g,

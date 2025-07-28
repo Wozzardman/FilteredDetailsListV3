@@ -200,11 +200,16 @@ export const VirtualizedFilterDropdown: React.FC<VirtualizedFilterDropdownProps>
                         borderBottom: '1px solid #e1e5e9',
                         background: '#fafbfc'
                     }}>
-                        <Stack horizontal tokens={{ childrenGap: 8 }}>
-                            <DefaultButton 
-                                text="Select All" 
-                                onClick={selectAll}
-                                styles={{ root: { minWidth: 80, height: 28 } }}
+                        <Stack horizontal tokens={{ childrenGap: 12 }} verticalAlign="center">
+                            <Checkbox
+                                label="Select All"
+                                checked={selectedValues.size === filteredValues.length && filteredValues.length > 0}
+                                indeterminate={selectedValues.size > 0 && selectedValues.size < filteredValues.length}
+                                onChange={selectAll}
+                                styles={{
+                                    root: { flex: 1 },
+                                    label: { fontSize: 14, fontWeight: 500 }
+                                }}
                             />
                             <DefaultButton 
                                 text="Clear All" 

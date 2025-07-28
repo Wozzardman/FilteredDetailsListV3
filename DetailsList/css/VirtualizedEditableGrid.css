@@ -16,10 +16,21 @@
 
 .virtualized-editable-grid-container {
     height: 100%;
+    width: 100%;
     display: flex;
     flex-direction: column;
     position: relative;
     overflow: hidden;
+    box-sizing: border-box;
+}
+
+/* Header Container - Fixed wrapper for transform-based sync */
+.virtualized-header-container {
+    width: 100%;
+    overflow: hidden; /* Changed from overflow-x: auto */
+    overflow-y: hidden;
+    flex-shrink: 0;
+    position: relative;
 }
 
 /* Header Styles */
@@ -28,10 +39,12 @@
     height: 48px;
     background-color: #f8f9fa;
     border-bottom: 2px solid #e1dfdd;
-    position: sticky;
+    position: relative;
     top: 0;
     z-index: 2;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    flex-shrink: 0; /* Prevent header from shrinking */
+    transition: transform 0.1ms linear; /* Smooth transform for scroll sync */
 }
 
 .virtualized-header-cell {
@@ -90,6 +103,8 @@
     overflow: auto;
     position: relative;
     background-color: #ffffff;
+    min-height: 0; /* Allow proper flex shrinking */
+    width: 100%;
 }
 
 /* Custom scrollbar for performance */

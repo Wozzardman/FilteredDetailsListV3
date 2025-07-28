@@ -51,7 +51,7 @@ export interface IExcelLikeColumnFilterProps {
     target: HTMLElement | null;
     onDismiss: () => void;
     isOpen: boolean;
-    getAvailableValues?: (columnKey: string) => string[];
+    getAvailableValues?: (columnKey: string) => Array<{value: any, displayValue: string, count: number}>;
 }
 
 export const ExcelLikeColumnFilter: React.FC<IExcelLikeColumnFilterProps> = ({
@@ -86,14 +86,14 @@ export const ExcelLikeColumnFilter: React.FC<IExcelLikeColumnFilterProps> = ({
             const availableValues = getAvailableValues(columnKey);
             const currentColumnFilter = currentFilters[columnKey];
             
-            values = availableValues.map(value => ({
-                value,
-                displayValue: formatDisplayValue(value, dataType),
-                count: 1, // Count not available with optimized version, but much faster
+            values = availableValues.map(item => ({
+                value: item.value,
+                displayValue: item.displayValue,
+                count: item.count, // Use the actual count from the optimized function
                 selected: currentColumnFilter 
                     ? Array.isArray(currentColumnFilter) 
-                        ? currentColumnFilter.includes(value)
-                        : currentColumnFilter === value
+                        ? currentColumnFilter.includes(item.value)
+                        : currentColumnFilter === item.value
                     : true
             }));
             

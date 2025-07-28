@@ -1,0 +1,164 @@
+/* Selection Checkbox Styles */
+.selection-header-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 32px;
+    padding: 4px;
+}
+
+.selection-row-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 100%;
+    padding: 4px;
+    min-height: 32px;
+}
+
+.selection-toggle-button {
+    padding: 8px 12px;
+    margin: 4px;
+    border: 1px solid #a19f9d;
+    border-radius: 4px;
+    background-color: #ffffff;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.15s ease-in-out;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.selection-toggle-button:hover {
+    background-color: #f3f2f1;
+    border-color: #0078d4;
+}
+
+.selection-toggle-button:focus {
+    outline: 2px solid #0078d4;
+    outline-offset: 2px;
+}
+
+.selection-toggle-button.active {
+    background-color: #0078d4;
+    border-color: #0078d4;
+    color: #ffffff;
+}
+
+.selection-toggle-button.active:hover {
+    background-color: #106ebe;
+}
+
+.selection-column {
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    padding: 0 !important;
+    text-align: center;
+    border-right: 1px solid #edebe9;
+    background-color: #faf9f8;
+}
+
+.selection-column-header {
+    background-color: #f8f8f8;
+    border-bottom: 1px solid #edebe9;
+    font-weight: 600;
+}
+
+.selection-summary {
+    padding: 8px 12px;
+    background-color: #f3f2f1;
+    border: 1px solid #edebe9;
+    border-radius: 4px;
+    margin: 4px;
+    font-size: 12px;
+    color: #323130;
+}
+
+.selection-actions {
+    display: flex;
+    gap: 8px;
+    padding: 8px;
+    border-bottom: 1px solid #edebe9;
+    background-color: #ffffff;
+    align-items: center;
+}
+
+.selection-count-badge {
+    background-color: #0078d4;
+    color: #ffffff;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    min-width: 16px;
+    text-align: center;
+}
+
+/* Virtualized Grid Integration */
+.grid-with-selection .ms-DetailsHeader {
+    padding-left: 40px;
+}
+
+.grid-with-selection .ms-DetailsRow {
+    padding-left: 0;
+}
+
+.grid-with-selection .ms-DetailsRow-cell:first-child {
+    padding-left: 4px;
+}
+
+/* Selection Mode Indicator */
+.selection-mode-indicator {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background-color: #0078d4;
+    color: #ffffff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    z-index: 10;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .selection-column {
+        width: 32px !important;
+        min-width: 32px !important;
+        max-width: 32px !important;
+    }
+    
+    .selection-header-container,
+    .selection-row-container {
+        width: 32px;
+        padding: 2px;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .selection-toggle-button {
+        border-width: 2px;
+    }
+    
+    .selection-column {
+        border-right-width: 2px;
+    }
+}
+
+/* Focus indicators for accessibility */
+.selection-checkbox-focus {
+    outline: 2px solid #0078d4;
+    outline-offset: 2px;
+}
+
+/* Animation for selection state changes */
+.selection-state-transition {
+    transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
+}

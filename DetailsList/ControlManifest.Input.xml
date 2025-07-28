@@ -1,7 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest>
-  <control namespace="JVT" constructor="FilteredDetailsListV2" version="7.2.5" display-name-key="FilteredDetailsListV2" description-key="FilteredDetailsListV2_Desc" control-type="virtual">
-    <external-service-usage enabled="false"></external-service-usage>
+  <control namespace="JVT" constructor="FilteredDetailsListV2" version="9.0.0" display-name-key="FilteredDetailsListV2" description-key="FilteredDetailsListV2_Desc" control-type="virtual">
+    <external-service-usage enabled="false">
+      <!-- Explicitly declare no external services to avoid CORS issues -->
+    </external-service-usage>
     <data-set name="records" display-name-key="Records" >
     </data-set>
     <data-set name="columns" display-name-key="Columns">
@@ -37,6 +39,7 @@
       <property-set name="ColFilterType" display-name-key="ColFilterType" of-type="SingleLine.Text" usage="bound" required="false" />
     </data-set>
     <!-- Input properties -->
+    <!-- SelectionType: 0=None (no selection), 1=Single (traditional row selection), 2=Multiple (checkbox selection mode) -->
     <property name="SelectionType" display-name-key="SelectionType" of-type="Enum" usage="input" required="true" default-value="1">
       <value name="None" display-name-key="None">0</value>
       <value name="Single" display-name-key="Single">1</value>
@@ -79,6 +82,19 @@
     <property name="OldValue" display-name-key="OldValue" of-type="SingleLine.Text" usage="output" />
     <property name="NewValue" display-name-key="NewValue" of-type="SingleLine.Text" usage="output" />
     
+    <!-- Power Apps Integration Properties for Patch/ForAll -->
+    <property name="EditedRecords" display-name-key="EditedRecords" of-type="SingleLine.TextArea" usage="output" />
+    <property name="EditedRecordsCount" display-name-key="EditedRecordsCount" of-type="Whole.None" usage="output" />
+    <property name="PatchFormula" display-name-key="PatchFormula" of-type="SingleLine.TextArea" usage="output" />
+    <property name="ForAllFormula" display-name-key="ForAllFormula" of-type="SingleLine.TextArea" usage="output" />
+    <property name="EditedRecordKeys" display-name-key="EditedRecordKeys" of-type="SingleLine.Text" usage="output" />
+    
+    <!-- Auto-Update Properties -->
+    <property name="AutoUpdateFormula" display-name-key="AutoUpdateFormula" of-type="SingleLine.TextArea" usage="output" />
+    <property name="RecordIdentityData" display-name-key="RecordIdentityData" of-type="SingleLine.TextArea" usage="output" />
+    <property name="PendingChangesSummary" display-name-key="PendingChangesSummary" of-type="SingleLine.TextArea" usage="output" />
+    <property name="ValidationErrors" display-name-key="ValidationErrors" of-type="SingleLine.TextArea" usage="output" />
+    
     <!-- Performance Properties - Simplified for Canvas Apps -->
     <property name="PerformanceMode" display-name-key="PerformanceMode" of-type="Enum" usage="input" required="false" default-value="1">
       <value name="Standard" display-name-key="Standard">0</value>
@@ -94,10 +110,33 @@
     <property name="HeaderVisible" display-name-key="HeaderVisible" of-type="TwoOptions" usage="input" required="false" default-value="true" />
     <property name="DefaultColumnWidth" display-name-key="DefaultColumnWidth" of-type="Whole.None" usage="input" required="false" default-value="150" />
     <property name="EnableColumnResizing" display-name-key="EnableColumnResizing" of-type="TwoOptions" usage="input" required="false" default-value="true" />
+    
+    <!-- Text sizing properties -->
+    <property name="HeaderTextSize" display-name-key="HeaderTextSize" of-type="Whole.None" usage="input" required="false" default-value="14" />
+    <property name="ColumnTextSize" display-name-key="ColumnTextSize" of-type="Whole.None" usage="input" required="false" default-value="13" />
     <!-- Filter properties -->
     <property name="EnableFiltering" display-name-key="EnableFiltering" of-type="TwoOptions" usage="input" required="false" default-value="false" />
     <property name="FilterConfiguration" display-name-key="FilterConfiguration" of-type="SingleLine.Text" usage="input" required="false" />
     <property name="AppliedFilters" display-name-key="AppliedFilters" of-type="SingleLine.Text" usage="input" required="false" />
+    
+    <!-- Enhanced Column Editor Configuration -->
+    <property name="UseEnhancedEditors" display-name-key="UseEnhancedEditors" of-type="TwoOptions" usage="input" required="false" default-value="false" />
+    <property name="ColumnEditorConfig" display-name-key="ColumnEditorConfig" of-type="SingleLine.Text" usage="input" required="false" />
+    
+    <!-- Grid Mode Toggle: Grid Edit vs Selection Mode -->
+    <property name="EnableSelectionMode" display-name-key="EnableSelectionMode" of-type="TwoOptions" usage="input" required="false" default-value="false" />
+    
+    <!-- Selection Mode Configuration - Enhanced for Multiple Selection -->
+    <!-- Remove custom Selected and SelectedItems properties - let Power Apps handle them natively through dataset selection -->
+    <!-- Power Apps will automatically provide .Selected and .SelectedItems for dataset-bound controls -->
+    <property name="SelectedCount" display-name-key="SelectedCount" of-type="Whole.None" usage="output" />
+    <property name="SelectAllState" display-name-key="SelectAllState" of-type="Enum" usage="output">
+      <value name="None" display-name-key="None">0</value>
+      <value name="Some" display-name-key="Some">1</value>
+      <value name="All" display-name-key="All">2</value>
+    </property>
+    <property name="SelectionChangedTrigger" display-name-key="SelectionChangedTrigger" of-type="SingleLine.Text" usage="output" />
+    
     <!-- Filter output events -->
     <property name="FilterEventName" display-name-key="FilterEventName" of-type="SingleLine.Text" usage="output" />
     <property name="FilterEventColumn" display-name-key="FilterEventColumn" of-type="SingleLine.Text" usage="output" />

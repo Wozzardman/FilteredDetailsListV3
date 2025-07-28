@@ -85,7 +85,6 @@ export interface GridProps {
     // Enterprise features
     enablePerformanceMonitoring?: boolean;
     enableAIInsights?: boolean;
-    enableCollaboration?: boolean;
     enableAdvancedVirtualization?: boolean;
 }
 

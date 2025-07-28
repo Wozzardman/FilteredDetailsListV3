@@ -13,10 +13,13 @@ import { MessageBar, MessageBarType } from '@fluentui/react/lib/MessageBar';
 import { Spinner, SpinnerSize } from '@fluentui/react/lib/Spinner';
 import { DefaultButton } from '@fluentui/react/lib/Button';
 import { InlineEditor } from './InlineEditor';
+import { EnhancedInlineEditor } from './EnhancedInlineEditor';
 import { EnterpriseChangeManager } from '../services/EnterpriseChangeManager';
 import { performanceMonitor } from '../performance/PerformanceMonitor';
 import { VirtualizedFilterDropdown, FilterValue } from './VirtualizedFilterDropdown';
 import { ExcelLikeColumnFilter } from './ExcelLikeColumnFilter';
+import { ColumnEditorMapping } from '../types/ColumnEditor.types';
+import { HeaderSelectionCheckbox, RowSelectionCheckbox } from './SelectionCheckbox';
 import '../css/VirtualizedEditableGrid.css';
 
 // Helper functions for PCF EntityRecord compatibility
@@ -49,7 +52,7 @@ const setPCFValue = (item: any, columnKey: string, value: any): void => {
 export interface VirtualizedEditableGridProps {
     items: any[];
     columns: IColumn[];
-    height: number;
+    height: number | string;
     width?: number | string;
     onCellEdit?: (itemId: string, columnKey: string, newValue: any) => void;
     onCommitChanges?: (changes: any[]) => Promise<void>;
@@ -58,7 +61,7 @@ export interface VirtualizedEditableGridProps {
     enableColumnFilters?: boolean;
     enableCascadingFilters?: boolean;
     readOnlyColumns?: string[];
-    getAvailableValues?: (columnKey: string) => string[];
+    getAvailableValues?: (columnKey: string) => Array<{value: any, displayValue: string, count: number}> | string[];
     getColumnDataType?: (columnKey: string) => 'text' | 'number' | 'date' | 'boolean' | 'choice';
     changeManager?: EnterpriseChangeManager;
     rowHeight?: number;
@@ -71,6 +74,21 @@ export interface VirtualizedEditableGridProps {
     enableExcelFiltering?: boolean;
     onColumnFilter?: (columnKey: string, filterValues: any[]) => void;
     currentFilters?: Map<string, any[]>;
+    // Enhanced Editor Configuration
+    columnEditorMapping?: ColumnEditorMapping;
+    useEnhancedEditors?: boolean;
+    
+    // Selection mode props
+    enableSelectionMode?: boolean;
+    selectedItems?: Set<string>;
+    selectAllState?: 'none' | 'some' | 'all';
+    onItemSelection?: (itemId: string) => void;
+    onSelectAll?: () => void;
+    onClearAllSelections?: () => void;
+    
+    // Text sizing properties
+    headerTextSize?: number; // Font size for column headers in px
+    columnTextSize?: number; // Font size for column data in px
 }
 
 interface EditingState {
@@ -103,8 +121,26 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
     onItemDoubleClick,
     enableExcelFiltering = true,
     onColumnFilter,
-    currentFilters = new Map()
+    currentFilters = new Map(),
+    columnEditorMapping = {},
+    useEnhancedEditors = true,
+    
+    // Selection mode props
+    enableSelectionMode = false,
+    selectedItems = new Set(),
+    selectAllState = 'none',
+    onItemSelection,
+    onSelectAll,
+    onClearAllSelections,
+    
+    // Text sizing props with defaults
+    headerTextSize = 14, // Default 14px for headers
+    columnTextSize = 13  // Default 13px for column data
 }) => {
+    // Refs for scrolling synchronization - DECLARE FIRST BEFORE ALL OTHER LOGIC
+    const parentRef = React.useRef<HTMLDivElement>(null);
+    const headerRef = React.useRef<HTMLDivElement>(null);
+
     const [editingState, setEditingState] = React.useState<EditingState | null>(null);
     const [pendingChanges, setPendingChanges] = React.useState<Map<string, any>>(new Map());
     const [isCommitting, setIsCommitting] = React.useState<boolean>(false);
@@ -201,9 +237,58 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
         return () => endMeasurement();
     }, [endMeasurement]);
 
-    // Virtual scrolling container ref
-    const parentRef = React.useRef<HTMLDivElement>(null);
+    // Header horizontal scroll synchronization - TRANSFORM APPROACH
+    React.useEffect(() => {
+        const scrollContainer = parentRef.current;
+        const headerContainer = headerRef.current;
 
+        if (!scrollContainer || !headerContainer) return;
+
+        let isScrolling = false;
+        let lastScrollLeft = 0;
+        let animationId: number | null = null;
+
+        const syncHeaderScroll = () => {
+            if (isScrolling) return; // Prevent recursive calls
+            
+            isScrolling = true;
+            
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+            
+            animationId = requestAnimationFrame(() => {
+                if (scrollContainer && headerContainer) {
+                    const currentScrollLeft = scrollContainer.scrollLeft;
+                    if (Math.abs(currentScrollLeft - lastScrollLeft) > 0.5) { // Only sync if there's meaningful change
+                        // Use transform instead of scrollLeft for smoother sync
+                        const headerContent = headerContainer.querySelector('.virtualized-header');
+                        if (headerContent) {
+                            (headerContent as HTMLElement).style.transform = `translateX(-${currentScrollLeft}px)`;
+                        }
+                        lastScrollLeft = currentScrollLeft;
+                    }
+                }
+                isScrolling = false;
+                animationId = null;
+            });
+        };
+
+        // Add scroll event listener for horizontal sync
+        scrollContainer.addEventListener('scroll', syncHeaderScroll, { passive: true });
+        
+        // Initial sync
+        syncHeaderScroll();
+
+        return () => {
+            scrollContainer.removeEventListener('scroll', syncHeaderScroll);
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+        };
+    }, []);
+
+    // Virtual scrolling container ref
     // PURE VIRTUALIZATION - Always on, META/Google competitive performance
     const virtualizer = useVirtualizer({
         count: filteredItems.length,
@@ -226,36 +311,94 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
         },
     });
 
-    // Calculate column widths with resizing support
-    const columnWidths = React.useMemo(() => {
-        const totalWidth = typeof width === 'number' ? width : 1200;
+    // PERFORMANCE OPTIMIZATION: Memoize available values to prevent recalculation on scroll
+    const memoizedAvailableValues = React.useMemo(() => {
+        const cache = new Map<string, string[]>();
+        return (columnKey: string) => {
+            if (!cache.has(columnKey)) {
+                const availableValuesData = getAvailableValues?.(columnKey) || [];
+                let displayValues: string[];
+                
+                // Handle both formats: object array or string array
+                if (availableValuesData.length > 0 && typeof availableValuesData[0] === 'object') {
+                    displayValues = (availableValuesData as Array<{value: any, displayValue: string, count: number}>)
+                        .map(item => item.displayValue);
+                } else {
+                    displayValues = availableValuesData as string[];
+                }
+                
+                cache.set(columnKey, displayValues);
+            }
+            return cache.get(columnKey) || [];
+        };
+    }, [getAvailableValues]);
+
+    // Create a wrapper for ExcelLikeColumnFilter that always returns the object format
+    const getAvailableValuesForFilter = React.useCallback((columnKey: string) => {
+        const availableValuesData = getAvailableValues?.(columnKey) || [];
         
-        return columns.map((col, index) => {
+        // Always return object format for ExcelLikeColumnFilter
+        if (availableValuesData.length > 0 && typeof availableValuesData[0] === 'object') {
+            return availableValuesData as Array<{value: any, displayValue: string, count: number}>;
+        } else {
+            // Convert string array to object format
+            return (availableValuesData as string[]).map(value => ({
+                value,
+                displayValue: value,
+                count: 1
+            }));
+        }
+    }, [getAvailableValues]);
+
+    // Create effective columns array including selection column if needed
+    const effectiveColumns = React.useMemo(() => {
+        if (enableSelectionMode) {
+            return [
+                {
+                    key: '__selection__',
+                    name: '',
+                    fieldName: '__selection__',
+                    minWidth: 40,
+                    maxWidth: 40,
+                    isResizable: false
+                } as IColumn,
+                ...columns
+            ];
+        }
+        return columns;
+    }, [columns, enableSelectionMode]);
+
+    // PERFORMANCE OPTIMIZATION: Memoize column widths to prevent recalculation
+    const memoizedColumnWidths = React.useMemo(() => {
+        return effectiveColumns.map((col, index) => {
+            const columnKey = col.key || col.fieldName || index.toString();
+            
+            // Selection column has fixed width
+            if (columnKey === '__selection__') {
+                return 40;
+            }
+            
             // Check if user has manually resized this column
-            const overrideWidth = columnWidthOverrides[col.key || col.fieldName || index.toString()];
+            const overrideWidth = columnWidthOverrides[columnKey];
             if (overrideWidth) {
                 return overrideWidth;
             }
             
-            // Use the column's configured width (minWidth represents the desired width)
-            if (col.minWidth) {
+            // Use the column's configured width as the default
+            // Don't constrain to container width - allow horizontal scrolling
+            if (col.minWidth && col.minWidth > 0) {
                 return col.minWidth;
             }
             
-            // Fallback to proportional width
-            const availableWidth = totalWidth - columns.reduce((sum, c) => {
-                const key = c.key || c.fieldName || columns.indexOf(c).toString();
-                return sum + (columnWidthOverrides[key] || c.minWidth || 0);
-            }, 0);
-            
-            const flexibleColumns = columns.filter((c, i) => {
-                const key = c.key || c.fieldName || i.toString();
-                return !columnWidthOverrides[key] && !c.minWidth;
-            });
-            
-            return flexibleColumns.length > 0 ? Math.max(150, availableWidth / flexibleColumns.length) : 150;
+            // Use default width for columns without specific width
+            return 150; // Default column width
         });
-    }, [columns, width, columnWidthOverrides]);
+    }, [effectiveColumns, columnWidthOverrides]);
+
+    // Calculate total grid width for horizontal scrolling
+    const totalGridWidth = React.useMemo(() => {
+        return memoizedColumnWidths.reduce((sum, width) => sum + width, 0);
+    }, [memoizedColumnWidths]);
 
     // Get cell key for change tracking
     const getCellKey = (itemIndex: number, columnKey: string) => `${itemIndex}-${columnKey}`;
@@ -302,7 +445,7 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
         }
 
         setEditingState(null);
-    }, [editingState, items, onCellEdit, changeManager]);
+    }, [editingState, filteredItems, onCellEdit, changeManager]);
 
     // Cancel edit
     const cancelEdit = React.useCallback(() => {
@@ -335,7 +478,8 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
     const cancelAllChanges = React.useCallback(() => {
         // Revert items to original values
         pendingChanges.forEach((change) => {
-            const item = items[change.itemIndex];
+            // Use filteredItems to match the same array used in drag fill
+            const item = filteredItems[change.itemIndex];
             if (item) {
                 setPCFValue(item, change.columnKey, change.oldValue);
             }
@@ -347,7 +491,7 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
         if (changeManager) {
             changeManager.cancelAllChanges();
         }
-    }, [pendingChanges, items, changeManager]);
+    }, [pendingChanges, filteredItems, changeManager]);
 
     // Command bar items
     const commandBarItems: ICommandBarItemProps[] = React.useMemo(() => {
@@ -381,7 +525,7 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
     }, [pendingChanges.size, commitAllChanges, cancelAllChanges, isCommitting, items.length]);
 
     // Render virtualized row
-    const renderRow = React.useCallback((virtualRow: any) => {
+    const renderRowContent = React.useCallback((virtualRow: any) => {
         const { index } = virtualRow;
         const item = filteredItems[index];
         if (!item) return null;
@@ -399,6 +543,7 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                     top: 0,
                     left: 0,
                     width: '100%',
+                    minWidth: `${totalGridWidth}px`, // Ensure minimum width for horizontal scrolling
                     height: `${virtualRow.size}px`,
                     transform: `translateY(${virtualRow.start}px)`,
                     display: 'flex',
@@ -409,8 +554,40 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                 onClick={() => onItemClick?.(item, index)}
                 onDoubleClick={() => onItemDoubleClick?.(item, index)}
             >
-                {columns.map((column, columnIndex) => {
+                {effectiveColumns.map((column, columnIndex) => {
                     const columnKey = column.fieldName || column.key;
+                    
+                    // Special handling for selection column
+                    if (columnKey === '__selection__') {
+                        const itemId = item.recordId || item.key || item.id || index.toString();
+                        const isSelected = selectedItems.has(itemId);
+                        
+                        return (
+                            <div
+                                key="__selection__"
+                                className="virtualized-cell selection-cell"
+                                style={{
+                                    width: memoizedColumnWidths[columnIndex], // Use the same width calculation as header
+                                    minWidth: memoizedColumnWidths[columnIndex],
+                                    maxWidth: memoizedColumnWidths[columnIndex],
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    padding: '0 8px',
+                                    borderRight: '1px solid #e1dfdd',
+                                    boxSizing: 'border-box' // Ensure consistent box model
+                                }}
+                            >
+                                <RowSelectionCheckbox
+                                    itemId={itemId}
+                                    selected={isSelected}
+                                    onToggleSelection={(id) => onItemSelection?.(id)}
+                                    rowIndex={index}
+                                />
+                            </div>
+                        );
+                    }
+                    
                     const cellKey = getCellKey(index, columnKey);
                     const isEditing = editingState?.itemIndex === index && editingState?.columnKey === columnKey;
                     const hasChanges = pendingChanges.has(cellKey);
@@ -418,12 +595,13 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
 
                     const cellValue = pendingChanges.get(cellKey)?.newValue ?? getPCFValue(item, columnKey);
                     const dataType = column.data?.dataType || 'string';
-                    const availableValues = getAvailableValues?.(columnKey) || [];
+                    // PERFORMANCE OPTIMIZATION: Use cached available values to prevent recalculation on scroll
+                    const availableValues = memoizedAvailableValues(columnKey);
 
                     const cellStyle: React.CSSProperties = {
-                        width: columnWidths[columnIndex],
-                        minWidth: columnWidths[columnIndex],
-                        maxWidth: columnWidths[columnIndex],
+                        width: memoizedColumnWidths[columnIndex],
+                        minWidth: memoizedColumnWidths[columnIndex],
+                        maxWidth: memoizedColumnWidths[columnIndex],
                         height: '100%',
                         padding: '0 8px',
                         display: 'flex',
@@ -435,22 +613,38 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                         cursor: isReadOnly ? 'default' : 'pointer',
                         backgroundColor: hasChanges ? '#fff4ce' : 'transparent',
                         borderLeft: hasChanges ? '3px solid #ffb900' : 'none',
-                        position: 'relative'
+                        position: 'relative',
+                        boxSizing: 'border-box', // Ensure consistent box model
+                        fontSize: `${columnTextSize}px` // Apply custom column text size
                     };
 
                     if (isEditing && enableInlineEditing) {
+                        const editorConfig = columnEditorMapping[columnKey];
+                        
                         return (
                             <div key={columnKey} style={cellStyle}>
-                                <InlineEditor
-                                    value={editingState.originalValue}
-                                    column={column}
-                                    dataType={dataType}
-                                    availableValues={availableValues}
-                                    isReadOnly={isReadOnly}
-                                    onCommit={commitEdit}
-                                    onCancel={cancelEdit}
-                                    style={{ width: '100%', border: 'none', background: 'transparent' }}
-                                />
+                                {useEnhancedEditors && editorConfig ? (
+                                    <EnhancedInlineEditor
+                                        value={editingState.originalValue}
+                                        column={column}
+                                        item={item}
+                                        editorConfig={editorConfig}
+                                        onCommit={commitEdit}
+                                        onCancel={cancelEdit}
+                                        style={{ width: '100%', border: 'none', background: 'transparent' }}
+                                    />
+                                ) : (
+                                    <InlineEditor
+                                        value={editingState.originalValue}
+                                        column={column}
+                                        dataType={dataType}
+                                        availableValues={availableValues}
+                                        isReadOnly={isReadOnly}
+                                        onCommit={commitEdit}
+                                        onCancel={cancelEdit}
+                                        style={{ width: '100%', border: 'none', background: 'transparent' }}
+                                    />
+                                )}
                             </div>
                         );
                     }
@@ -466,7 +660,7 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                                 column.onRender(item, index, column) : 
                                 String(cellValue || '')
                             }
-                            {!isReadOnly && enableDragFill && (
+                            {!isReadOnly && enableDragFill && !enableSelectionMode && (
                                 <div 
                                     style={{
                                         position: 'absolute',
@@ -501,12 +695,17 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                                                                 if (targetItem) {
                                                                     const itemId = targetItem.key || targetItem.id || targetItem.getRecordId?.() || i.toString();
                                                                     const changeKey = getCellKey(i, columnKey);
+                                                                    
+                                                                    // Check if there's already a pending change for this cell
+                                                                    const existingChange = pendingChanges.get(changeKey);
+                                                                    const originalValue = existingChange ? existingChange.oldValue : getPCFValue(targetItem, columnKey);
+                                                                    
                                                                     const change = {
                                                                         itemId,
                                                                         itemIndex: i,
                                                                         columnKey,
                                                                         newValue: startValue,
-                                                                        oldValue: getPCFValue(targetItem, columnKey)
+                                                                        oldValue: originalValue // Preserve the original value, not the current value
                                                                     };
                                                                     
                                                                     setPendingChanges(prev => new Map(prev.set(changeKey, change)));
@@ -537,29 +736,89 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                 })}
             </div>
         );
-    }, [filteredItems, columns, columnWidths, editingState, pendingChanges, readOnlyColumns, enableInlineEditing, enableDragFill, startEdit, commitEdit, cancelEdit, getAvailableValues, onItemClick, onItemDoubleClick]);
+    }, [filteredItems, columns, memoizedColumnWidths, editingState, pendingChanges, readOnlyColumns, enableInlineEditing, enableDragFill, startEdit, commitEdit, cancelEdit, memoizedAvailableValues, onItemClick, onItemDoubleClick]);
+
+    // PERFORMANCE OPTIMIZATION: Create stable render function to prevent unnecessary re-renders
+    const renderRow = React.useCallback((virtualRow: any) => {
+        return renderRowContent(virtualRow);
+    }, [renderRowContent]);
 
     // Render header with Excel-like filter buttons and column resizing
     const renderHeader = () => (
-        <div className="virtualized-header">
-            {columns.map((column, index) => {
+        <div 
+            className="virtualized-header"
+            style={{
+                display: 'flex',
+                width: '100%',
+                minWidth: `${totalGridWidth}px`, // Ensure header matches grid width for horizontal scrolling
+                backgroundColor: '#faf9f8',
+                borderBottom: '1px solid #e1dfdd',
+                position: 'relative',
+                top: 0,
+                zIndex: 5,
+                flexShrink: 0, // Prevent header from shrinking
+                height: '48px'
+            }}
+        >
+            {effectiveColumns.map((column, index) => {
+                const columnKey = column.key || column.fieldName || index.toString();
+                
+                // Special handling for selection column
+                if (columnKey === '__selection__') {
+                    return (
+                        <div
+                            key="__selection__"
+                            className="virtualized-header-cell selection-header"
+                            style={{ 
+                                width: memoizedColumnWidths[index], // Use the same width calculation as data cells
+                                minWidth: memoizedColumnWidths[index],
+                                maxWidth: memoizedColumnWidths[index],
+                                position: 'relative',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRight: '1px solid #e1dfdd',
+                                background: '#faf9f8',
+                                padding: '0 8px', // Match data cell padding exactly
+                                boxSizing: 'border-box', // Ensure consistent box model
+                                overflow: 'hidden'
+                            }}
+                        >
+                            <HeaderSelectionCheckbox
+                                selectAllState={selectAllState}
+                                selectedCount={selectedItems.size}
+                                totalCount={filteredItems.length}
+                                onToggleSelectAll={() => {
+                                    if (selectAllState === 'all') {
+                                        onClearAllSelections?.();
+                                    } else {
+                                        onSelectAll?.();
+                                    }
+                                }}
+                            />
+                        </div>
+                    );
+                }
+                
                 const hasFilter = columnFilters[column.key]?.length > 0;
                 const dataType = getColumnDataType?.(column.key) || 'text';
-                const columnKey = column.key || column.fieldName || index.toString();
                 
                 return (
                     <div
                         key={column.key}
                         className={`virtualized-header-cell ${isResizing === column.key ? 'resizing' : ''}`}
                         style={{ 
-                            width: columnWidths[index],
+                            width: memoizedColumnWidths[index],
+                            minWidth: memoizedColumnWidths[index],
+                            maxWidth: memoizedColumnWidths[index],
                             position: 'relative',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             borderRight: '1px solid #e1dfdd',
                             background: '#faf9f8',
-                            padding: '8px',
+                            padding: '0 8px', // Match data cell padding exactly
+                            boxSizing: 'border-box', // Ensure consistent box model
                             overflow: 'hidden'
                         }}
                     >
@@ -568,6 +827,7 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                             style={{ 
                                 flex: 1, 
                                 fontWeight: 600,
+                                fontSize: `${headerTextSize}px`, // Apply custom header text size
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
                                 whiteSpace: 'nowrap'
@@ -578,29 +838,55 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                         
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             {enableColumnFilters && (
-                                <DefaultButton
-                                    className={`virtualized-header-filter-button ${hasFilter ? 'active' : ''}`}
-                                    text="⌄"
+                                <span
+                                    className={`virtualized-header-filter-icon ${hasFilter ? 'active' : ''}`}
                                     title={`Filter ${column.name}`}
-                                    onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                    onClick={(e: React.MouseEvent<HTMLSpanElement>) => {
                                         const target = e.currentTarget as HTMLElement;
                                         handleFilterButtonClick(columnKey, target);
                                     }}
-                                    styles={{
-                                        root: { 
-                                            height: 24, 
-                                            width: 24,
-                                            minWidth: 24,
-                                            backgroundColor: hasFilter ? '#0078d4' : 'transparent',
-                                            color: hasFilter ? 'white' : '#605e5c'
-                                        },
-                                        label: { fontSize: 12 }
+                                    style={{
+                                        cursor: 'pointer',
+                                        fontSize: '12px',
+                                        color: hasFilter ? '#0078d4' : '#605e5c',
+                                        userSelect: 'none',
+                                        padding: '4px',
+                                        borderRadius: '3px',
+                                        backgroundColor: hasFilter ? '#f3f2f1' : 'transparent',
+                                        transition: 'all 0.2s ease',
+                                        lineHeight: 1,
+                                        display: 'inline-block',
+                                        width: '16px', // Increased from 12px
+                                        height: '16px' // Increased from 12px
                                     }}
-                                />
+                                    onMouseEnter={(e) => {
+                                        if (!hasFilter) {
+                                            (e.target as HTMLElement).style.backgroundColor = '#f3f2f1';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (!hasFilter) {
+                                            (e.target as HTMLElement).style.backgroundColor = 'transparent';
+                                        }
+                                    }}
+                                >
+                                    {/* Funnel icon - filled when active, bigger size */}
+                                    <svg
+                                        width="16" // Increased from 12
+                                        height="16" // Increased from 12
+                                        viewBox="0 0 16 16" // Updated viewBox for new size
+                                        fill={hasFilter ? '#0078d4' : 'none'}
+                                        stroke={hasFilter ? '#0078d4' : '#605e5c'}
+                                        strokeWidth="1.2" // Slightly thicker for visibility
+                                        style={{ display: 'block' }}
+                                    >
+                                        <path d="M2 3h12l-4 5v5l-4-1.5V8L2 3z" />
+                                    </svg>
+                                </span>
                             )}
                         </div>
 
-                        {/* Column resize handle */}
+                        {/* Column resize handle - Make it wider for easier interaction */}
                         {column.isResizable && (
                             <div
                                 className="column-resize-handle"
@@ -609,23 +895,25 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                                     right: 0,
                                     top: 0,
                                     bottom: 0,
-                                    width: '6px',
+                                    width: '12px', // Wider for easier grabbing
                                     cursor: 'col-resize',
-                                    backgroundColor: isResizing === columnKey ? '#0078d4' : 'transparent',
-                                    opacity: isResizing === columnKey ? 0.8 : 0,
-                                    transition: 'opacity 0.2s',
+                                    backgroundColor: 'transparent',
+                                    borderRight: isResizing === columnKey ? '2px solid #0078d4' : '1px solid transparent',
+                                    transition: 'border-color 0.2s',
                                     zIndex: 10
                                 }}
                                 onMouseDown={(e: React.MouseEvent) => {
                                     e.preventDefault();
-                                    handleResizeStart(columnKey, e.clientX, columnWidths[index]);
+                                    handleResizeStart(columnKey, e.clientX, memoizedColumnWidths[index]);
                                 }}
                                 onMouseEnter={(e: React.MouseEvent) => {
-                                    (e.target as HTMLElement).style.opacity = '0.6';
+                                    if (isResizing !== columnKey) {
+                                        (e.target as HTMLElement).style.borderRight = '1px solid #605e5c';
+                                    }
                                 }}
                                 onMouseLeave={(e: React.MouseEvent) => {
                                     if (isResizing !== columnKey) {
-                                        (e.target as HTMLElement).style.opacity = '0';
+                                        (e.target as HTMLElement).style.borderRight = '1px solid transparent';
                                     }
                                 }}
                             />
@@ -640,14 +928,14 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
         <div 
             className="virtualized-editable-grid-container"
             style={{
-                width: typeof width === 'number' ? `${width}px` : width,
-                height: typeof height === 'number' ? `${height}px` : height,
-                maxWidth: typeof width === 'number' ? `${width}px` : width,
-                maxHeight: typeof height === 'number' ? `${height}px` : height,
+                width: (typeof width === 'number' && width > 0) ? `${width}px` : (typeof width === 'string' && width ? width : '100%'),
+                height: (typeof height === 'number' && height > 0) ? `${height}px` : (typeof height === 'string' && height ? height : '100%'),
+                maxWidth: '100%',
                 overflow: 'hidden',
                 boxSizing: 'border-box',
                 display: 'flex',
-                flexDirection: 'column'
+                flexDirection: 'column',
+                flex: 1 // Allow the grid to flex with its container
             }}
         >
             {/* Command Bar */}
@@ -677,8 +965,20 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                 </MessageBar>
             )}
 
-            {/* Header */}
-            {renderHeader()}
+            {/* Header - FIXED POSITION, no independent scrolling */}
+            <div 
+                ref={headerRef}
+                className="virtualized-header-container"
+                style={{
+                    width: '100%',
+                    overflowX: 'hidden', // CHANGED: No independent scrolling
+                    overflowY: 'hidden',
+                    flexShrink: 0,
+                    position: 'relative'
+                }}
+            >
+                {renderHeader()}
+            </div>
 
             {/* PURE VIRTUALIZED GRID BODY - Always on for META/Google competitive performance */}
             <div 
@@ -686,8 +986,9 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                 className="virtualized-grid-body"
                 style={{
                     flex: 1,
-                    overflow: 'auto',
-                    minHeight: 0
+                    overflow: 'auto', // Enable both horizontal and vertical scrolling
+                    minHeight: 0,
+                    position: 'relative'
                 }}
             >
                 <div
@@ -695,6 +996,7 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                     style={{
                         height: `${virtualizer.getTotalSize()}px`,
                         width: '100%',
+                        minWidth: `${totalGridWidth}px`, // Enable horizontal scrolling when columns exceed container
                         position: 'relative',
                     }}
                 >
@@ -715,7 +1017,7 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                     target={filterTargets[activeFilterColumn]}
                     onDismiss={() => setActiveFilterColumn(null)}
                     isOpen={!!activeFilterColumn}
-                    getAvailableValues={getAvailableValues}
+                    getAvailableValues={getAvailableValuesForFilter}
                 />
             )}
         </div>
