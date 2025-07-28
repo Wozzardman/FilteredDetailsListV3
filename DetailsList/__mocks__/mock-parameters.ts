@@ -18,6 +18,7 @@ export function getMockParameters(): IInputs {
         LargeDatasetPaging: new MockTwoOptionsProperty(false),
         RaiseOnRowSelectionChangeEvent: new MockTwoOptionsProperty(false),
         InputEvent: new MockStringProperty(),
+        DataSourceName: new MockStringProperty(),
         // Legacy properties that need to be included for compatibility
         CommitTrigger: new MockStringProperty(),
         CancelChangesTrigger: new MockStringProperty(),
@@ -34,6 +35,7 @@ export function getMockParameters(): IInputs {
         // Enhanced Editor Properties
         UseEnhancedEditors: new MockTwoOptionsProperty(false),
         ColumnEditorConfig: new MockStringProperty(),
+        ColumnEditorFormulas: new MockStringProperty(),
         
         // Selection Mode Properties
         EnableSelectionMode: new MockTwoOptionsProperty(false),

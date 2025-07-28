@@ -310,7 +310,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
             }}
         >
             {/* Control Bar */}
-            <Stack horizontal tokens={{ childrenGap: 16 }} className="control-bar">
+            <Stack horizontal tokens={{ childrenGap: 16 }} className="control-bar" verticalAlign="center">
                 {enableFiltering && (
                     <TextField
                         placeholder="Filter records..."
@@ -340,11 +340,12 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                     </Stack>
                 )}
                 
-                {performanceDisplay}
+                {/* Combined status display */}
+                <Stack horizontal tokens={{ childrenGap: 12 }}>
+                    {performanceDisplay}
+                    {changeTrackingDisplay}
+                </Stack>
             </Stack>
-
-            {/* Change Tracking Controls */}
-            {changeTrackingDisplay}
 
             {/* Main Grid - ALWAYS VIRTUALIZED for META/Google Competition */}
             <div 

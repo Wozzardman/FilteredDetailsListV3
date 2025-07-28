@@ -514,13 +514,6 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
             );
         }
 
-        // Performance metrics
-        items.push({
-            key: 'perf',
-            text: `${items.length} rows virtualized`,
-            disabled: true
-        });
-
         return items;
     }, [pendingChanges.size, commitAllChanges, cancelAllChanges, isCommitting, items.length]);
 
@@ -938,8 +931,8 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                 flex: 1 // Allow the grid to flex with its container
             }}
         >
-            {/* Command Bar */}
-            {(pendingChanges.size > 0 || commandBarItems.length > 0) && (
+            {/* Command Bar - Only show when there are pending changes */}
+            {pendingChanges.size > 0 && (
                 <CommandBar
                     items={commandBarItems}
                     styles={{ root: { minHeight: 40, marginBottom: 8 } }}

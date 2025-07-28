@@ -8,6 +8,7 @@ import { IFilterState } from './Filter.types';
 import { FilterUtils } from './FilterUtils';
 import { performanceMonitor } from './performance/PerformanceMonitor';
 import { AutoUpdateManager, RecordIdentity } from './services/AutoUpdateManager';
+import { PowerAppsFxColumnEditorParser } from './services/PowerAppsFxColumnEditorParser';
 type DataSet = ComponentFramework.PropertyHelper.DataSetApi.EntityRecord & IObjectWithKey;
 
 // Native Power Apps selection state (similar to ComboBox.SelectedItems)
@@ -90,6 +91,12 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
 
     // Legacy compatibility mode flag
     private isLegacyMode = false; // Always use modern mode
+    
+    // Error state tracking and auto-recovery
+    private isInErrorState = false;
+    private errorRecoveryTimer: number | null = null;
+    private errorRecoveryAttempts = 0;
+    private maxRecoveryAttempts = 5;
 
     public init(context: ComponentFramework.Context<IInputs>, notifyOutputChanged: () => void): void {
         const endMeasurement = performanceMonitor.startMeasure('component-init');
@@ -365,19 +372,23 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     }
 
     public updateView(context: ComponentFramework.Context<IInputs>): React.ReactElement {
-        // Handle selection mode toggle
-        this.handleSelectionModeToggle(context);
-        
-        // Handle commit trigger input
-        this.handleCommitTrigger(context);
-        
-        // Update native selection state from Power Apps dataset
-        if (this.isSelectionMode) {
-            this.updateNativeSelectionState();
-        }
-        
-        // Detect legacy vs modern mode
-        this.isLegacyMode = this.detectLegacyMode(context);
+        try {
+            // Store context for use in other methods
+            this.context = context;
+            
+            // Handle selection mode toggle
+            this.handleSelectionModeToggle(context);
+            
+            // Handle commit trigger input
+            this.handleCommitTrigger(context);
+            
+            // Update native selection state from Power Apps dataset
+            if (this.isSelectionMode) {
+                this.updateNativeSelectionState();
+            }
+            
+            // Detect legacy vs modern mode
+            this.isLegacyMode = this.detectLegacyMode(context);
 
         let dataset: ComponentFramework.PropertyTypes.DataSet;
         let columns: ComponentFramework.PropertyTypes.DataSet;
@@ -392,10 +403,64 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             columns = context.parameters.columns;
         }
 
+        // Validate datasets are available before proceeding
+        if (!dataset || !columns) {
+            console.warn('⚠️ Dataset or columns not available, returning empty grid');
+            return React.createElement(UltimateEnterpriseGrid, {
+                items: [],
+                columns: [],
+                height: 200,
+                width: '100%',
+                enableVirtualization: false,
+                enableInlineEditing: false,
+                enableFiltering: false,
+                enableExport: false,
+                enableSelectionMode: false,
+                headerTextSize: context.parameters.HeaderTextSize?.raw || 14,
+                columnTextSize: context.parameters.ColumnTextSize?.raw || 13
+            });
+        }
+
         // Set column limit to 150 for the selected columns dataset
         if (columns.paging.pageSize !== FilteredDetailsListV2.COLUMN_LIMIT) {
             columns.paging.setPageSize(FilteredDetailsListV2.COLUMN_LIMIT);
             columns.refresh();
+        }
+
+        // Clear error state if we reach this point successfully
+        if (this.isInErrorState) {
+            console.log('✅ Error state cleared - control recovered successfully');
+            this.isInErrorState = false;
+            this.errorRecoveryAttempts = 0;
+            this.clearErrorRecoveryTimer();
+        }
+
+        // Handle loading state - return loading grid to prevent errors
+        if (dataset.loading || columns.loading) {
+            console.log('📊 Datasets still loading, returning loading state');
+            return React.createElement(UltimateEnterpriseGrid, {
+                items: [{
+                    key: 'loading',
+                    message: 'Loading data...'
+                }],
+                columns: [{
+                    key: 'message',
+                    name: 'Status',
+                    fieldName: 'message',
+                    minWidth: 150,
+                    maxWidth: 600,
+                    isResizable: false
+                }],
+                height: (context.mode.allocatedHeight && context.mode.allocatedHeight > 0) ? context.mode.allocatedHeight : 400,
+                width: (context.mode.allocatedWidth && context.mode.allocatedWidth > 0) ? context.mode.allocatedWidth : '100%',
+                enableVirtualization: false,
+                enableInlineEditing: false,
+                enableFiltering: false,
+                enableExport: false,
+                enableSelectionMode: false,
+                headerTextSize: context.parameters.HeaderTextSize?.raw || 14,
+                columnTextSize: context.parameters.ColumnTextSize?.raw || 13
+            });
         }
 
         // Add comprehensive debug logging
@@ -643,10 +708,17 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 // Get default column width from manifest property, fallback to visualSizeFactor or default
                 const defaultWidth = context.parameters.DefaultColumnWidth?.raw || 150;
                 const visualSizeFactor = typeof col.visualSizeFactor === 'number' && !isNaN(col.visualSizeFactor) ? col.visualSizeFactor : 0;
-                // Fix: visualSizeFactor should be used directly, not multiplied by 100
-                const columnWidth = visualSizeFactor > 0 ? Math.min(visualSizeFactor, 500) : defaultWidth;
                 
-                console.log(`🔧 Processing column: ${col.name} (${col.displayName}) - Type: ${col.dataType}, VisualSizeFactor: ${col.visualSizeFactor}, Calculated Width: ${columnWidth}`);
+                // Use DefaultColumnWidth when explicitly configured, otherwise fall back to visualSizeFactor
+                let columnWidth = defaultWidth;
+                if (context.parameters.DefaultColumnWidth?.raw === undefined || context.parameters.DefaultColumnWidth?.raw === null) {
+                    // Only use visualSizeFactor if DefaultColumnWidth wasn't explicitly set and visualSizeFactor is reasonable
+                    if (visualSizeFactor > 50 && visualSizeFactor <= 500) {
+                        columnWidth = visualSizeFactor;
+                    }
+                }
+                
+                console.log(`🔧 Processing column: ${col.name} (${col.displayName}) - Type: ${col.dataType}, VisualSizeFactor: ${col.visualSizeFactor}, DefaultWidth: ${defaultWidth}, Final Width: ${columnWidth}`);
                 
                 // Check if column resizing is enabled globally and per-column
                 const globalResizeEnabled = context.parameters.EnableColumnResizing?.raw ?? true;
@@ -656,7 +728,8 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                     key: col.name,
                     name: col.displayName,
                     fieldName: col.name,
-                    minWidth: columnWidth, // Use calculated width as the default (not minimum)
+                    minWidth: Math.min(80, columnWidth), // Reasonable minimum width
+                    width: columnWidth, // Set the default/initial width
                     maxWidth: columnWidth * 3, // Maximum 3x the default width
                     isResizable: columnResizable,
                     filterable: true,
@@ -686,12 +759,27 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         const useEnhancedEditors = context.parameters.UseEnhancedEditors?.raw ?? false;
         let columnEditorMapping = {};
         
-        if (useEnhancedEditors && context.parameters.ColumnEditorConfig?.raw) {
-            try {
-                columnEditorMapping = JSON.parse(context.parameters.ColumnEditorConfig.raw);
-                console.log('📝 Column editor configuration loaded:', columnEditorMapping);
-            } catch (error) {
-                console.warn('⚠️ Invalid column editor configuration JSON:', error);
+        if (useEnhancedEditors) {
+            // Try Power Apps FX formulas first (new simplified method)
+            const formulasProperty = (context.parameters as any).ColumnEditorFormulas;
+            if (formulasProperty?.raw) {
+                try {
+                    columnEditorMapping = PowerAppsFxColumnEditorParser.parseSimpleFormulaString(
+                        formulasProperty.raw
+                    );
+                    console.log('🚀 Column editor configuration loaded from Power Apps FX formulas:', columnEditorMapping);
+                } catch (error) {
+                    console.warn('⚠️ Error parsing Power Apps FX formulas:', error);
+                }
+            }
+            // Fallback to legacy JSON configuration
+            else if (context.parameters.ColumnEditorConfig?.raw) {
+                try {
+                    columnEditorMapping = JSON.parse(context.parameters.ColumnEditorConfig.raw);
+                    console.log('📝 Column editor configuration loaded from JSON:', columnEditorMapping);
+                } catch (error) {
+                    console.warn('⚠️ Invalid column editor configuration JSON:', error);
+                }
             }
         }
 
@@ -751,6 +839,47 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         }
 
         return grid;
+        } catch (error) {
+            console.error('❌ Error in updateView:', error);
+            
+            // Set error state and start recovery mechanism
+            this.isInErrorState = true;
+            this.startErrorRecovery();
+            
+            // Update the fallback message to include recovery info
+            const recoveryMessage = this.errorRecoveryAttempts < this.maxRecoveryAttempts 
+                ? `Control configuration error. Auto-recovery in progress (attempt ${this.errorRecoveryAttempts + 1}/${this.maxRecoveryAttempts})...`
+                : 'Control configuration error. Please check your settings and try again.';
+            
+            // Return a fallback grid with minimal configuration to prevent control crash
+            const fallbackColumns = [{
+                key: 'error',
+                name: 'Error Loading Control',
+                fieldName: 'error',
+                minWidth: 150,
+                maxWidth: 600,
+                isResizable: true
+            }];
+            
+            const fallbackItems = [{
+                key: 'error-row',
+                error: recoveryMessage
+            }];
+            
+            return React.createElement(UltimateEnterpriseGrid, {
+                items: fallbackItems,
+                columns: fallbackColumns,
+                height: 200,
+                width: '100%',
+                enableVirtualization: false,
+                enableInlineEditing: false,
+                enableFiltering: false,
+                enableExport: false,
+                enableSelectionMode: false,
+                headerTextSize: 14,
+                columnTextSize: 13
+            });
+        }
     }
 
     /**
@@ -841,7 +970,15 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             EditedRecordsCount: this.pendingChanges.size,
             PatchFormula: this.generatePatchFormula(),
             ForAllFormula: this.generateForAllFormula(),
-            EditedRecordKeys: JSON.stringify(Array.from(this.pendingChanges.keys()))
+            EditedRecordKeys: JSON.stringify(Array.from(this.pendingChanges.keys())),
+            
+            // Direct Power Apps Patch Integration - separate components for executable formulas
+            PatchDataSource: this.getPatchDataSourceName(),
+            PatchRecord: this.getPatchRecordReference(),
+            PatchChanges: this.getPatchChangesObject(),
+            PatchChangesColumn: this.getPatchChangesColumn(),
+            PatchChangesValue: this.getPatchChangesValue(),
+            SaveTrigger: this.pendingChanges.size > 0 ? Date.now().toString() : ''
         } as any;
         
         // Reset the event so that it does not re-trigger
@@ -851,7 +988,70 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     }
 
     public destroy(): void {
-        // noop
+        // Clean up auto-recovery timer
+        this.clearErrorRecoveryTimer();
+    }
+
+    /**
+     * Start auto-recovery mechanism for error states
+     */
+    private startErrorRecovery(): void {
+        if (this.errorRecoveryTimer || this.errorRecoveryAttempts >= this.maxRecoveryAttempts) {
+            return; // Already running or max attempts reached
+        }
+
+        console.log(`🔄 Starting error recovery, attempt ${this.errorRecoveryAttempts + 1}/${this.maxRecoveryAttempts}`);
+        
+        this.errorRecoveryTimer = window.setTimeout(() => {
+            this.errorRecoveryAttempts++;
+            this.attemptRecovery();
+        }, 2000); // Try recovery after 2 seconds
+    }
+
+    /**
+     * Attempt to recover from error state
+     */
+    private attemptRecovery(): void {
+        try {
+            console.log('🔄 Attempting error recovery...');
+            
+            // Check if the conditions that caused the error are resolved
+            const dataset = this.context.parameters.records;
+            const columns = this.context.parameters.columns;
+            
+            if (dataset && columns && !dataset.loading && !columns.loading) {
+                console.log('✅ Error conditions resolved, triggering re-render');
+                this.isInErrorState = false;
+                this.errorRecoveryAttempts = 0;
+                this.clearErrorRecoveryTimer();
+                
+                // Force a re-render by notifying of output changes
+                this.notifyOutputChanged();
+            } else {
+                console.log(`⏳ Error conditions still present, will retry (${this.errorRecoveryAttempts}/${this.maxRecoveryAttempts})`);
+                
+                if (this.errorRecoveryAttempts < this.maxRecoveryAttempts) {
+                    // Schedule next recovery attempt
+                    this.startErrorRecovery();
+                } else {
+                    console.log('❌ Max recovery attempts reached, giving up auto-recovery');
+                    this.clearErrorRecoveryTimer();
+                }
+            }
+        } catch (error) {
+            console.error('❌ Error during recovery attempt:', error);
+            this.clearErrorRecoveryTimer();
+        }
+    }
+
+    /**
+     * Clear the error recovery timer
+     */
+    private clearErrorRecoveryTimer(): void {
+        if (this.errorRecoveryTimer) {
+            window.clearTimeout(this.errorRecoveryTimer);
+            this.errorRecoveryTimer = null;
+        }
     }
 
     private setPageSize(context: ComponentFramework.Context<IInputs>) {
@@ -1333,7 +1533,114 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             return '';
         }
 
-        // Generate formula like: Patch(DataSource, MyGrid.Selected, {Field1: MyGrid.Selected.Field1_Modified, Field2: MyGrid.Selected.Field2_Modified})
+        // Get the actual data source name from multiple potential sources
+        const dataset = this.context.parameters.records;
+        let dataSourceName = 'DataSource'; // Default fallback
+        
+        // Method 0: Check for manual override first (highest priority)
+        const manualDataSourceName = this.undefinedIfEmpty(this.context.parameters.DataSourceName);
+        if (manualDataSourceName) {
+            dataSourceName = manualDataSourceName;
+            console.log('✅ Using manually configured data source name:', dataSourceName);
+        } else {
+            // Enhanced data source detection with comprehensive logging
+            try {
+                console.log('🔍 Starting enhanced data source detection...');
+                console.log('📊 Dataset object:', dataset);
+                console.log('📋 Dataset properties:', Object.getOwnPropertyNames(dataset));
+                console.log('📋 Dataset prototype methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(dataset)));
+                
+                // Method 1: dataset.getTitle() - Primary method
+                if (dataset.getTitle && typeof dataset.getTitle === 'function') {
+                    const title = dataset.getTitle();
+                    console.log('🎯 Method 1 - getTitle():', title);
+                    if (title && title !== '' && title !== 'val') {
+                        dataSourceName = title;
+                        console.log('✅ Data source from getTitle():', dataSourceName);
+                    }
+                }
+
+                // Method 2: getTargetEntityType() - For Dataverse connections
+                if (!dataSourceName || dataSourceName === 'DataSource') {
+                    if (dataset.getTargetEntityType && typeof dataset.getTargetEntityType === 'function') {
+                        const entityType = dataset.getTargetEntityType();
+                        console.log('🎯 Method 2 - getTargetEntityType():', entityType);
+                        if (entityType && entityType !== '') {
+                            dataSourceName = entityType;
+                            console.log('✅ Data source from getTargetEntityType():', dataSourceName);
+                        }
+                    }
+                }
+
+            // Method 3: Direct entityType property
+            if (!dataSourceName || dataSourceName === 'DataSource') {
+                const entityType = (dataset as any).entityType;
+                console.log('🎯 Method 3 - entityType property:', entityType);
+                if (entityType && entityType !== '') {
+                    dataSourceName = entityType;
+                    console.log('✅ Data source from entityType property:', dataSourceName);
+                }
+            }
+
+            // Method 4: Extract from getNamedReference()
+            if (!dataSourceName || dataSourceName === 'DataSource') {
+                if ((dataset as any).getNamedReference && typeof (dataset as any).getNamedReference === 'function') {
+                    const namedRef = (dataset as any).getNamedReference();
+                    console.log('🎯 Method 4 - getNamedReference():', namedRef);
+                    if (namedRef && namedRef.entityType) {
+                        dataSourceName = namedRef.entityType;
+                        console.log('✅ Data source from getNamedReference().entityType:', dataSourceName);
+                    }
+                }
+            }
+
+            // Method 5: Check context for app-level information
+            if (!dataSourceName || dataSourceName === 'DataSource') {
+                console.log('🎯 Method 5 - Checking context for app info...');
+                console.log('📋 Context properties:', Object.getOwnPropertyNames(this.context));
+                
+                // Try to find app or page context that might contain the Items property source
+                if ((this.context as any).page) {
+                    console.log('📄 Page context found:', (this.context as any).page);
+                }
+                if ((this.context as any).app) {
+                    console.log('📱 App context found:', (this.context as any).app);
+                }
+            }
+
+            // Method 6: Look at first record for more clues
+            if (!dataSourceName || dataSourceName === 'DataSource') {
+                if (dataset.records && Object.keys(dataset.records).length > 0) {
+                    const firstRecordId = Object.keys(dataset.records)[0];
+                    const firstRecord = dataset.records[firstRecordId];
+                    console.log('🎯 Method 6 - Analyzing first record:', firstRecord);
+                    console.log('📋 First record properties:', Object.getOwnPropertyNames(firstRecord));
+                    console.log('📋 First record prototype:', Object.getOwnPropertyNames(Object.getPrototypeOf(firstRecord)));
+                    
+                    if (firstRecord && (firstRecord as any).getNamedReference) {
+                        const ref = (firstRecord as any).getNamedReference();
+                        console.log('🔗 Record named reference:', ref);
+                        if (ref && ref.entityType) {
+                            dataSourceName = ref.entityType;
+                            console.log('✅ Data source from record getNamedReference().entityType:', dataSourceName);
+                        }
+                    }
+                }
+            }
+
+            // Final fallback - if still DataSource, try common Power Apps table names
+            if (dataSourceName === 'DataSource') {
+                console.log('🤔 Still using fallback, checking for common patterns...');
+                console.log('💡 Hint: You can manually set the DataSourceName property to override auto-detection');
+            }
+
+            } catch (error) {
+                console.warn('⚠️ Error during data source detection:', error);
+            }
+        }
+        
+        console.log(`📊 Final data source determined: ${dataSourceName}`);
+        
         const controlName = 'MyGrid'; // This could be made configurable
         const changes: string[] = [];
         
@@ -1353,7 +1660,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             return '';
         }
 
-        return `Patch(DataSource, ${controlName}.Selected, {${changes.join(', ')}})`;
+        return `Patch(${dataSourceName}, ${controlName}.Selected, {${changes.join(', ')}})`;
     };
 
     /**
@@ -1364,6 +1671,38 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             return '';
         }
 
+        // Get the actual data source name from multiple potential sources (same logic as Patch formula)
+        const dataset = this.context.parameters.records;
+        let dataSourceName = 'DataSource'; // Default fallback
+        
+        // Try multiple methods to get the data source name
+        try {
+            // Method 1: Check if there's a title or name property
+            if (dataset.getTitle && dataset.getTitle()) {
+                dataSourceName = dataset.getTitle();
+            }
+            // Method 2: Try to get entity logical name (for Dataverse)
+            else if ((dataset as any).getTargetEntityType && (dataset as any).getTargetEntityType()) {
+                dataSourceName = (dataset as any).getTargetEntityType();
+            }
+            // Method 3: Check if we can extract from dataset metadata
+            else if ((dataset as any).entityType) {
+                dataSourceName = (dataset as any).entityType;
+            }
+            // Method 4: Look for any indication of table name in the dataset
+            else if (dataset.records && Object.keys(dataset.records).length > 0) {
+                const firstRecord = dataset.records[Object.keys(dataset.records)[0]];
+                if (firstRecord && (firstRecord as any).getNamedReference) {
+                    const ref = (firstRecord as any).getNamedReference();
+                    if (ref && ref.entityType) {
+                        dataSourceName = ref.entityType;
+                    }
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ Could not detect data source name for ForAll, using default:', error);
+        }
+        
         const controlName = 'MyGrid'; // This could be made configurable
         const allChanges: string[] = [];
         
@@ -1385,7 +1724,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             return '';
         }
 
-        return `ForAll(${controlName}.SelectedItems, Patch(DataSource, ThisRecord, {${updateFields.join(', ')}}))`;
+        return `ForAll(${controlName}.SelectedItems, Patch(${dataSourceName}, ThisRecord, {${updateFields.join(', ')}}))`;
     };
 
     /**
@@ -1640,5 +1979,99 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         } catch (error) {
             console.error('❌ Error in handleClearAllSelections:', error);
         }
+    };
+
+    /**
+     * Get data source name for direct Power Apps Patch integration
+     */
+    private getPatchDataSourceName = (): string => {
+        const dataset = this.context.parameters.records;
+        
+        // Use the same logic as generatePatchFormula for consistency
+        const manualDataSourceName = this.undefinedIfEmpty((this.context.parameters as any).DataSourceName);
+        if (manualDataSourceName) {
+            return manualDataSourceName;
+        }
+        
+        // Auto-detect data source name
+        try {
+            if (dataset.getTitle && typeof dataset.getTitle === 'function') {
+                const title = dataset.getTitle();
+                if (title && title !== '' && title !== 'val') {
+                    return title;
+                }
+            }
+            
+            if (dataset.getTargetEntityType && typeof dataset.getTargetEntityType === 'function') {
+                const entityType = dataset.getTargetEntityType();
+                if (entityType && entityType !== '') {
+                    return entityType;
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ Error detecting data source name:', error);
+        }
+        
+        return 'MasterWeldData'; // Fallback to your known data source
+    };
+
+    /**
+     * Get record reference for direct Power Apps Patch integration
+     */
+    private getPatchRecordReference = (): string => {
+        // Return the control name + .Selected for the currently edited record
+        return 'MyGrid.Selected';
+    };
+
+    /**
+     * Get changes object for direct Power Apps Patch integration
+     */
+    private getPatchChangesObject = (): string => {
+        if (!this.currentChangedRecordKey || !this.pendingChanges.has(this.currentChangedRecordKey)) {
+            return '{}';
+        }
+
+        const recordChanges = this.pendingChanges.get(this.currentChangedRecordKey);
+        if (!recordChanges) {
+            return '{}';
+        }
+
+        // Convert changes to Power Apps record format
+        const changes: Record<string, any> = {};
+        recordChanges.forEach((newValue, columnName) => {
+            changes[columnName] = newValue;
+        });
+
+        return JSON.stringify(changes);
+    };
+
+    private getPatchChangesColumn = (): string => {
+        if (!this.currentChangedRecordKey || !this.pendingChanges.has(this.currentChangedRecordKey)) {
+            return '';
+        }
+
+        const recordChanges = this.pendingChanges.get(this.currentChangedRecordKey);
+        if (!recordChanges || recordChanges.size === 0) {
+            return '';
+        }
+
+        // Return the first changed column name
+        const firstColumn = Array.from(recordChanges.keys())[0];
+        return firstColumn || '';
+    };
+
+    private getPatchChangesValue = (): string => {
+        if (!this.currentChangedRecordKey || !this.pendingChanges.has(this.currentChangedRecordKey)) {
+            return '';
+        }
+
+        const recordChanges = this.pendingChanges.get(this.currentChangedRecordKey);
+        if (!recordChanges || recordChanges.size === 0) {
+            return '';
+        }
+
+        // Return the first changed value
+        const firstValue = Array.from(recordChanges.values())[0];
+        return firstValue?.toString() || '';
     };
 }
