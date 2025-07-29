@@ -9,7 +9,7 @@ import { UltraVirtualizedGrid, useUltraVirtualization } from '../virtualization/
 import { EnterpriseChangeManager } from '../services/EnterpriseChangeManager';
 import { DataExportService } from '../services/DataExportService';
 import { IExportOptions } from '../types/Advanced.types';
-import { VirtualizedEditableGrid } from './VirtualizedEditableGrid';
+import { VirtualizedEditableGrid, VirtualizedEditableGridRef } from './VirtualizedEditableGrid';
 import { ColumnEditorMapping } from '../types/ColumnEditor.types';
 import { HeaderSelectionCheckbox, RowSelectionCheckbox } from './SelectionCheckbox';
 import '../css/SelectionMode.css';
@@ -115,9 +115,13 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     // Row styling props
     alternateRowColor
 }) => {
+    // Ref for grid imperative methods
+    const gridRef = React.useRef<VirtualizedEditableGridRef>(null);
+    
     // State management
     const [filteredItems, setFilteredItems] = useState<any[]>(items);
     const [globalFilter, setGlobalFilter] = useState<string>('');
+    const [pendingChangesCount, setPendingChangesCount] = useState<number>(0);
     const [changeManager] = useState(() => new EnterpriseChangeManager());
     const [exportService] = useState(() => DataExportService.getInstance());
     
@@ -186,6 +190,9 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                 }
                 
                 changeManager.addChange(recordKey, columnKey, oldValue, newValue);
+                
+                // Update pending changes count immediately
+                setPendingChangesCount(changeManager.getPendingChanges().length);
             }
         }
     }, [enableInlineEditing, enableChangeTracking, onCellEdit, changeManager]);
@@ -276,6 +283,11 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
         if (changeManager) {
             try {
                 await changeManager.commitAllChanges();
+                // Also call the grid method to keep in sync
+                if (gridRef.current) {
+                    gridRef.current.commitAllChanges();
+                }
+                setPendingChangesCount(0); // Reset count after commit
             } catch (error) {
                 console.error('Error committing changes:', error);
             }
@@ -286,6 +298,11 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     const handleCancelChanges = useCallback(() => {
         if (changeManager) {
             changeManager.cancelAllChanges();
+            // Also call the grid method to keep in sync
+            if (gridRef.current) {
+                gridRef.current.cancelAllChanges();
+            }
+            setPendingChangesCount(0); // Reset count after cancel
         }
     }, [changeManager]);
 
@@ -300,12 +317,26 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
         </div>
     );
 
-    // Change tracking display (status only - no duplicate buttons)
-    const pendingChangesCount = changeManager?.getPendingChanges().length || 0;
+    // Change tracking display with inline buttons
     const changeTrackingDisplay = enableChangeTracking && pendingChangesCount > 0 ? (
-        <div className="change-tracking" data-theme={theme}>
-            <span>{pendingChangesCount} pending changes</span>
-        </div>
+        <Stack horizontal tokens={{ childrenGap: 8 }} verticalAlign="center">
+            <DefaultButton 
+                text={`Save Changes (${pendingChangesCount})`}
+                onClick={handleCommitChanges}
+                primary
+                styles={{
+                    root: { minHeight: 28, fontSize: 13 },
+                    label: { fontWeight: 600 }
+                }}
+            />
+            <DefaultButton 
+                text="Cancel Changes"
+                onClick={handleCancelChanges}
+                styles={{
+                    root: { minHeight: 28, fontSize: 13 }
+                }}
+            />
+        </Stack>
     ) : null;
 
     // Dynamic CSS variables for row styling
@@ -392,6 +423,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                 }}
             >
                 <VirtualizedEditableGrid
+                    ref={gridRef}
                     items={filteredItems}
                     columns={columns}
                     height="100%" // Let the grid flex with its container

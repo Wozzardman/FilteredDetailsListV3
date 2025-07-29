@@ -18,6 +18,7 @@
     min-height: 32px;
     opacity: 0;
     transition: opacity 0.2s ease-in-out;
+    border-radius: 4px;
 }
 
 /* Show selection checkbox on row hover */
@@ -29,6 +30,7 @@
 /* Always show if already selected */
 .selection-row-container.selected {
     opacity: 1;
+    background-color: rgba(0, 120, 212, 0.1);
 }
 
 .selection-toggle-button {
@@ -72,7 +74,6 @@
     max-width: 40px !important;
     padding: 0 !important;
     text-align: center;
-    border-right: 1px solid #edebe9;
     background-color: #faf9f8;
 }
 
@@ -174,4 +175,106 @@
 /* Animation for selection state changes */
 .selection-state-transition {
     transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
+}
+
+/* Enhanced Modern Checkbox Styling */
+.selection-checkbox {
+    position: relative;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #d0d7de;
+    border-radius: 6px;
+    background: #ffffff;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    margin: 0;
+}
+
+.selection-checkbox:hover {
+    border-color: #0969da;
+    box-shadow: 0 2px 8px rgba(9, 105, 218, 0.2);
+    transform: translateY(-1px);
+}
+
+.selection-checkbox.checked {
+    background: linear-gradient(135deg, #0969da 0%, #0550ae 100%);
+    border-color: #0969da;
+    box-shadow: 0 3px 12px rgba(9, 105, 218, 0.3);
+}
+
+.selection-checkbox.indeterminate {
+    background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
+    border-color: #6f42c1;
+    box-shadow: 0 3px 12px rgba(111, 66, 193, 0.3);
+}
+
+/* Checkmark Icon */
+.selection-checkbox .checkmark {
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: bold;
+    opacity: 0;
+    transform: scale(0.5);
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.selection-checkbox.checked .checkmark {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Indeterminate Icon (dash) */
+.selection-checkbox .indeterminate-mark {
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: bold;
+    opacity: 0;
+    transform: scale(0.5);
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.selection-checkbox.indeterminate .indeterminate-mark {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Enhanced Row Selection Styling */
+.grid-row.selected {
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    border-left: 4px solid #3b82f6;
+    box-shadow: inset 0 1px 3px rgba(59, 130, 246, 0.1);
+}
+
+.grid-row:hover .selection-checkbox {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Enhanced selection containers */
+.selection-header-container .selection-checkbox,
+.selection-row-container .selection-checkbox {
+    margin: auto;
+}
+
+.selection-row-container:hover {
+    background-color: rgba(9, 105, 218, 0.05);
+    border-radius: 6px;
+}
+
+/* Responsive Design for Modern Checkboxes */
+@media (max-width: 768px) {
+    .selection-checkbox {
+        width: 18px;
+        height: 18px;
+        border-radius: 5px;
+    }
+    
+    .selection-checkbox .checkmark,
+    .selection-checkbox .indeterminate-mark {
+        font-size: 12px;
+    }
 }

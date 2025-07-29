@@ -37,32 +37,51 @@
 .virtualized-header {
     display: flex;
     height: 48px;
-    background-color: #f8f9fa;
+    background: linear-gradient(180deg, #fafafa 0%, #f5f5f5 100%);
     border-bottom: 2px solid #e1dfdd;
     position: relative;
     top: 0;
     z-index: 2;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     flex-shrink: 0; /* Prevent header from shrinking */
     transition: transform 0.1ms linear; /* Smooth transform for scroll sync */
 }
 
 .virtualized-header-cell {
     height: 100%;
-    padding: 0 8px;
+    padding: 0 12px;
     display: flex;
     align-items: center;
-    border-right: 1px solid #e1dfdd;
     font-weight: 600;
+    font-size: 14px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     cursor: pointer;
-    transition: background-color 0.15s ease;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    color: #24292f;
+    position: relative;
+}
+
+.virtualized-header-cell::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: transparent;
+    transition: background 0.2s ease;
 }
 
 .virtualized-header-cell:hover {
-    background-color: #f3f2f1;
+    background-color: rgba(9, 105, 218, 0.06);
+    color: #0969da;
+    transform: translateY(-1px);
+}
+
+.virtualized-header-cell:hover::before {
+    background: linear-gradient(90deg, #0969da 0%, #0550ae 100%);
 }
 
 .virtualized-header-cell:last-child {
@@ -79,22 +98,26 @@
     cursor: col-resize;
     background: transparent;
     z-index: 10;
-    transition: background-color 0.2s ease;
+    transition: all 0.2s ease;
+    border-radius: 2px;
 }
 
 .column-resize-handle:hover {
-    background-color: #0078d4;
+    background: linear-gradient(180deg, #0969da 0%, #0550ae 100%);
+    width: 3px;
+    box-shadow: 0 0 8px rgba(9, 105, 218, 0.4);
 }
 
 .virtualized-header-cell.resizing {
-    background-color: #deecf9;
-    box-shadow: 0 2px 4px rgba(0, 120, 212, 0.2);
+    background: linear-gradient(135deg, rgba(9, 105, 218, 0.1) 0%, rgba(5, 80, 174, 0.1) 100%);
+    box-shadow: 0 2px 8px rgba(9, 105, 218, 0.2);
+    transform: translateY(-1px);
 }
 
 .virtualized-header-cell.resizing .column-resize-handle {
-    background-color: #0078d4;
-    width: 2px;
-    box-shadow: 1px 0 2px rgba(0, 120, 212, 0.3);
+    background: linear-gradient(180deg, #0969da 0%, #0550ae 100%);
+    width: 3px;
+    box-shadow: 0 0 12px rgba(9, 105, 218, 0.5);
 }
 
 /* Virtualized Grid Body */
@@ -160,7 +183,6 @@
     padding: 0 8px;
     display: flex;
     align-items: center;
-    border-right: 1px solid #e1dfdd;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -174,6 +196,13 @@
 
 .virtualized-cell.editable {
     cursor: pointer;
+}
+
+.virtualized-cell.editable:hover {
+    background-color: rgba(0, 120, 212, 0.08);
+    border-radius: 3px;
+    margin: 2px;
+    padding: 0 6px; /* Adjust padding to account for margin */
 }
 
 .virtualized-cell.read-only {
@@ -489,14 +518,196 @@
 .virtualized-header-filter-button {
     margin-left: auto;
     opacity: 0;
-    transition: opacity 0.2s ease;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 6px;
+    padding: 4px;
+    background: transparent;
 }
 
 .virtualized-header-cell:hover .virtualized-header-filter-button {
     opacity: 1;
+    background: rgba(9, 105, 218, 0.08);
+    transform: scale(1.05);
 }
 
 .virtualized-header-filter-button.active {
     opacity: 1;
-    color: #0078d4;
+    color: #0969da;
+    background: rgba(9, 105, 218, 0.15);
+    box-shadow: 0 2px 6px rgba(9, 105, 218, 0.2);
+}
+
+/* Drag Fill Handle - Only show on cell hover */
+.virtualized-cell:hover .drag-fill-handle {
+    opacity: 0.8 !important;
+}
+
+.drag-fill-handle:hover {
+    opacity: 1 !important;
+    transform: scale(1.2);
+}
+
+/* Row Hover Effects */
+.virtualized-row:hover {
+    background-color: rgba(0, 120, 212, 0.05) !important;
+    transition: background-color 0.15s ease;
+}
+
+.virtualized-row:hover .virtualized-cell {
+    background-color: transparent;
+}
+
+/* Filter Button Enhancements */
+.virtualized-header-filter-icon {
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.virtualized-header-filter-icon:hover {
+    background-color: rgba(0, 120, 212, 0.1) !important;
+    transform: scale(1.05);
+}
+
+.virtualized-header-filter-icon.active {
+    background-color: rgba(0, 120, 212, 0.15) !important;
+    box-shadow: 0 2px 4px rgba(0, 120, 212, 0.2);
+}
+
+/* Row Animation and Styling */
+.virtualized-row {
+    transition: all 0.2s ease;
+}
+
+.virtualized-row.even {
+    background-color: transparent;
+}
+
+.virtualized-row.odd {
+    background-color: transparent;
+}
+
+/* Enhanced Control Bar Styling */
+.control-bar {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border: 1px solid #e1e4e8;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    margin-bottom: 16px;
+    padding: 16px 20px;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    transition: all 0.2s ease;
+}
+
+.control-bar:hover {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+    transform: translateY(-1px);
+}
+
+/* Enhanced Export Button Styling */
+.control-bar .ms-Button {
+    border-radius: 8px;
+    border: 1.5px solid #d0d7de;
+    background: linear-gradient(135deg, #ffffff 0%, #f6f8fa 100%);
+    font-weight: 500;
+    font-size: 14px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    height: 36px;
+    min-width: 100px;
+}
+
+.control-bar .ms-Button:hover {
+    background: linear-gradient(135deg, #f6f8fa 0%, #eaeef2 100%);
+    border-color: #0969da;
+    box-shadow: 0 2px 8px rgba(9, 105, 218, 0.15);
+    transform: translateY(-1px);
+}
+
+.control-bar .ms-Button:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 3px rgba(9, 105, 218, 0.2);
+}
+
+/* Primary Button (Save Changes) Styling */
+.ms-Button--primary {
+    background: linear-gradient(135deg, #0969da 0%, #0550ae 100%) !important;
+    border: 1.5px solid #0969da !important;
+    box-shadow: 0 2px 8px rgba(9, 105, 218, 0.25) !important;
+}
+
+.ms-Button--primary:hover {
+    background: linear-gradient(135deg, #0550ae 0%, #033d8b 100%) !important;
+    box-shadow: 0 4px 16px rgba(9, 105, 218, 0.35) !important;
+    transform: translateY(-2px) !important;
+}
+
+/* Enhanced TextField Styling */
+.control-bar .ms-TextField {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.control-bar .ms-TextField .ms-TextField-field {
+    border: 1.5px solid #d0d7de;
+    border-radius: 8px;
+    background: #ffffff;
+    font-size: 14px;
+    padding: 10px 12px;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.control-bar .ms-TextField .ms-TextField-field:focus {
+    border-color: #0969da;
+    box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1), 0 2px 8px rgba(9, 105, 218, 0.15);
+    background: #ffffff;
+}
+
+.control-bar .ms-TextField .ms-TextField-field::placeholder {
+    color: #656d76;
+    font-style: italic;
+}
+
+/* Enhanced Grid Container */
+.ultimate-enterprise-grid {
+    border: 1px solid #d0d7de;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+    background: #ffffff;
+    transition: box-shadow 0.2s ease;
+}
+
+.ultimate-enterprise-grid:hover {
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* Enhanced Grid Container */
+.grid-container {
+    border-radius: 8px;
+    overflow: hidden;
+    background: #ffffff;
+}
+
+/* Enhanced Performance Metrics */
+.performance-metrics {
+    font-size: 13px;
+    font-weight: 500;
+    color: #656d76;
+    background: linear-gradient(135deg, #f6f8fa 0%, #eaeef2 100%);
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #d0d7de;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* Enhanced Header Gradient */
+.virtualized-header {
+    background: linear-gradient(180deg, #ffffff 0%, #f6f8fa 50%, #eaeef2 100%);
+    border-bottom: 2px solid #d0d7de;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }

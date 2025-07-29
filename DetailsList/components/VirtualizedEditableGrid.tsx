@@ -8,7 +8,6 @@
 import * as React from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { IColumn } from '@fluentui/react/lib/DetailsList';
-import { CommandBar, ICommandBarItemProps } from '@fluentui/react/lib/CommandBar';
 import { MessageBar, MessageBarType } from '@fluentui/react/lib/MessageBar';
 import { Spinner, SpinnerSize } from '@fluentui/react/lib/Spinner';
 import { DefaultButton } from '@fluentui/react/lib/Button';
@@ -99,13 +98,19 @@ export interface VirtualizedEditableGridProps {
     alternateRowColor?: string; // Color for alternating rows
 }
 
+export interface VirtualizedEditableGridRef {
+    commitAllChanges: () => Promise<void>;
+    cancelAllChanges: () => void;
+    getPendingChangesCount: () => number;
+}
+
 interface EditingState {
     itemIndex: number;
     columnKey: string;
     originalValue: any;
 }
 
-export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = ({
+export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridRef, VirtualizedEditableGridProps>(({
     items = [],
     columns = [],
     height,
@@ -152,7 +157,7 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
     enableExcelClipboard = false,
     clipboardService,
     onClipboardOperation
-}) => {
+}, ref) => {
     // Refs for scrolling synchronization - DECLARE FIRST BEFORE ALL OTHER LOGIC
     const parentRef = React.useRef<HTMLDivElement>(null);
     const headerRef = React.useRef<HTMLDivElement>(null);
@@ -509,29 +514,12 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
         }
     }, [pendingChanges, filteredItems, changeManager]);
 
-    // Command bar items
-    const commandBarItems: ICommandBarItemProps[] = React.useMemo(() => {
-        const items: ICommandBarItemProps[] = [];
-
-        if (pendingChanges.size > 0) {
-            items.push(
-                {
-                    key: 'save',
-                    text: `Save Changes (${pendingChanges.size})`,
-                    onClick: () => { commitAllChanges(); },
-                    disabled: isCommitting,
-                },
-                {
-                    key: 'cancel',
-                    text: 'Cancel Changes',
-                    onClick: cancelAllChanges,
-                    disabled: isCommitting,
-                }
-            );
-        }
-
-        return items;
-    }, [pendingChanges.size, commitAllChanges, cancelAllChanges, isCommitting, items.length]);
+    // Expose methods through ref
+    React.useImperativeHandle(ref, () => ({
+        commitAllChanges,
+        cancelAllChanges,
+        getPendingChangesCount: () => pendingChanges.size
+    }), [commitAllChanges, cancelAllChanges, pendingChanges.size]);
 
     // Render virtualized row
     const renderRowContent = React.useCallback((virtualRow: any) => {
@@ -590,7 +578,6 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     padding: '0 8px',
-                                    borderRight: '1px solid #e1dfdd',
                                     boxSizing: 'border-box' // Ensure consistent box model
                                 }}
                             >
@@ -622,7 +609,6 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                         padding: '0 8px',
                         display: 'flex',
                         alignItems: 'center',
-                        borderRight: '1px solid #e1dfdd',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
@@ -668,6 +654,7 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                     return (
                         <div
                             key={columnKey}
+                            className={`virtualized-cell ${isReadOnly ? 'read-only' : 'editable'}`}
                             style={cellStyle}
                             onClick={() => !isReadOnly && startEdit(index, columnKey)}
                             title={hasChanges ? `Changed from: ${pendingChanges.get(cellKey)?.oldValue}` : String(cellValue || '')}
@@ -678,6 +665,7 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                             }
                             {!isReadOnly && enableDragFill && !enableSelectionMode && (
                                 <div 
+                                    className="drag-fill-handle"
                                     style={{
                                         position: 'absolute',
                                         bottom: 0,
@@ -687,7 +675,8 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                                         backgroundColor: '#0078d4',
                                         border: '1px solid white',
                                         cursor: 'crosshair',
-                                        opacity: 0.7
+                                        opacity: 0,
+                                        transition: 'opacity 0.15s ease'
                                     }}
                                     onMouseDown={(e) => {
                                         e.preventDefault();
@@ -793,7 +782,6 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                borderRight: '1px solid #e1dfdd',
                                 background: '#faf9f8',
                                 padding: '0 8px', // Match data cell padding exactly
                                 boxSizing: 'border-box', // Ensure consistent box model
@@ -831,7 +819,6 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            borderRight: '1px solid #e1dfdd',
                             background: '#faf9f8',
                             padding: '0 8px', // Match data cell padding exactly
                             boxSizing: 'border-box', // Ensure consistent box model
@@ -913,9 +900,8 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                                     bottom: 0,
                                     width: '12px', // Wider for easier grabbing
                                     cursor: 'col-resize',
-                                    backgroundColor: 'transparent',
-                                    borderRight: isResizing === columnKey ? '2px solid #0078d4' : '1px solid transparent',
-                                    transition: 'border-color 0.2s',
+                                    backgroundColor: isResizing === columnKey ? '#0078d4' : 'transparent',
+                                    transition: 'background-color 0.2s',
                                     zIndex: 10
                                 }}
                                 onMouseDown={(e: React.MouseEvent) => {
@@ -924,12 +910,12 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                                 }}
                                 onMouseEnter={(e: React.MouseEvent) => {
                                     if (isResizing !== columnKey) {
-                                        (e.target as HTMLElement).style.borderRight = '1px solid #605e5c';
+                                        (e.target as HTMLElement).style.backgroundColor = '#e1dfdd';
                                     }
                                 }}
                                 onMouseLeave={(e: React.MouseEvent) => {
                                     if (isResizing !== columnKey) {
-                                        (e.target as HTMLElement).style.borderRight = '1px solid transparent';
+                                        (e.target as HTMLElement).style.backgroundColor = 'transparent';
                                     }
                                 }}
                             />
@@ -954,14 +940,6 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
                 flex: 1 // Allow the grid to flex with its container
             }}
         >
-            {/* Command Bar - Only show when there are pending changes */}
-            {pendingChanges.size > 0 && (
-                <CommandBar
-                    items={commandBarItems}
-                    styles={{ root: { minHeight: 40, marginBottom: 8 } }}
-                />
-            )}
-
             {/* Error Message */}
             {errorMessage && (
                 <MessageBar 
@@ -1038,6 +1016,8 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
             )}
         </div>
     );
-};
+});
+
+VirtualizedEditableGrid.displayName = 'VirtualizedEditableGrid';
 
 export default VirtualizedEditableGrid;

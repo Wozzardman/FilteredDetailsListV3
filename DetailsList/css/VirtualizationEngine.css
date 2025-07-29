@@ -29,7 +29,6 @@
     display: flex;
     align-items: center;
     padding: 8px 12px;
-    border-right: 1px solid #e1e1e1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -46,7 +45,6 @@
     display: flex;
     align-items: center;
     padding: 8px 12px;
-    border-right: 1px solid #e1e1e1;
     border-bottom: 1px solid #e1e1e1;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -70,7 +68,6 @@
     display: flex;
     align-items: center;
     padding: 8px 12px;
-    border-right: 1px solid #e1e1e1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -135,11 +132,9 @@
     overflow: hidden;
     white-space: nowrap;
 }
-}
 
 .virtualized-data-cell {
     border-bottom: 1px solid #e1dfdd;
-    border-right: 1px solid #e1dfdd;
     padding: 8px 12px;
     display: flex;
     align-items: center;
