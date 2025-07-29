@@ -682,12 +682,28 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                         e.preventDefault();
                                         // Implement basic drag fill functionality
                                         const startDragFill = (startIndex: number, columnKey: string, startValue: any) => {
+                                            const dragFillChanges = new Map<string, any>();
+                                            
                                             const handleMouseMove = (moveEvent: MouseEvent) => {
                                                 // Find the target cell based on mouse position
                                                 const element = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY);
                                                 if (element && element.closest('.virtualized-row')) {
                                                     const rowElement = element.closest('.virtualized-row') as HTMLElement;
                                                     const targetIndex = parseInt(rowElement.dataset.index || '0');
+                                                    
+                                                    // Clear previous drag fill changes
+                                                    dragFillChanges.forEach((_, changeKey) => {
+                                                        const [indexStr] = changeKey.split('-');
+                                                        const index = parseInt(indexStr);
+                                                        if (index !== startIndex) {
+                                                            setPendingChanges(prev => {
+                                                                const newMap = new Map(prev);
+                                                                newMap.delete(changeKey);
+                                                                return newMap;
+                                                            });
+                                                        }
+                                                    });
+                                                    dragFillChanges.clear();
                                                     
                                                     // Fill range with the start value
                                                     if (targetIndex !== startIndex) {
@@ -715,7 +731,8 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                                                     
                                                                     setPendingChanges(prev => new Map(prev.set(changeKey, change)));
                                                                     setPCFValue(targetItem, columnKey, startValue);
-                                                                    onCellEdit?.(itemId, columnKey, startValue);
+                                                                    dragFillChanges.set(changeKey, change);
+                                                                    // Don't call onCellEdit during drag - it will be called once at the end
                                                                 }
                                                             }
                                                         }
@@ -724,6 +741,14 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                             };
                                             
                                             const handleMouseUp = () => {
+                                                // When drag ends, call onCellEdit once for all the changes
+                                                if (dragFillChanges.size > 0 && onCellEdit) {
+                                                    // Call onCellEdit for all the drag filled changes
+                                                    Array.from(dragFillChanges.values()).forEach(change => {
+                                                        onCellEdit(change.itemId, change.columnKey, change.newValue);
+                                                    });
+                                                }
+                                                
                                                 document.removeEventListener('mousemove', handleMouseMove);
                                                 document.removeEventListener('mouseup', handleMouseUp);
                                             };

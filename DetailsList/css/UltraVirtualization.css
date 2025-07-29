@@ -196,23 +196,49 @@
     z-index: 10;
 }
 
-/* Cell editor styles */
+/* Enhanced Cell editor styles */
 .ultra-cell-editor {
     width: 100%;
     height: 100%;
-    border: 2px solid #0078d4;
-    border-radius: 2px;
-    padding: 4px 8px;
+    border: 2px solid #0969da;
+    border-radius: 6px;
+    padding: 6px 12px;
     font-size: 14px;
     font-family: inherit;
-    background: white;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
     outline: none;
     margin: -2px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 
+        0 0 0 3px rgba(9, 105, 218, 0.1),
+        0 2px 8px rgba(9, 105, 218, 0.15);
+    color: #24292f;
+    line-height: 1.4;
 }
 
 .ultra-cell-editor:focus {
-    border-color: #106ebe;
-    box-shadow: 0 0 0 1px #106ebe;
+    border-color: #0550ae;
+    background: #ffffff;
+    box-shadow: 
+        0 0 0 3px rgba(9, 105, 218, 0.2),
+        0 4px 16px rgba(9, 105, 218, 0.25),
+        0 1px 4px rgba(0, 0, 0, 0.1);
+    transform: scale(1.01);
+    color: #0969da;
+    font-weight: 500;
+}
+
+/* Placeholder styling for empty editors */
+.ultra-cell-editor::placeholder {
+    color: #656d76;
+    font-style: italic;
+    opacity: 0.8;
+}
+
+/* Selection highlighting */
+.ultra-cell-editor::selection {
+    background: rgba(9, 105, 218, 0.2);
+    color: inherit;
 }
 
 /* Performance overlay */
