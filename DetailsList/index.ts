@@ -810,11 +810,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             columnTextSize: context.parameters.ColumnTextSize?.raw || 13,
             
             // Row styling configuration
-            alternatingRowColors: context.parameters.AlternatingRowColors?.raw || false,
-            evenRowColor: context.parameters.EvenRowColor?.raw || undefined,
-            oddRowColor: context.parameters.OddRowColor?.raw || undefined,
-            hoverRowColor: context.parameters.HoverRowColor?.raw || undefined,
-            selectedRowColor: context.parameters.SelectedRowColor?.raw || undefined,
+            alternateRowColor: context.parameters.AlternateRowColor?.raw || undefined,
             
             // Selection mode props - using native Power Apps selection
             enableSelectionMode: this.isSelectionMode,
@@ -823,6 +819,10 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             onItemSelection: this.handleItemSelection,
             onSelectAll: this.handleSelectAll,
             onClearAllSelections: this.handleClearAllSelections,
+            
+            // Excel Clipboard configuration (use fallback values if properties don't exist)
+            enableExcelClipboard: (context.parameters as any).EnableExcelClipboard?.raw || false,
+            onClipboardOperation: this.handleClipboardOperation,
             
             onCellEdit: onCellEditWrapper,
             getColumnDataType: (columnKey: string) => {
@@ -1018,6 +1018,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         // Reset the event so that it does not re-trigger
         this.eventName = '';
         this.filterEventName = '';
+        
         return { ...defaultOutputs, ...eventOutputs, ...changeOutputs, ...autoUpdateOutputs, ...selectionOutputs, ...powerAppsIntegrationOutputs };
     }
 
@@ -2081,6 +2082,30 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             console.log('🗑️ All selections cleared using native Power Apps API');
         } catch (error) {
             console.error('❌ Error in handleClearAllSelections:', error);
+        }
+    };
+
+    /**
+     * Handle clipboard operations (copy/paste)
+     */
+    private handleClipboardOperation = (operation: 'copy' | 'paste', data?: any): void => {
+        try {
+            console.log(`📋 Clipboard operation: ${operation}`, data);
+            
+            // Set output properties for Power Apps
+            this.eventName = operation === 'copy' ? 'ClipboardCopy' : 'ClipboardPaste';
+            this.eventRowKey = data?.targetIndex ? data.targetIndex.toString() : '';
+            this.eventColumn = 'ClipboardData';
+            
+            // Store clipboard data for output
+            if (operation === 'paste' && data?.data) {
+                this.currentNewValue = JSON.stringify(data.data);
+            }
+            
+            // Trigger output change event
+            this.notifyOutputChanged();
+        } catch (error) {
+            console.error('❌ Error in handleClipboardOperation:', error);
         }
     };
 

@@ -163,7 +163,7 @@ export const RowSelectionCheckbox: React.FC<RowSelectionCheckboxProps> = React.m
     }, [disabled, itemId, onToggleSelection]);
 
     return (
-        <div className="selection-row-container">
+        <div className={`selection-row-container ${selected ? 'selected' : ''}`}>
             <SelectionCheckbox
                 checked={selected}
                 disabled={disabled}

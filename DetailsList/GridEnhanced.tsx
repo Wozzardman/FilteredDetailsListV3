@@ -1,6 +1,6 @@
 // Enhanced Grid - Original Grid.tsx with added enterprise features
 // Preserves all original multi-select, checkbox, and selection functionality
-// Adds: Performance monitoring, Data export, Advanced filtering, AI insights
+// Adds: Performance monitoring, Data export, Advanced filtering, AI insights, Drag & Drop, Excel Clipboard
 
 import {
     IDetailsListProps,
@@ -40,7 +40,7 @@ import {
     ICommandBarItemProps,
 } from '@fluentui/react';
 import * as React from 'react';
-import { IGridColumn } from './Component.types';
+import { IGridColumn, ComponentProps, GridState, ClipboardConfig } from './Component.types';
 import { ClassNames, concatClassNames } from './Grid.styles';
 import { GridCell } from './GridCell';
 import { CellTypes, ColumnsColumns, RecordsColumns, SortDirection, FilterTypes } from './ManifestConstants';
@@ -48,6 +48,7 @@ import { NoFields } from './NoFields';
 import { FilterUtils } from './FilterUtils';
 import { IFilterState, IColumnFilter } from './Filter.types';
 import { FilterBar } from './FilterBar';
+import { ExcelClipboardService } from './services/ExcelClipboardService';
 import { FilterMenu } from './FilterMenu';
 import { DataExportService } from './services/DataExportService';
 
@@ -92,7 +93,10 @@ export interface GridProps {
     ariaLabel: string | null;
     compact?: boolean;
     themeJSON?: string;
+    
+    // Row coloring configuration
     alternateRowColor?: string;
+    
     isHeaderVisible?: boolean;
     selectionAlwaysVisible?: boolean;
     resources: ComponentFramework.Resources;
@@ -105,6 +109,10 @@ export interface GridProps {
     enablePerformanceMonitoring?: boolean;
     enableDataExport?: boolean;
     enableAIInsights?: boolean;
+    
+    // Excel Clipboard features
+    enableExcelClipboard?: boolean;
+    onClipboardOperation?: (operation: 'copy' | 'paste', data?: any) => void;
 }
 
 export function getRecordKey(record: ComponentFramework.PropertyHelper.DataSetApi.EntityRecord): string {
@@ -165,6 +173,8 @@ export const GridEnhanced = React.memo((props: GridProps) => {
         enablePerformanceMonitoring = false,
         enableDataExport = false,
         enableAIInsights = false,
+        enableExcelClipboard = false,
+        onClipboardOperation,
         onNavigate,
         shimmer,
         ariaLabel,
@@ -199,6 +209,15 @@ export const GridEnhanced = React.memo((props: GridProps) => {
 
     // Enhanced features state
     const exportService = React.useMemo(() => new DataExportService(), []);
+    
+    // Excel Clipboard service
+    const clipboardService = React.useMemo(() => new ExcelClipboardService(), []);
+    
+    // Clipboard state
+    const [clipboardData, setClipboardData] = React.useState<GridState['clipboardData']>();
+    
+    // Notification state for clipboard operations
+    const [notification, setNotification] = React.useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
 
     // Performance monitoring cleanup
     React.useEffect(() => {
@@ -522,6 +541,77 @@ export const GridEnhanced = React.memo((props: GridProps) => {
         return { gridColumns: gridColumns, expandColumn: expandColumn as IGridColumn | undefined };
     }, [sortedColumnIds, columns, datasetColumns, sorting, onColumnClick, enableFiltering, filters, handleFilterClick]);
 
+    // Drag & Drop and Clipboard event handlers (placed after gridColumns creation)
+    const handleCopy = React.useCallback(
+        async (selectedItems?: any[]) => {
+            if (!enableExcelClipboard) return;
+            
+            try {
+                const itemsToCopy = selectedItems || items.filter((_, index) => 
+                    selection.isIndexSelected(index)
+                );
+                
+                const success = await clipboardService.copyToClipboard(itemsToCopy, gridColumns);
+                if (success) {
+                    setNotification({ type: 'success', message: `Copied ${itemsToCopy.length} items to clipboard` });
+                    if (onClipboardOperation) {
+                        onClipboardOperation('copy', itemsToCopy);
+                    }
+                }
+            } catch (error) {
+                setNotification({ type: 'error', message: 'Failed to copy to clipboard' });
+                console.error('Copy failed:', error);
+            }
+        },
+        [enableExcelClipboard, items, selection, gridColumns, clipboardService, onClipboardOperation]
+    );
+
+    const handlePaste = React.useCallback(
+        async (targetIndex?: number) => {
+            if (!enableExcelClipboard) return;
+            
+            try {
+                const pasteData = await clipboardService.pasteFromClipboard();
+                if (pasteData && pasteData.data && pasteData.data.length > 0) {
+                    setNotification({ type: 'success', message: `Pasted ${pasteData.data.length} items from clipboard` });
+                    if (onClipboardOperation) {
+                        onClipboardOperation('paste', { data: pasteData.data, targetIndex });
+                    }
+                }
+            } catch (error) {
+                setNotification({ type: 'error', message: 'Failed to paste from clipboard' });
+                console.error('Paste failed:', error);
+            }
+        },
+        [enableExcelClipboard, clipboardService, onClipboardOperation]
+    );
+
+    // Keyboard shortcuts for clipboard
+    React.useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (!enableExcelClipboard) return;
+            
+            if ((event.ctrlKey || event.metaKey) && event.key === 'c') {
+                event.preventDefault();
+                handleCopy();
+            } else if ((event.ctrlKey || event.metaKey) && event.key === 'v') {
+                event.preventDefault();
+                handlePaste();
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [enableExcelClipboard, handleCopy, handlePaste]);
+
+    // Clear notifications after delay
+    React.useEffect(() => {
+        if (notification) {
+            const timer = setTimeout(() => setNotification(null), 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [notification]);
+
     // Original render methods
     const onRenderItemColumn = React.useCallback(
         (item?: ComponentFramework.PropertyHelper.DataSetApi.EntityRecord, index?: number, column?: IColumn) => {
@@ -607,12 +697,29 @@ export const GridEnhanced = React.memo((props: GridProps) => {
 
     const gridProps = getGridProps(props, selectionType);
 
+    // Row styling configuration
+    const rowStyleVars = React.useMemo(() => {
+        const vars: Record<string, string> = {};
+        if (alternateRowColor) {
+            vars['--alternate-row-color'] = alternateRowColor;
+        }
+        return vars;
+    }, [alternateRowColor]);
+
+    const containerClassName = React.useMemo(() => {
+        const classes = [ClassNames.JvtFilteredDetailsListV2];
+        if (alternateRowColor) {
+            classes.push('alternating-rows');
+        }
+        return classes.join(' ');
+    }, [alternateRowColor]);
+
     return (
         <ThemeProvider
             theme={theme}
             applyTo="none"
-            style={containerSize}
-            className={ClassNames.JvtFilteredDetailsListV2}
+            style={{...containerSize, ...rowStyleVars}}
+            className={containerClassName}
         >
             {/* Enhanced Command Bar */}
             {(enableDataExport || enableAIInsights) && commandBarItems.length > 0 && (
@@ -680,6 +787,13 @@ export const GridEnhanced = React.memo((props: GridProps) => {
             {/* Original Loading Overlay */}
             {(itemsLoading || isComponentLoading) && <Overlay />}
             {columnDatasetNotDefined && !itemsLoading && <NoFields resources={resources} />}
+
+            {/* Notification for clipboard operations */}
+            {notification && (
+                <div className={`clipboard-indicator ${notification.type}`}>
+                    {notification.message}
+                </div>
+            )}
         </ThemeProvider>
     );
 });

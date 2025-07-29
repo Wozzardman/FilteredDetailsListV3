@@ -423,16 +423,6 @@
     contain-intrinsic-size: 100px 40px;
 }
 
-/* Drag and drop indicators */
-.ultra-virtual-row.drag-over {
-    background-color: rgba(0, 120, 212, 0.1);
-    border: 2px dashed #0078d4;
-}
-
-.ultra-virtual-row.drop-target {
-    box-shadow: 0 4px 12px rgba(0, 120, 212, 0.3);
-}
-
 /* Animation classes for state changes */
 .ultra-virtual-row.entering {
     animation: ultra-fade-in 0.2s ease-out;

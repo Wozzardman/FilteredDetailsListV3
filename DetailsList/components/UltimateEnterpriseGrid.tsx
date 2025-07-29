@@ -54,14 +54,14 @@ export interface IUltimateEnterpriseGridProps {
     columnTextSize?: number;
     
     // Row styling configuration
-    alternatingRowColors?: boolean;
-    evenRowColor?: string;
-    oddRowColor?: string;
-    hoverRowColor?: string;
-    selectedRowColor?: string;
+    alternateRowColor?: string;
     onItemSelection?: (itemId: string) => void;
     onSelectAll?: () => void;
     onClearAllSelections?: () => void;
+    
+    // Excel Clipboard properties
+    enableExcelClipboard?: boolean;
+    onClipboardOperation?: (operation: 'copy' | 'paste', data?: any) => void;
     
     className?: string;
     theme?: 'light' | 'dark' | 'high-contrast';
@@ -100,6 +100,10 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     onSelectAll,
     onClearAllSelections,
     
+    // Excel Clipboard props
+    enableExcelClipboard = false,
+    onClipboardOperation,
+    
     className = '',
     theme = 'light',
     locale = 'en-US',
@@ -109,11 +113,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     columnTextSize = 13, // Default 13px for column data
     
     // Row styling props
-    alternatingRowColors = false,
-    evenRowColor,
-    oddRowColor,
-    hoverRowColor,
-    selectedRowColor
+    alternateRowColor
 }) => {
     // State management
     const [filteredItems, setFilteredItems] = useState<any[]>(items);
@@ -311,23 +311,20 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     // Dynamic CSS variables for row styling
     const rowStyleVars = React.useMemo(() => {
         const vars: Record<string, string> = {};
-        if (alternatingRowColors) {
-            if (evenRowColor) vars['--even-row-color'] = evenRowColor;
-            if (oddRowColor) vars['--odd-row-color'] = oddRowColor;
-            if (hoverRowColor) vars['--hover-row-color'] = hoverRowColor;
-            if (selectedRowColor) vars['--selected-row-color'] = selectedRowColor;
+        if (alternateRowColor) {
+            vars['--alternate-row-color'] = alternateRowColor;
         }
         return vars;
-    }, [alternatingRowColors, evenRowColor, oddRowColor, hoverRowColor, selectedRowColor]);
+    }, [alternateRowColor]);
 
     // Dynamic class name for alternating rows
     const gridClassName = React.useMemo(() => {
         const classes = [`ultimate-enterprise-grid`, className];
-        if (alternatingRowColors) {
+        if (alternateRowColor) {
             classes.push('alternating-rows');
         }
         return classes.join(' ');
-    }, [className, alternatingRowColors]);
+    }, [className, alternateRowColor]);
 
     return (
         <div 
@@ -430,6 +427,13 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                     // Text sizing props
                     headerTextSize={headerTextSize}
                     columnTextSize={columnTextSize}
+                    
+                    // Row styling props
+                    alternateRowColor={alternateRowColor}
+                    
+                    // Excel Clipboard props
+                    enableExcelClipboard={enableExcelClipboard}
+                    onClipboardOperation={onClipboardOperation}
                 />
             </div>
         </div>

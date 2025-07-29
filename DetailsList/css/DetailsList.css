@@ -138,7 +138,6 @@ body .PowerAppsPortal .JvtFilteredDetailsListV2,
   display: flex;
   align-items: center;
   padding: 0 8px;
-  border-right: 1px solid #edebe9;
   background: #faf9f8;
   font-weight: 600;
   color: #323130;
@@ -148,6 +147,8 @@ body .PowerAppsPortal .JvtFilteredDetailsListV2,
   box-sizing: border-box;
   flex-shrink: 0; /* Prevent header cells from shrinking */
   cursor: pointer;
+  transition: background-color 0.15s ease;
+  border-bottom: 2px solid #edebe9;
 }
 
 .jvt-virtualized-grid-body {
@@ -167,23 +168,26 @@ body .PowerAppsPortal .JvtFilteredDetailsListV2,
   position: absolute; /* Required for react-virtualized positioning */
   left: 0;
   right: 0;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .jvt-virtualized-row:hover {
   background: #f3f2f1;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  z-index: 1;
 }
 
 .jvt-virtualized-row.jvt-even {
-  background: #faf9f8;
+  background: var(--alternate-row-color, #faf9f8);
 }
 
 .jvt-virtualized-row.jvt-even:hover {
   background: #f3f2f1;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
 }
 
 .jvt-virtualized-cell {
   padding: 0 8px;
-  border-right: 1px solid #edebe9;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -192,6 +196,9 @@ body .PowerAppsPortal .JvtFilteredDetailsListV2,
   box-sizing: border-box;
   height: 100%;
   flex-shrink: 0; /* Prevent cells from shrinking */
+  color: #323130;
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 .jvt-absolute-positioned {
@@ -977,7 +984,6 @@ body .PowerAppsPortal .JvtFilteredDetailsListV2,
   font-weight: 600;
   font-size: var(--jvt-font-size-md);
   color: var(--jvt-text-primary);
-  border-right: 1px solid var(--jvt-border-primary);
   background: var(--jvt-bg-tertiary);
   transition: background-color var(--jvt-transition-fast);
   cursor: pointer;
@@ -1043,7 +1049,6 @@ body .PowerAppsPortal .JvtFilteredDetailsListV2,
   display: flex;
   align-items: center;
   padding: var(--jvt-cell-padding);
-  border-right: 1px solid var(--jvt-border-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1768,23 +1773,19 @@ body .PowerAppsPortal .JvtFilteredDetailsListV2,
   transition: background-color 0.15s ease-in-out;
 }
 
-/* Custom alternating row colors when enabled */
+/* Simple alternating row colors when enabled */
 .JvtFilteredDetailsListV2.alternating-rows .ms-DetailsRow:nth-child(even) {
-  background-color: var(--even-row-color, #f8f9fa) !important;
-}
-
-.JvtFilteredDetailsListV2.alternating-rows .ms-DetailsRow:nth-child(odd) {
-  background-color: var(--odd-row-color, #ffffff) !important;
+  background-color: var(--alternate-row-color, #f8f9fa) !important;
 }
 
 /* Hover states for alternating rows */
 .JvtFilteredDetailsListV2.alternating-rows .ms-DetailsRow:nth-child(even):hover {
-  background-color: var(--hover-row-color, var(--even-row-color, #f8f9fa)) !important;
+  background-color: var(--alternate-row-color, #f8f9fa) !important;
   filter: brightness(0.95);
 }
 
 .JvtFilteredDetailsListV2.alternating-rows .ms-DetailsRow:nth-child(odd):hover {
-  background-color: var(--hover-row-color, var(--odd-row-color, #ffffff)) !important;
+  background-color: #ffffff !important;
   filter: brightness(0.95);
 }
 
@@ -1825,4 +1826,111 @@ body .PowerAppsPortal .JvtFilteredDetailsListV2,
     background-color: var(--odd-row-color, #f0f0f0) !important;
     border: 1px solid #000000;
   }
+}
+
+/* =========================== */
+/* EXCEL CLIPBOARD FEATURES   */
+/* =========================== */
+
+/* Copy/paste indicators */
+.clipboard-indicator {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: #107c10;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  z-index: 10000;
+  animation: fadeInOut 2s ease-in-out;
+}
+
+.clipboard-indicator.error {
+  background: #d83b01;
+}
+
+.clipboard-indicator.info {
+  background: #0078d4;
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translateY(-10px); }
+  20% { opacity: 1; transform: translateY(0); }
+  80% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-10px); }
+}
+
+/* Selection highlighting for copy */
+.copy-selection {
+  background-color: rgba(0, 120, 212, 0.1) !important;
+  border: 1px dashed #0078d4 !important;
+}
+
+/* Paste preview overlay */
+.paste-preview {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid #0078d4;
+  border-radius: 4px;
+  padding: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  max-width: 400px;
+  max-height: 300px;
+  overflow: auto;
+}
+
+.paste-preview-header {
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #0078d4;
+}
+
+.paste-preview-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+}
+
+.paste-preview-table th,
+.paste-preview-table td {
+  border: 1px solid #ccc;
+  padding: 4px;
+  text-align: left;
+}
+
+.paste-preview-table th {
+  background-color: #f0f0f0;
+  font-weight: bold;
+}
+
+.paste-preview-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.paste-preview-button {
+  padding: 4px 12px;
+  border: 1px solid #ccc;
+  background: white;
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.paste-preview-button.primary {
+  background: #0078d4;
+  color: white;
+  border-color: #0078d4;
+}
+
+.paste-preview-button:hover {
+  background: #f0f0f0;
+}
+
+.paste-preview-button.primary:hover {
+  background: #106ebe;
 }

@@ -78,6 +78,11 @@ export interface VirtualizedEditableGridProps {
     columnEditorMapping?: ColumnEditorMapping;
     useEnhancedEditors?: boolean;
     
+    // Excel Clipboard properties
+    enableExcelClipboard?: boolean;
+    clipboardService?: any; // ExcelClipboardService instance
+    onClipboardOperation?: (operation: 'copy' | 'paste', data?: any) => void;
+    
     // Selection mode props
     enableSelectionMode?: boolean;
     selectedItems?: Set<string>;
@@ -89,6 +94,9 @@ export interface VirtualizedEditableGridProps {
     // Text sizing properties
     headerTextSize?: number; // Font size for column headers in px
     columnTextSize?: number; // Font size for column data in px
+    
+    // Row styling properties
+    alternateRowColor?: string; // Color for alternating rows
 }
 
 interface EditingState {
@@ -135,7 +143,15 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
     
     // Text sizing props with defaults
     headerTextSize = 14, // Default 14px for headers
-    columnTextSize = 13  // Default 13px for column data
+    columnTextSize = 13, // Default 13px for column data
+    
+    // Row styling props
+    alternateRowColor,
+    
+    // Excel Clipboard props
+    enableExcelClipboard = false,
+    clipboardService,
+    onClipboardOperation
 }) => {
     // Refs for scrolling synchronization - DECLARE FIRST BEFORE ALL OTHER LOGIC
     const parentRef = React.useRef<HTMLDivElement>(null);
@@ -525,25 +541,32 @@ export const VirtualizedEditableGrid: React.FC<VirtualizedEditableGridProps> = (
 
         const isEven = index % 2 === 0;
         const rowClassName = `virtualized-row ${isEven ? 'even' : 'odd'}`;
+        
+        // Apply alternating row color if specified
+        const rowStyle: React.CSSProperties = {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            minWidth: `${totalGridWidth}px`, // Ensure minimum width for horizontal scrolling
+            height: `${virtualRow.size}px`,
+            transform: `translateY(${virtualRow.start}px)`,
+            display: 'flex',
+            alignItems: 'center',
+            borderBottom: '1px solid #e1dfdd',
+        };
+        
+        // Apply alternating row background color for even rows
+        if (alternateRowColor && isEven) {
+            rowStyle.backgroundColor = alternateRowColor;
+        }
 
         return (
             <div
                 key={index}
                 className={rowClassName}
                 data-index={index}
-                style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    minWidth: `${totalGridWidth}px`, // Ensure minimum width for horizontal scrolling
-                    height: `${virtualRow.size}px`,
-                    transform: `translateY(${virtualRow.start}px)`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    borderBottom: '1px solid #e1dfdd',
-                    backgroundColor: isEven ? '#ffffff' : '#faf9f8',
-                }}
+                style={rowStyle}
                 onClick={() => onItemClick?.(item, index)}
                 onDoubleClick={() => onItemDoubleClick?.(item, index)}
             >

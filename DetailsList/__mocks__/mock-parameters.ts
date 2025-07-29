@@ -34,11 +34,7 @@ export function getMockParameters(): IInputs {
         AppliedFilters: new MockStringProperty(),
         
         // Row styling properties
-        AlternatingRowColors: new MockTwoOptionsProperty(false),
-        EvenRowColor: new MockStringProperty(),
-        OddRowColor: new MockStringProperty(),
-        HoverRowColor: new MockStringProperty(),
-        SelectedRowColor: new MockStringProperty(),
+        AlternateRowColor: new MockStringProperty(),
         
         // Enhanced Editor Properties
         UseEnhancedEditors: new MockTwoOptionsProperty(false),
@@ -47,6 +43,11 @@ export function getMockParameters(): IInputs {
         
         // Selection Mode Properties
         EnableSelectionMode: new MockTwoOptionsProperty(false),
+        
+
+        
+        // Excel Clipboard Properties
+        EnableExcelClipboard: new MockTwoOptionsProperty(false),
         
         records: new MockDataSet([]),
         columns: new MockDataSet([]),

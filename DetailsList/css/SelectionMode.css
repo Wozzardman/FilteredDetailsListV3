@@ -16,6 +16,19 @@
     height: 100%;
     padding: 4px;
     min-height: 32px;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+}
+
+/* Show selection checkbox on row hover */
+.jvt-virtualized-row:hover .selection-row-container,
+.virtualized-row:hover .selection-row-container {
+    opacity: 1;
+}
+
+/* Always show if already selected */
+.selection-row-container.selected {
+    opacity: 1;
 }
 
 .selection-toggle-button {
