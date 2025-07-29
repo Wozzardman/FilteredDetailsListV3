@@ -32,6 +32,14 @@ export function getMockParameters(): IInputs {
         EnableFiltering: new MockTwoOptionsProperty(),
         FilterConfiguration: new MockStringProperty(),
         AppliedFilters: new MockStringProperty(),
+        
+        // Row styling properties
+        AlternatingRowColors: new MockTwoOptionsProperty(false),
+        EvenRowColor: new MockStringProperty(),
+        OddRowColor: new MockStringProperty(),
+        HoverRowColor: new MockStringProperty(),
+        SelectedRowColor: new MockStringProperty(),
+        
         // Enhanced Editor Properties
         UseEnhancedEditors: new MockTwoOptionsProperty(false),
         ColumnEditorConfig: new MockStringProperty(),

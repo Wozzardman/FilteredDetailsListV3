@@ -3,6 +3,7 @@ import * as React from 'react';
 import { IInputs, IOutputs } from './generated/ManifestTypes';
 import { getRecordKey } from './Grid';
 import { UltimateEnterpriseGrid } from './components/UltimateEnterpriseGrid';
+import { LoadingOverlay } from './components/LoadingOverlay';
 import { InputEvents, OutputEvents, RecordsColumns, ItemsColumns, SortDirection } from './ManifestConstants';
 import { IFilterState } from './Filter.types';
 import { FilterUtils } from './FilterUtils';
@@ -97,6 +98,11 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     private errorRecoveryTimer: number | null = null;
     private errorRecoveryAttempts = 0;
     private maxRecoveryAttempts = 5;
+
+    // Loading state tracking
+    private isLoading = false;
+    private loadingMessage = 'Loading...';
+    private loadingStartTime = 0;
 
     public init(context: ComponentFramework.Context<IInputs>, notifyOutputChanged: () => void): void {
         const endMeasurement = performanceMonitor.startMeasure('component-init');
@@ -435,32 +441,32 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             this.clearErrorRecoveryTimer();
         }
 
-        // Handle loading state - return loading grid to prevent errors
+        // Handle loading state - show loading overlay instead of error messages
         if (dataset.loading || columns.loading) {
-            console.log('📊 Datasets still loading, returning loading state');
-            return React.createElement(UltimateEnterpriseGrid, {
-                items: [{
-                    key: 'loading',
-                    message: 'Loading data...'
-                }],
-                columns: [{
-                    key: 'message',
-                    name: 'Status',
-                    fieldName: 'message',
-                    minWidth: 150,
-                    maxWidth: 600,
-                    isResizable: false
-                }],
-                height: (context.mode.allocatedHeight && context.mode.allocatedHeight > 0) ? context.mode.allocatedHeight : 400,
-                width: (context.mode.allocatedWidth && context.mode.allocatedWidth > 0) ? context.mode.allocatedWidth : '100%',
-                enableVirtualization: false,
-                enableInlineEditing: false,
-                enableFiltering: false,
-                enableExport: false,
-                enableSelectionMode: false,
-                headerTextSize: context.parameters.HeaderTextSize?.raw || 14,
-                columnTextSize: context.parameters.ColumnTextSize?.raw || 13
-            });
+            this.startLoading('Loading data...');
+            console.log('📊 Datasets still loading, showing loading overlay');
+            
+            // Return basic grid structure with loading overlay
+            return React.createElement('div', {
+                style: {
+                    position: 'relative',
+                    width: (context.mode.allocatedWidth && context.mode.allocatedWidth > 0) ? context.mode.allocatedWidth : '100%',
+                    height: (context.mode.allocatedHeight && context.mode.allocatedHeight > 0) ? context.mode.allocatedHeight : 400,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'var(--neutralLighterAlt, #faf9f8)',
+                    border: '1px solid var(--neutralQuaternaryAlt, #e1dfdd)',
+                    borderRadius: '2px'
+                }
+            }, React.createElement(LoadingOverlay, {
+                message: this.loadingMessage,
+                isVisible: true,
+                theme: context.parameters.Theme?.raw === 'dark' ? 'dark' : 'light'
+            }));
+        } else {
+            // Stop loading when data is ready
+            this.stopLoading();
         }
 
         // Add comprehensive debug logging
@@ -803,6 +809,13 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             headerTextSize: context.parameters.HeaderTextSize?.raw || 14,
             columnTextSize: context.parameters.ColumnTextSize?.raw || 13,
             
+            // Row styling configuration
+            alternatingRowColors: context.parameters.AlternatingRowColors?.raw || false,
+            evenRowColor: context.parameters.EvenRowColor?.raw || undefined,
+            oddRowColor: context.parameters.OddRowColor?.raw || undefined,
+            hoverRowColor: context.parameters.HoverRowColor?.raw || undefined,
+            selectedRowColor: context.parameters.SelectedRowColor?.raw || undefined,
+            
             // Selection mode props - using native Power Apps selection
             enableSelectionMode: this.isSelectionMode,
             selectedItems: this.nativeSelectionState.selectedItems,
@@ -846,10 +859,31 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             this.isInErrorState = true;
             this.startErrorRecovery();
             
-            // Update the fallback message to include recovery info
-            const recoveryMessage = this.errorRecoveryAttempts < this.maxRecoveryAttempts 
-                ? `Control configuration error. Auto-recovery in progress (attempt ${this.errorRecoveryAttempts + 1}/${this.maxRecoveryAttempts})...`
-                : 'Control configuration error. Please check your settings and try again.';
+            // If we're in recovery mode, show loading state instead of error
+            if (this.errorRecoveryAttempts < this.maxRecoveryAttempts) {
+                this.startLoading(`Recovering control... (attempt ${this.errorRecoveryAttempts + 1}/${this.maxRecoveryAttempts})`);
+                
+                return React.createElement('div', {
+                    style: {
+                        position: 'relative',
+                        width: (context.mode.allocatedWidth && context.mode.allocatedWidth > 0) ? context.mode.allocatedWidth : '100%',
+                        height: (context.mode.allocatedHeight && context.mode.allocatedHeight > 0) ? context.mode.allocatedHeight : 400,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: 'var(--neutralLighterAlt, #faf9f8)',
+                        border: '1px solid var(--neutralQuaternaryAlt, #e1dfdd)',
+                        borderRadius: '2px'
+                    }
+                }, React.createElement(LoadingOverlay, {
+                    message: this.loadingMessage,
+                    isVisible: true,
+                    theme: context.parameters.Theme?.raw === 'dark' ? 'dark' : 'light'
+                }));
+            }
+            
+            // Only show error fallback grid if recovery has failed
+            const recoveryMessage = 'Control configuration error. Please check your settings and try again.';
             
             // Return a fallback grid with minimal configuration to prevent control crash
             const fallbackColumns = [{
@@ -1052,6 +1086,36 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             window.clearTimeout(this.errorRecoveryTimer);
             this.errorRecoveryTimer = null;
         }
+    }
+
+    /**
+     * Start loading state with optional message
+     */
+    private startLoading(message: string = 'Loading...'): void {
+        this.isLoading = true;
+        this.loadingMessage = message;
+        this.loadingStartTime = Date.now();
+        console.log(`🔄 Loading started: ${message}`);
+    }
+
+    /**
+     * Stop loading state
+     */
+    private stopLoading(): void {
+        if (this.isLoading) {
+            const duration = Date.now() - this.loadingStartTime;
+            console.log(`✅ Loading completed in ${duration}ms`);
+        }
+        this.isLoading = false;
+        this.loadingMessage = 'Loading...';
+        this.loadingStartTime = 0;
+    }
+
+    /**
+     * Check if currently in loading state
+     */
+    private isCurrentlyLoading(): boolean {
+        return this.isLoading;
     }
 
     private setPageSize(context: ComponentFramework.Context<IInputs>) {
@@ -1940,23 +2004,62 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 return;
             }
 
+            // Performance optimization: Use batch operations and avoid DOM updates during selection
+            const performanceStart = performance.now();
+            
             const currentSelected = dataset.getSelectedRecordIds() || [];
             const allItems = this.sortedRecordsIds || [];
             
-            if (currentSelected.length === allItems.length && allItems.length > 0) {
-                // All selected - clear all
-                dataset.setSelectedRecordIds([]);
+            // Use Set for faster lookups
+            const selectedSet = new Set(currentSelected);
+            const shouldSelectAll = selectedSet.size !== allItems.length || allItems.some(id => !selectedSet.has(id));
+            
+            // Batch operation with timeout for large datasets
+            if (allItems.length > 1000) {
+                console.log(`🚀 Large dataset detected (${allItems.length} items), using optimized batch selection`);
+                this.performBatchSelection(shouldSelectAll, allItems, dataset);
             } else {
-                // Not all selected - select all
-                dataset.setSelectedRecordIds(allItems);
+                // Standard selection for smaller datasets
+                if (shouldSelectAll) {
+                    dataset.setSelectedRecordIds(allItems);
+                } else {
+                    dataset.setSelectedRecordIds([]);
+                }
             }
             
             this.updateNativeSelectionState();
             this.notifyOutputChanged();
-            console.log('🔄 Native select all toggled');
+            
+            const performanceEnd = performance.now();
+            console.log(`🔄 Select all completed in ${(performanceEnd - performanceStart).toFixed(2)}ms`);
         } catch (error) {
             console.error('❌ Error in handleSelectAll:', error);
         }
+    };
+
+    /**
+     * Optimized batch selection for large datasets to prevent UI blocking
+     */
+    private performBatchSelection = (selectAll: boolean, allItems: string[], dataset: any): void => {
+        const batchSize = 500; // Process in chunks of 500
+        let currentIndex = 0;
+        
+        const processBatch = () => {
+            const endIndex = Math.min(currentIndex + batchSize, allItems.length);
+            const batch = selectAll ? allItems.slice(0, endIndex) : [];
+            
+            // Set selection for current batch
+            dataset.setSelectedRecordIds(batch);
+            
+            currentIndex = endIndex;
+            
+            if (currentIndex < allItems.length && selectAll) {
+                // Schedule next batch with minimal delay to prevent UI blocking
+                setTimeout(processBatch, 1);
+            }
+        };
+        
+        processBatch();
     };
 
     private handleClearAllSelections = (): void => {

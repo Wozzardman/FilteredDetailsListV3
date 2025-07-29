@@ -1686,3 +1686,143 @@ body .PowerAppsPortal .JvtFilteredDetailsListV2,
     font-size: 12px;
   }
 }
+
+/* Loading Overlay Styles */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.9);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  box-sizing: border-box;
+}
+
+.loading-overlay.dark {
+  background-color: rgba(0, 0, 0, 0.8);
+}
+
+/* Loading animation styles */
+.loading-spinner-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.loading-message {
+  color: var(--neutralPrimary, #323130);
+  font-weight: 500;
+  text-align: center;
+  font-size: 16px;
+  margin-top: 8px;
+}
+
+.loading-progress-bar {
+  width: 200px;
+  margin-top: 8px;
+}
+
+/* Dark theme loading overlay */
+[data-theme="dark"] .loading-overlay {
+  background-color: rgba(50, 49, 48, 0.9);
+}
+
+[data-theme="dark"] .loading-message {
+  color: var(--neutralPrimaryAlt, #ffffff);
+}
+
+/* High contrast mode */
+.high-contrast .loading-overlay {
+  background-color: rgba(255, 255, 255, 0.95);
+  border: 2px solid WindowText;
+}
+
+.high-contrast .loading-message {
+  color: WindowText;
+}
+
+/* Responsive loading overlay */
+@media (max-width: 768px) {
+  .loading-message {
+    font-size: 14px;
+  }
+  
+  .loading-progress-bar {
+    width: 150px;
+  }
+}
+
+/* =========================== */
+/* ALTERNATING ROW COLORS      */
+/* =========================== */
+
+/* Base row styling */
+.JvtFilteredDetailsListV2 .ms-DetailsRow {
+  transition: background-color 0.15s ease-in-out;
+}
+
+/* Custom alternating row colors when enabled */
+.JvtFilteredDetailsListV2.alternating-rows .ms-DetailsRow:nth-child(even) {
+  background-color: var(--even-row-color, #f8f9fa) !important;
+}
+
+.JvtFilteredDetailsListV2.alternating-rows .ms-DetailsRow:nth-child(odd) {
+  background-color: var(--odd-row-color, #ffffff) !important;
+}
+
+/* Hover states for alternating rows */
+.JvtFilteredDetailsListV2.alternating-rows .ms-DetailsRow:nth-child(even):hover {
+  background-color: var(--hover-row-color, var(--even-row-color, #f8f9fa)) !important;
+  filter: brightness(0.95);
+}
+
+.JvtFilteredDetailsListV2.alternating-rows .ms-DetailsRow:nth-child(odd):hover {
+  background-color: var(--hover-row-color, var(--odd-row-color, #ffffff)) !important;
+  filter: brightness(0.95);
+}
+
+/* Selected state overrides alternating colors */
+.JvtFilteredDetailsListV2.alternating-rows .ms-DetailsRow.is-selected {
+  background-color: var(--selected-row-color, #0078d4) !important;
+  color: white;
+}
+
+.JvtFilteredDetailsListV2.alternating-rows .ms-DetailsRow.is-selected:hover {
+  background-color: var(--selected-row-color, #0078d4) !important;
+  filter: brightness(1.1);
+}
+
+/* Dark theme support for alternating rows */
+@media (prefers-color-scheme: dark) {
+  .JvtFilteredDetailsListV2.alternating-rows .ms-DetailsRow:nth-child(even) {
+    background-color: var(--even-row-color, #2d2d30) !important;
+  }
+
+  .JvtFilteredDetailsListV2.alternating-rows .ms-DetailsRow:nth-child(odd) {
+    background-color: var(--odd-row-color, #1e1e1e) !important;
+  }
+  
+  .JvtFilteredDetailsListV2.alternating-rows .ms-DetailsRow.is-selected {
+    background-color: var(--selected-row-color, #0066cc) !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .JvtFilteredDetailsListV2.alternating-rows .ms-DetailsRow:nth-child(even) {
+    background-color: var(--even-row-color, #ffffff) !important;
+    border: 1px solid #000000;
+  }
+
+  .JvtFilteredDetailsListV2.alternating-rows .ms-DetailsRow:nth-child(odd) {
+    background-color: var(--odd-row-color, #f0f0f0) !important;
+    border: 1px solid #000000;
+  }
+}

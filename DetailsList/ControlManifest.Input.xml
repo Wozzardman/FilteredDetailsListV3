@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest>
-  <control namespace="JVT" constructor="FilteredDetailsListV2" version="9.0.8" display-name-key="FilteredDetailsListV2" description-key="FilteredDetailsListV2_Desc" control-type="virtual">
+  <control namespace="JVT" constructor="FilteredDetailsListV2" version="9.1.0" display-name-key="FilteredDetailsListV2" description-key="FilteredDetailsListV2_Desc" control-type="virtual">
     <external-service-usage enabled="false">
       <!-- Explicitly declare no external services to avoid CORS issues -->
     </external-service-usage>
@@ -123,6 +123,20 @@
     <!-- Text sizing properties -->
     <property name="HeaderTextSize" display-name-key="HeaderTextSize" of-type="Whole.None" usage="input" required="false" default-value="14" />
     <property name="ColumnTextSize" display-name-key="ColumnTextSize" of-type="Whole.None" usage="input" required="false" default-value="13" />
+    
+    <!-- Row styling properties -->
+    <property name="AlternatingRowColors" display-name-key="AlternatingRowColors" of-type="TwoOptions" usage="input" required="false" default-value="false" />
+    <property name="EvenRowColor" display-name-key="EvenRowColor" of-type="SingleLine.Text" usage="input" required="false" />
+    <property name="OddRowColor" display-name-key="OddRowColor" of-type="SingleLine.Text" usage="input" required="false" />
+    <property name="HoverRowColor" display-name-key="HoverRowColor" of-type="SingleLine.Text" usage="input" required="false" />
+    <property name="SelectedRowColor" display-name-key="SelectedRowColor" of-type="SingleLine.Text" usage="input" required="false" />
+    
+    <!-- Drag & Drop and Interaction Features -->
+    <property name="EnableRowReordering" display-name-key="EnableRowReordering" of-type="TwoOptions" usage="input" required="false" default-value="false" />
+    <property name="EnableColumnReordering" display-name-key="EnableColumnReordering" of-type="TwoOptions" usage="input" required="false" default-value="false" />
+    <property name="EnableExcelClipboard" display-name-key="EnableExcelClipboard" of-type="TwoOptions" usage="input" required="false" default-value="true" />
+    <property name="RowOrderChanged" display-name-key="RowOrderChanged" of-type="SingleLine.Text" usage="output" />
+    <property name="ColumnOrderChanged" display-name-key="ColumnOrderChanged" of-type="SingleLine.Text" usage="output" />
     <!-- Filter properties -->
     <property name="EnableFiltering" display-name-key="EnableFiltering" of-type="TwoOptions" usage="input" required="false" default-value="false" />
     <property name="FilterConfiguration" display-name-key="FilterConfiguration" of-type="SingleLine.Text" usage="input" required="false" />

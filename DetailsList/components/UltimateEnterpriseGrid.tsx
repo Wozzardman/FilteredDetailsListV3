@@ -48,6 +48,17 @@ export interface IUltimateEnterpriseGridProps {
     enableSelectionMode?: boolean;
     selectedItems?: Set<string>;
     selectAllState?: 'none' | 'some' | 'all';
+    
+    // Text size configuration
+    headerTextSize?: number;
+    columnTextSize?: number;
+    
+    // Row styling configuration
+    alternatingRowColors?: boolean;
+    evenRowColor?: string;
+    oddRowColor?: string;
+    hoverRowColor?: string;
+    selectedRowColor?: string;
     onItemSelection?: (itemId: string) => void;
     onSelectAll?: () => void;
     onClearAllSelections?: () => void;
@@ -55,10 +66,6 @@ export interface IUltimateEnterpriseGridProps {
     className?: string;
     theme?: 'light' | 'dark' | 'high-contrast';
     locale?: string;
-    
-    // Text sizing properties
-    headerTextSize?: number; // Font size for column headers in px
-    columnTextSize?: number; // Font size for column data in px
 }
 
 /**
@@ -99,7 +106,14 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     
     // Text sizing props with defaults
     headerTextSize = 14, // Default 14px for headers
-    columnTextSize = 13  // Default 13px for column data
+    columnTextSize = 13, // Default 13px for column data
+    
+    // Row styling props
+    alternatingRowColors = false,
+    evenRowColor,
+    oddRowColor,
+    hoverRowColor,
+    selectedRowColor
 }) => {
     // State management
     const [filteredItems, setFilteredItems] = useState<any[]>(items);
@@ -294,11 +308,33 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
         </div>
     ) : null;
 
+    // Dynamic CSS variables for row styling
+    const rowStyleVars = React.useMemo(() => {
+        const vars: Record<string, string> = {};
+        if (alternatingRowColors) {
+            if (evenRowColor) vars['--even-row-color'] = evenRowColor;
+            if (oddRowColor) vars['--odd-row-color'] = oddRowColor;
+            if (hoverRowColor) vars['--hover-row-color'] = hoverRowColor;
+            if (selectedRowColor) vars['--selected-row-color'] = selectedRowColor;
+        }
+        return vars;
+    }, [alternatingRowColors, evenRowColor, oddRowColor, hoverRowColor, selectedRowColor]);
+
+    // Dynamic class name for alternating rows
+    const gridClassName = React.useMemo(() => {
+        const classes = [`ultimate-enterprise-grid`, className];
+        if (alternatingRowColors) {
+            classes.push('alternating-rows');
+        }
+        return classes.join(' ');
+    }, [className, alternatingRowColors]);
+
     return (
         <div 
-            className={`ultimate-enterprise-grid ${className}`} 
+            className={gridClassName} 
             data-theme={theme}
             style={{
+                ...rowStyleVars,
                 width: (typeof width === 'number' && width > 0) ? `${width}px` : (typeof width === 'string' ? width : '100%'),
                 height: (typeof height === 'number' && height > 0) ? `${height}px` : (typeof height === 'string' ? height : '400px'),
                 maxWidth: (typeof width === 'number' && width > 0) ? `${width}px` : (typeof width === 'string' ? width : '100%'),
