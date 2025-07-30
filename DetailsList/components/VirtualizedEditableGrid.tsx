@@ -169,6 +169,9 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     const [isCommitting, setIsCommitting] = React.useState<boolean>(false);
     const [errorMessage, setErrorMessage] = React.useState<string>('');
     const [dragFillState, setDragFillState] = React.useState<any>(null);
+    
+    // Force refresh trigger for grid re-rendering
+    const [refreshTrigger, setRefreshTrigger] = React.useState<number>(0);
 
     // Excel-like column filtering state
     const [columnFilters, setColumnFilters] = React.useState<Record<string, any[]>>({});
@@ -499,27 +502,59 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
 
     // Cancel all changes
     const cancelAllChanges = React.useCallback(() => {
+        console.log('🚫 VirtualizedEditableGrid: Starting cancel operation');
+        console.log('📊 Pending changes to revert:', pendingChanges.size);
+        
+        // Create a snapshot of changes to avoid modification during iteration
+        const changesToRevert = Array.from(pendingChanges.entries());
+        console.log('📸 Created snapshot of changes:', changesToRevert.length);
+        
         // Revert items to original values
-        pendingChanges.forEach((change) => {
+        changesToRevert.forEach(([changeKey, change]) => {
+            console.log(`🔄 Reverting change ${changeKey}:`, {
+                itemIndex: change.itemIndex,
+                columnKey: change.columnKey,
+                currentValue: change.newValue,
+                revertingTo: change.oldValue
+            });
+            
             // Use filteredItems to match the same array used in drag fill
             const item = filteredItems[change.itemIndex];
             if (item) {
+                const currentValue = getPCFValue(item, change.columnKey);
+                console.log(`📋 Current item value before revert:`, currentValue);
+                
                 setPCFValue(item, change.columnKey, change.oldValue);
+                
+                const valueAfterRevert = getPCFValue(item, change.columnKey);
+                console.log(`✅ Value after revert:`, valueAfterRevert);
+            } else {
+                console.warn(`⚠️ Item not found at index ${change.itemIndex} for change ${changeKey}`);
             }
         });
 
+        console.log('🗑️ Clearing pending changes map');
         setPendingChanges(new Map());
         setEditingState(null);
 
         if (changeManager) {
+            console.log('🔄 Calling changeManager.cancelAllChanges()');
             changeManager.cancelAllChanges();
         }
         
+        // Force grid re-render to show reverted values
+        console.log('🔄 Triggering grid refresh to show reverted values');
+        setRefreshTrigger(prev => prev + 1);
+        
         // Call the parent cancel handler if provided
         if (onCancelChanges) {
+            console.log('📞 Calling parent onCancelChanges handler');
             onCancelChanges();
         }
-    }, [pendingChanges, filteredItems, changeManager, onCancelChanges]);
+        
+        console.log('✅ VirtualizedEditableGrid: Cancel operation completed successfully');
+        console.log('📊 Final pending changes count:', pendingChanges.size);
+    }, [pendingChanges, filteredItems, changeManager, onCancelChanges, setRefreshTrigger]);
 
     // Expose methods through ref
     React.useImperativeHandle(ref, () => ({
@@ -691,6 +726,30 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                         const startDragFill = (startIndex: number, columnKey: string, startValue: any) => {
                                             const dragFillChanges = new Map<string, any>();
                                             
+                                            // Capture the original value of the starting cell for potential reversion
+                                            const startItem = filteredItems[startIndex];
+                                            const startCellKey = getCellKey(startIndex, columnKey);
+                                            const existingStartChange = pendingChanges.get(startCellKey);
+                                            const startOriginalValue = existingStartChange ? existingStartChange.oldValue : getPCFValue(startItem, columnKey);
+                                            
+                                            // Map to store original values of ALL cells we might touch during drag fill
+                                            // This ensures we don't lose track of original values during the drag operation
+                                            const originalValuesSnapshot = new Map<string, any>();
+                                            
+                                            // Pre-populate with existing pending changes to preserve their original values
+                                            pendingChanges.forEach((change, changeKey) => {
+                                                originalValuesSnapshot.set(changeKey, change.oldValue);
+                                            });
+                                            
+                                            console.log(`🎯 Drag fill starting from cell ${startCellKey}:`, {
+                                                startIndex,
+                                                columnKey,
+                                                startValue,
+                                                startOriginalValue,
+                                                hasExistingChange: !!existingStartChange,
+                                                existingPendingChanges: pendingChanges.size
+                                            });
+                                            
                                             const handleMouseMove = (moveEvent: MouseEvent) => {
                                                 // Find the target cell based on mouse position
                                                 const element = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY);
@@ -698,10 +757,11 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                                     const rowElement = element.closest('.virtualized-row') as HTMLElement;
                                                     const targetIndex = parseInt(rowElement.dataset.index || '0');
                                                     
-                                                    // Clear previous drag fill changes
+                                                    // Clear previous drag fill changes (but preserve original values)
                                                     dragFillChanges.forEach((_, changeKey) => {
                                                         const [indexStr] = changeKey.split('-');
                                                         const index = parseInt(indexStr);
+                                                        // Don't remove the starting cell's original change
                                                         if (index !== startIndex) {
                                                             setPendingChanges(prev => {
                                                                 const newMap = new Map(prev);
@@ -718,29 +778,50 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                                         const maxIndex = Math.max(startIndex, targetIndex);
                                                         
                                                         for (let i = minIndex; i <= maxIndex; i++) {
-                                                            if (i !== startIndex) {
-                                                                const targetItem = filteredItems[i];
-                                                                if (targetItem) {
-                                                                    const itemId = targetItem.key || targetItem.id || targetItem.getRecordId?.() || i.toString();
-                                                                    const changeKey = getCellKey(i, columnKey);
-                                                                    
-                                                                    // Check if there's already a pending change for this cell
-                                                                    const existingChange = pendingChanges.get(changeKey);
-                                                                    const originalValue = existingChange ? existingChange.oldValue : getPCFValue(targetItem, columnKey);
-                                                                    
-                                                                    const change = {
-                                                                        itemId,
-                                                                        itemIndex: i,
-                                                                        columnKey,
-                                                                        newValue: startValue,
-                                                                        oldValue: originalValue // Preserve the original value, not the current value
-                                                                    };
-                                                                    
-                                                                    setPendingChanges(prev => new Map(prev.set(changeKey, change)));
-                                                                    setPCFValue(targetItem, columnKey, startValue);
-                                                                    dragFillChanges.set(changeKey, change);
-                                                                    // Don't call onCellEdit during drag - it will be called once at the end
+                                                            const targetItem = filteredItems[i];
+                                                            if (targetItem) {
+                                                                const itemId = targetItem.key || targetItem.id || targetItem.getRecordId?.() || i.toString();
+                                                                const changeKey = getCellKey(i, columnKey);
+                                                                
+                                                                let originalValue: any;
+                                                                
+                                                                if (i === startIndex) {
+                                                                    // For the starting cell, preserve its true original value
+                                                                    originalValue = startOriginalValue;
+                                                                } else {
+                                                                    // For other cells, check our snapshot first, then existing changes, then current value
+                                                                    if (originalValuesSnapshot.has(changeKey)) {
+                                                                        // Use the original value from our snapshot
+                                                                        originalValue = originalValuesSnapshot.get(changeKey);
+                                                                    } else {
+                                                                        // This is a new cell being touched - capture its current value as original
+                                                                        const existingChange = pendingChanges.get(changeKey);
+                                                                        originalValue = existingChange ? existingChange.oldValue : getPCFValue(targetItem, columnKey);
+                                                                        // Store this original value for future reference
+                                                                        originalValuesSnapshot.set(changeKey, originalValue);
+                                                                    }
                                                                 }
+                                                                
+                                                                console.log(`🖱️ Drag fill - Cell ${changeKey}:`, {
+                                                                    itemIndex: i,
+                                                                    columnKey,
+                                                                    originalValue,
+                                                                    newValue: startValue,
+                                                                    isStartCell: i === startIndex,
+                                                                    hadSnapshot: originalValuesSnapshot.has(changeKey)
+                                                                });
+                                                                
+                                                                const change = {
+                                                                    itemId,
+                                                                    itemIndex: i,
+                                                                    columnKey,
+                                                                    newValue: startValue,
+                                                                    oldValue: originalValue
+                                                                };
+                                                                
+                                                                setPendingChanges(prev => new Map(prev.set(changeKey, change)));
+                                                                setPCFValue(targetItem, columnKey, startValue);
+                                                                dragFillChanges.set(changeKey, change);
                                                             }
                                                         }
                                                     }
@@ -773,7 +854,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 })}
             </div>
         );
-    }, [filteredItems, columns, memoizedColumnWidths, editingState, pendingChanges, readOnlyColumns, enableInlineEditing, enableDragFill, startEdit, commitEdit, cancelEdit, memoizedAvailableValues, onItemClick, onItemDoubleClick]);
+    }, [filteredItems, columns, memoizedColumnWidths, editingState, pendingChanges, readOnlyColumns, enableInlineEditing, enableDragFill, startEdit, commitEdit, cancelEdit, memoizedAvailableValues, onItemClick, onItemDoubleClick, refreshTrigger]);
 
     // PERFORMANCE OPTIMIZATION: Create stable render function to prevent unnecessary re-renders
     const renderRow = React.useCallback((virtualRow: any) => {
