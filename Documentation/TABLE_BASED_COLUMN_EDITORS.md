@@ -130,10 +130,10 @@ Table(
 
 **What AllowDirectTextInput Does:**
 - **Dropdowns**: Adds "**+ Add New...**" option at the bottom of the dropdown list
-- **Dates**: Allows typing "2024-01-15" directly or using date picker  
-- **Numbers**: Users can type "50.5" directly or use spinner controls
-- **Currency**: Users can type "$100.50" directly or use formatted input
-- **Any Field**: Provides intuitive visual cue for custom input capability
+- **Dates**: Adds a **"Clear"** button next to the date picker for easy date clearing
+- **Numbers/Currency**: Allows typing values directly or using spinner controls
+- **Text Fields**: Enhanced flexibility for direct input
+- **Any Field**: Provides intuitive controls based on field type needs
 
 **Dropdown "Add New" UX:**
 1. User sees dropdown with predefined options + "**+ Add New...**" at bottom
@@ -142,11 +142,17 @@ Table(
 4. Press **Enter** to save, **Escape** to cancel
 5. Custom value is saved to the field
 
+**Date "Clear" UX:**
+1. User sees date picker with **Clear** button (X icon) next to it
+2. Click date picker to select date normally
+3. Click **Clear** button to immediately empty/null the date field
+4. Perfect for when users need to remove dates quickly
+
 **Benefits:**
-- 🎯 **Discoverable**: Clear visual indication that custom values are allowed
-- 🚀 **Flexible**: Users can choose predefined options OR create custom ones
-- 💡 **Intuitive**: Familiar UI pattern (like "Other..." options in forms)
-- ⚡ **Fast**: Power users can type quickly, casual users can select from dropdown
+- 🎯 **Context-Aware**: Different UI enhancements based on field type needs
+- 🚀 **Practical**: Dropdowns get "add new", dates get "clear" - exactly what users need
+- 💡 **Intuitive**: Clear visual indicators for available actions
+- ⚡ **Efficient**: One-click clearing for dates, easy custom input for dropdowns
 
 ### **Welding Records (Your Example)**
 ```powerquery

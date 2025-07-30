@@ -13,6 +13,8 @@ import { Rating } from '@fluentui/react/lib/Rating';
 import { ColorPicker } from '@fluentui/react/lib/ColorPicker';
 import { ComboBox, IComboBoxOption } from '@fluentui/react/lib/ComboBox';
 import { SpinButton } from '@fluentui/react/lib/SpinButton';
+import { IconButton } from '@fluentui/react/lib/Button';
+import { Stack } from '@fluentui/react/lib/Stack';
 import { IColumn } from '@fluentui/react/lib/DetailsList';
 import { 
     ColumnEditorType, 
@@ -332,28 +334,79 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
             );
 
         case 'date':
-            return (
-                <DatePicker
-                    {...commonProps}
-                    value={currentValue instanceof Date ? currentValue : 
-                           currentValue ? new Date(currentValue) : undefined}
-                    onSelectDate={(date) => {
-                        handleValueChange(date);
-                        if (date) {
-                            // Auto-commit on date selection
-                            setTimeout(() => {
-                                const formattedValue = config.valueFormatter ? 
-                                    config.valueFormatter(date, item, column) : 
-                                    date;
-                                onCommit(formattedValue);
-                            }, 100);
-                        }
-                    }}
-                    formatDate={(date) => date?.toLocaleDateString() || ''}
-                    minDate={config.dateTimeConfig?.minDate}
-                    maxDate={config.dateTimeConfig?.maxDate}
-                />
-            );
+            if (config.allowDirectTextInput) {
+                // Date picker with clear button when direct text input is enabled
+                return (
+                    <Stack horizontal verticalAlign="center" style={style}>
+                        <DatePicker
+                            {...commonProps}
+                            value={currentValue instanceof Date ? currentValue : 
+                                   currentValue ? new Date(currentValue) : undefined}
+                            onSelectDate={(date) => {
+                                handleValueChange(date);
+                                if (date) {
+                                    // Auto-commit on date selection
+                                    setTimeout(() => {
+                                        const formattedValue = config.valueFormatter ? 
+                                            config.valueFormatter(date, item, column) : 
+                                            date;
+                                        onCommit(formattedValue);
+                                    }, 100);
+                                }
+                            }}
+                            formatDate={(date) => date?.toLocaleDateString() || ''}
+                            minDate={config.dateTimeConfig?.minDate}
+                            maxDate={config.dateTimeConfig?.maxDate}
+                            styles={{
+                                root: { flexGrow: 1 }
+                            }}
+                        />
+                        <IconButton
+                            iconProps={{ iconName: 'Clear' }}
+                            title="Clear Date"
+                            ariaLabel="Clear Date"
+                            onClick={() => {
+                                handleValueChange(null);
+                                setTimeout(() => {
+                                    onCommit(null);
+                                }, 100);
+                            }}
+                            styles={{
+                                root: {
+                                    marginLeft: '4px',
+                                    minWidth: '32px',
+                                    height: '32px'
+                                }
+                            }}
+                        />
+                    </Stack>
+                );
+            } else {
+                // Standard date picker without clear button
+                return (
+                    <DatePicker
+                        {...commonProps}
+                        value={currentValue instanceof Date ? currentValue : 
+                               currentValue ? new Date(currentValue) : undefined}
+                        onSelectDate={(date) => {
+                            handleValueChange(date);
+                            if (date) {
+                                // Auto-commit on date selection
+                                setTimeout(() => {
+                                    const formattedValue = config.valueFormatter ? 
+                                        config.valueFormatter(date, item, column) : 
+                                        date;
+                                    onCommit(formattedValue);
+                                }, 100);
+                            }
+                        }}
+                        formatDate={(date) => date?.toLocaleDateString() || ''}
+                        minDate={config.dateTimeConfig?.minDate}
+                        maxDate={config.dateTimeConfig?.maxDate}
+                        style={style}
+                    />
+                );
+            }
 
         case 'boolean':
             return (
@@ -390,10 +443,23 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                             if (e.key === 'Enter') {
                                 if (newItemText.trim()) {
                                     handleValueChange(newItemText.trim());
+                                    onCommit(newItemText.trim());
                                     setIsAddingNew(false);
                                     setNewItemText('');
                                 }
                             } else if (e.key === 'Escape') {
+                                setIsAddingNew(false);
+                                setNewItemText('');
+                                onCancel();
+                            }
+                        }}
+                        onBlur={() => {
+                            if (newItemText.trim()) {
+                                handleValueChange(newItemText.trim());
+                                onCommit(newItemText.trim());
+                                setIsAddingNew(false);
+                                setNewItemText('');
+                            } else {
                                 setIsAddingNew(false);
                                 setNewItemText('');
                                 onCancel();
@@ -417,15 +483,6 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                 data: opt
             }));
 
-            // Add "Add New +" option if AllowDirectTextInput is enabled
-            if (config.allowDirectTextInput) {
-                dropdownOptionsFormatted.push({
-                    key: '__ADD_NEW__',
-                    text: '+ Add New...',
-                    data: { isAddNew: true }
-                });
-            }
-
             return (
                 <Dropdown
                     {...commonProps}
@@ -438,13 +495,6 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                         width: '100%'
                     }}
                     onChange={(_, option) => {
-                        // Check if user selected "Add New +" option
-                        if (option?.key === '__ADD_NEW__') {
-                            setIsAddingNew(true);
-                            setNewItemText(typeof currentValue === 'string' ? currentValue : '');
-                            return;
-                        }
-
                         const newValue = option?.data?.value || option?.key;
                         handleValueChange(newValue);
                         // Auto-commit dropdown selections
@@ -454,6 +504,13 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                                 newValue;
                             onCommit(formattedValue);
                         }, 100);
+                    }}
+                    onDoubleClick={() => {
+                        // Enable custom text input on double-click when AllowDirectTextInput is enabled
+                        if (config.allowDirectTextInput) {
+                            setIsAddingNew(true);
+                            setNewItemText(typeof currentValue === 'string' ? currentValue : '');
+                        }
                     }}
                 />
             );
