@@ -111,6 +111,7 @@ export interface ColumnEditorConfig {
     isReadOnly?: boolean;
     isRequired?: boolean;
     placeholder?: string;
+    allowDirectTextInput?: boolean; // Universal: Allow typing values directly instead of using specialized controls
     
     // Type-specific configurations
     dropdownOptions?: DropdownOption[];

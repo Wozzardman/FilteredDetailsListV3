@@ -128,12 +128,25 @@ Table(
 )
 ```
 
-**Benefits of AllowDirectTextInput:**
-- **Dropdowns**: Users can type "HDPE" directly or select from dropdown
-- **Dates**: Users can type "2024-01-15" or use date picker  
-- **Numbers**: Users can type "50.5" or use spinner controls
-- **Currency**: Users can type "$100.50" or use formatted input
-- **Any Field**: Sometimes typing is faster than specialized controls!
+**What AllowDirectTextInput Does:**
+- **Dropdowns**: Adds "**+ Add New...**" option at the bottom of the dropdown list
+- **Dates**: Allows typing "2024-01-15" directly or using date picker  
+- **Numbers**: Users can type "50.5" directly or use spinner controls
+- **Currency**: Users can type "$100.50" directly or use formatted input
+- **Any Field**: Provides intuitive visual cue for custom input capability
+
+**Dropdown "Add New" UX:**
+1. User sees dropdown with predefined options + "**+ Add New...**" at bottom
+2. Clicking "**+ Add New...**" switches to text input mode
+3. User types custom value (e.g., "CUSTOM_WELD_TYPE")
+4. Press **Enter** to save, **Escape** to cancel
+5. Custom value is saved to the field
+
+**Benefits:**
+- 🎯 **Discoverable**: Clear visual indication that custom values are allowed
+- 🚀 **Flexible**: Users can choose predefined options OR create custom ones
+- 💡 **Intuitive**: Familiar UI pattern (like "Other..." options in forms)
+- ⚡ **Fast**: Power users can type quickly, casual users can select from dropdown
 
 ### **Welding Records (Your Example)**
 ```powerquery

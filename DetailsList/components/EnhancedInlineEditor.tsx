@@ -51,6 +51,8 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
     const [dropdownOptions, setDropdownOptions] = React.useState<DropdownOption[]>([]);
     const [autocompleteOptions, setAutocompleteOptions] = React.useState<AutocompleteOption[]>([]);
     const [isLoadingOptions, setIsLoadingOptions] = React.useState<boolean>(false);
+    const [isAddingNew, setIsAddingNew] = React.useState<boolean>(false);
+    const [newItemText, setNewItemText] = React.useState<string>('');
 
     // Default editor config if none provided
     const config: ColumnEditorConfig = editorConfig || {
@@ -375,14 +377,54 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
             if (isLoadingOptions) {
                 return <div style={style}>Loading options...</div>;
             }
+
+            // If in "add new" mode, show text input instead of dropdown
+            if (isAddingNew) {
+                return (
+                    <TextField
+                        {...commonProps}
+                        value={newItemText}
+                        placeholder="Enter new value..."
+                        onChange={(_, newValue) => setNewItemText(newValue || '')}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                if (newItemText.trim()) {
+                                    handleValueChange(newItemText.trim());
+                                    setIsAddingNew(false);
+                                    setNewItemText('');
+                                }
+                            } else if (e.key === 'Escape') {
+                                setIsAddingNew(false);
+                                setNewItemText('');
+                                onCancel();
+                            }
+                        }}
+                        autoFocus
+                        style={{
+                            ...commonProps.style,
+                            minWidth: '120px',
+                            width: '100%'
+                        }}
+                    />
+                );
+            }
             
-            const dropdownOptionsFormatted: IDropdownOption[] = dropdownOptions.map(opt => ({
+            let dropdownOptionsFormatted: IDropdownOption[] = dropdownOptions.map(opt => ({
                 key: opt.key,
                 text: opt.text,
                 disabled: opt.disabled,
                 selected: opt.value === currentValue,
                 data: opt
             }));
+
+            // Add "Add New +" option if AllowDirectTextInput is enabled
+            if (config.allowDirectTextInput) {
+                dropdownOptionsFormatted.push({
+                    key: '__ADD_NEW__',
+                    text: '+ Add New...',
+                    data: { isAddNew: true }
+                });
+            }
 
             return (
                 <Dropdown
@@ -396,6 +438,13 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                         width: '100%'
                     }}
                     onChange={(_, option) => {
+                        // Check if user selected "Add New +" option
+                        if (option?.key === '__ADD_NEW__') {
+                            setIsAddingNew(true);
+                            setNewItemText(typeof currentValue === 'string' ? currentValue : '');
+                            return;
+                        }
+
                         const newValue = option?.data?.value || option?.key;
                         handleValueChange(newValue);
                         // Auto-commit dropdown selections
