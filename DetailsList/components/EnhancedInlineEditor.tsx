@@ -389,6 +389,12 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                     {...commonProps}
                     options={dropdownOptionsFormatted}
                     selectedKey={currentValue}
+                    placeholder={config.placeholder || "Select an option..."}
+                    style={{ 
+                        ...commonProps.style,
+                        minWidth: '120px', // Ensure minimum width for visibility
+                        width: '100%'
+                    }}
                     onChange={(_, option) => {
                         const newValue = option?.data?.value || option?.key;
                         handleValueChange(newValue);

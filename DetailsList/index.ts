@@ -811,12 +811,122 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
 
         // Parse column editor configuration from app
         const useEnhancedEditors = context.parameters.UseEnhancedEditors?.raw ?? false;
-        let columnEditorMapping = {};
+        let columnEditorMapping: any = {};
         
         if (useEnhancedEditors) {
-            // Try Power Apps FX formulas first (new simplified method)
-            const formulasProperty = (context.parameters as any).ColumnEditorFormulas;
-            if (formulasProperty?.raw) {
+            // Priority 1: Table-based configuration (new Power Apps native approach)
+            const editorConfigDataset = (context.parameters as any).editorConfig;
+            if (editorConfigDataset && editorConfigDataset.records) {
+                try {
+                    const records = editorConfigDataset.records;
+                    const recordIds = Object.keys(records);
+                    console.log('📊 Processing table-based editor configuration with', recordIds.length, 'records');
+                    
+                    for (const recordId of recordIds) {
+                        const record = records[recordId];
+                        const columnKey = record.getValue('ColumnKey') as string;
+                        const editorType = record.getValue('EditorType') as string;
+                        
+                        if (columnKey && editorType) {
+                            const config: any = {
+                                type: editorType.toLowerCase()
+                            };
+                            
+                            // Map table columns to configuration properties
+                            const isRequired = record.getValue('IsRequired');
+                            const isReadOnly = record.getValue('IsReadOnly');
+                            const placeholder = record.getValue('Placeholder');
+                            const minValue = record.getValue('MinValue');
+                            const maxValue = record.getValue('MaxValue');
+                            const maxLength = record.getValue('MaxLength');
+                            const isMultiline = record.getValue('IsMultiline');
+                            const validationPattern = record.getValue('ValidationPattern');
+                            const patternErrorMessage = record.getValue('PatternErrorMessage');
+                            const dropdownOptions = record.getValue('DropdownOptions');
+                            const allowDirectTextInput = record.getValue('AllowDirectTextInput');
+                            const currencySymbol = record.getValue('CurrencySymbol');
+                            const decimalPlaces = record.getValue('DecimalPlaces');
+                            const stepValue = record.getValue('StepValue');
+                            const showTime = record.getValue('ShowTime');
+                            const dateFormat = record.getValue('DateFormat');
+                            const maxRating = record.getValue('MaxRating');
+                            const allowZeroRating = record.getValue('AllowZeroRating');
+                            const showSliderValue = record.getValue('ShowSliderValue');
+                            
+                            // Apply common properties
+                            if (isRequired !== null && isRequired !== undefined) config.isRequired = isRequired;
+                            if (isReadOnly !== null && isReadOnly !== undefined) config.isReadOnly = isReadOnly;
+                            if (placeholder) config.placeholder = placeholder;
+                            if (allowDirectTextInput !== null && allowDirectTextInput !== undefined) config.allowDirectTextInput = allowDirectTextInput;
+                            
+                            // Apply type-specific configurations
+                            if (editorType.toLowerCase() === 'text' || editorType.toLowerCase() === 'email' || editorType.toLowerCase() === 'url' || editorType.toLowerCase() === 'phone') {
+                                if (maxLength) config.textConfig = { ...config.textConfig, maxLength };
+                                if (isMultiline) config.textConfig = { ...config.textConfig, multiline: isMultiline };
+                                if (validationPattern) config.textConfig = { ...config.textConfig, pattern: validationPattern };
+                                if (patternErrorMessage) config.textConfig = { ...config.textConfig, patternError: patternErrorMessage };
+                            }
+                            else if (editorType.toLowerCase() === 'number') {
+                                if (minValue !== null && minValue !== undefined) config.numberConfig = { ...config.numberConfig, min: minValue };
+                                if (maxValue !== null && maxValue !== undefined) config.numberConfig = { ...config.numberConfig, max: maxValue };
+                                if (stepValue !== null && stepValue !== undefined) config.numberConfig = { ...config.numberConfig, step: stepValue };
+                            }
+                            else if (editorType.toLowerCase() === 'currency') {
+                                if (currencySymbol) config.currencyConfig = { ...config.currencyConfig, currencySymbol };
+                                if (decimalPlaces !== null && decimalPlaces !== undefined) config.currencyConfig = { ...config.currencyConfig, decimalPlaces };
+                                if (minValue !== null && minValue !== undefined) config.currencyConfig = { ...config.currencyConfig, min: minValue };
+                                if (maxValue !== null && maxValue !== undefined) config.currencyConfig = { ...config.currencyConfig, max: maxValue };
+                            }
+                            else if (editorType.toLowerCase() === 'dropdown') {
+                                if (dropdownOptions) {
+                                    try {
+                                        // Support both JSON array and comma-separated values
+                                        let options: any[];
+                                        if (dropdownOptions.startsWith('[') && dropdownOptions.endsWith(']')) {
+                                            options = JSON.parse(dropdownOptions);
+                                        } else {
+                                            options = dropdownOptions.split(',').map((opt: string) => opt.trim());
+                                        }
+                                        
+                                        // Convert to the expected format
+                                        config.dropdownOptions = options.map((opt: any) => {
+                                            if (typeof opt === 'string' || typeof opt === 'number') {
+                                                return { key: String(opt), text: String(opt) };
+                                            }
+                                            return opt; // Already in correct format
+                                        });
+                                    } catch (error) {
+                                        console.warn(`⚠️ Error parsing dropdown options for ${columnKey}:`, error);
+                                    }
+                                }
+                            }
+                            else if (editorType.toLowerCase() === 'date') {
+                                if (showTime !== null && showTime !== undefined) config.dateTimeConfig = { ...config.dateTimeConfig, showTime };
+                                if (dateFormat) config.dateTimeConfig = { ...config.dateTimeConfig, format: dateFormat };
+                            }
+                            else if (editorType.toLowerCase() === 'rating') {
+                                if (maxRating) config.ratingConfig = { ...config.ratingConfig, max: maxRating };
+                                if (allowZeroRating !== null && allowZeroRating !== undefined) config.ratingConfig = { ...config.ratingConfig, allowZero: allowZeroRating };
+                            }
+                            else if (editorType.toLowerCase() === 'slider') {
+                                if (minValue !== null && minValue !== undefined) config.sliderConfig = { ...config.sliderConfig, min: minValue };
+                                if (maxValue !== null && maxValue !== undefined) config.sliderConfig = { ...config.sliderConfig, max: maxValue };
+                                if (stepValue !== null && stepValue !== undefined) config.sliderConfig = { ...config.sliderConfig, step: stepValue };
+                                if (showSliderValue !== null && showSliderValue !== undefined) config.sliderConfig = { ...config.sliderConfig, showValue: showSliderValue };
+                            }
+                            
+                            columnEditorMapping[columnKey] = config;
+                        }
+                    }
+                    
+                    console.log('🎯 Table-based column editor configuration loaded:', columnEditorMapping);
+                } catch (error) {
+                    console.warn('⚠️ Error processing table-based editor configuration:', error);
+                }
+            }
+            // Priority 2: Power Apps FX formulas (existing implementation)
+            else if ((context.parameters as any).ColumnEditorFormulas?.raw) {
+                const formulasProperty = (context.parameters as any).ColumnEditorFormulas;
                 try {
                     columnEditorMapping = PowerAppsFxColumnEditorParser.parseSimpleFormulaString(
                         formulasProperty.raw
@@ -826,11 +936,11 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                     console.warn('⚠️ Error parsing Power Apps FX formulas:', error);
                 }
             }
-            // Fallback to legacy JSON configuration
-            else if (context.parameters.ColumnEditorConfig?.raw) {
+            // Priority 3: Legacy JSON configuration (backward compatibility)
+            else if ((context.parameters as any).ColumnEditorConfig?.raw) {
                 try {
-                    columnEditorMapping = JSON.parse(context.parameters.ColumnEditorConfig.raw);
-                    console.log('📝 Column editor configuration loaded from JSON:', columnEditorMapping);
+                    columnEditorMapping = JSON.parse((context.parameters as any).ColumnEditorConfig.raw);
+                    console.log('📝 Column editor configuration loaded from JSON (legacy):', columnEditorMapping);
                 } catch (error) {
                     console.warn('⚠️ Invalid column editor configuration JSON:', error);
                 }

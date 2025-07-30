@@ -216,6 +216,36 @@
     line-height: 1.4;
 }
 
+/* Enhanced dropdown editor styles */
+.enhanced-editor [data-is-focusable="true"] {
+    min-width: 120px !important;
+    width: 100% !important;
+}
+
+/* Dropdown specific styling */
+.enhanced-editor .ms-Dropdown {
+    min-width: 120px !important;
+    width: 100% !important;
+}
+
+.enhanced-editor .ms-Dropdown-container {
+    min-width: 120px !important;
+    width: 100% !important;
+}
+
+.enhanced-editor .ms-Dropdown-title {
+    min-width: 100px !important;
+    font-size: 14px;
+    padding: 6px 8px;
+}
+
+/* Placeholder text styling for empty dropdowns */
+.enhanced-editor .ms-Dropdown-title:empty::before {
+    content: "Select an option...";
+    color: #666;
+    font-style: italic;
+}
+
 .ultra-cell-editor:focus {
     border-color: #0550ae;
     background: #ffffff;

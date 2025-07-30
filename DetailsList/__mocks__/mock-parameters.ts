@@ -38,8 +38,8 @@ export function getMockParameters(): IInputs {
         
         // Enhanced Editor Properties
         UseEnhancedEditors: new MockTwoOptionsProperty(false),
-        ColumnEditorConfig: new MockStringProperty(),
         ColumnEditorFormulas: new MockStringProperty(),
+        editorConfig: new MockDataSet([]),
         
         // Selection Mode Properties
         EnableSelectionMode: new MockTwoOptionsProperty(false),
