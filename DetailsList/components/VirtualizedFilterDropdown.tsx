@@ -109,9 +109,11 @@ export const VirtualizedFilterDropdown: React.FC<VirtualizedFilterDropdownProps>
                     transform: `translateY(${virtualRow.start}px)`,
                     display: 'flex',
                     alignItems: 'center',
-                    padding: '4px 8px',
+                    padding: '2px 8px',
                     cursor: 'pointer',
-                    background: isSelected ? '#e3f2fd' : 'transparent'
+                    background: isSelected ? '#e3f2fd' : 'transparent',
+                    gap: '6px',
+                    overflow: 'hidden'
                 }}
                 onClick={() => toggleValue(item.value)}
             >
@@ -119,7 +121,10 @@ export const VirtualizedFilterDropdown: React.FC<VirtualizedFilterDropdownProps>
                     checked={isSelected}
                     onChange={() => toggleValue(item.value)}
                     styles={{
-                        root: { marginRight: 8 },
+                        root: { 
+                            marginRight: 0,
+                            flexShrink: 0
+                        },
                         checkbox: { width: 16, height: 16 }
                     }}
                 />
@@ -129,7 +134,9 @@ export const VirtualizedFilterDropdown: React.FC<VirtualizedFilterDropdownProps>
                         flex: 1, 
                         overflow: 'hidden', 
                         textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap' 
+                        whiteSpace: 'nowrap',
+                        fontSize: '12px',
+                        marginRight: '4px'
                     }}
                 >
                     {item.displayText}
@@ -138,12 +145,20 @@ export const VirtualizedFilterDropdown: React.FC<VirtualizedFilterDropdownProps>
                     variant="tiny" 
                     style={{ 
                         color: '#666', 
-                        marginLeft: 8,
-                        minWidth: 30,
-                        textAlign: 'right'
+                        minWidth: '20px',
+                        maxWidth: '50px',
+                        textAlign: 'center',
+                        fontSize: '10px',
+                        backgroundColor: '#f3f2f1',
+                        padding: '1px 4px',
+                        borderRadius: '6px',
+                        flexShrink: 0,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
                     }}
                 >
-                    ({item.count})
+                    {item.count}
                 </Text>
             </div>
         );
@@ -160,8 +175,8 @@ export const VirtualizedFilterDropdown: React.FC<VirtualizedFilterDropdownProps>
             styles={{
                 root: { zIndex: 9999 },
                 calloutMain: { 
-                    minWidth: 280, 
-                    maxWidth: 350,
+                    minWidth: 400, 
+                    maxWidth: 450,
                     maxHeight: maxHeight + 120,
                     border: '1px solid #e1e5e9',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.15)'

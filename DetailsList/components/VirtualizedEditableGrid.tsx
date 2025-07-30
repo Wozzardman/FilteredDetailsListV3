@@ -845,7 +845,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             background: '#faf9f8',
-                            padding: '0 8px', // Match data cell padding exactly
+                            padding: '0 12px 0 8px', // More padding on right for filter icon, match data cell left padding
                             boxSizing: 'border-box', // Ensure consistent box model
                             overflow: 'hidden'
                         }}
@@ -864,7 +864,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                             {column.name}
                         </span>
                         
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', position: 'relative', zIndex: 15 }}>
                             {enableColumnFilters && (
                                 <span
                                     className={`virtualized-header-filter-icon ${hasFilter ? 'active' : ''}`}
@@ -875,59 +875,87 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                     }}
                                     style={{
                                         cursor: 'pointer',
-                                        fontSize: '12px',
-                                        color: hasFilter ? '#0078d4' : '#605e5c',
+                                        fontSize: '14px',
+                                        color: hasFilter ? '#0078d4' : '#8a8886',
                                         userSelect: 'none',
-                                        padding: '4px',
-                                        borderRadius: '3px',
-                                        backgroundColor: hasFilter ? '#f3f2f1' : 'transparent',
-                                        transition: 'all 0.2s ease',
+                                        padding: '6px',
+                                        borderRadius: '6px',
+                                        backgroundColor: hasFilter ? 'rgba(0, 120, 212, 0.1)' : 'transparent',
+                                        border: hasFilter ? '1px solid rgba(0, 120, 212, 0.3)' : '1px solid transparent',
+                                        transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
                                         lineHeight: 1,
-                                        display: 'inline-block',
-                                        width: '16px', // Increased from 12px
-                                        height: '16px' // Increased from 12px
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        width: '24px',
+                                        height: '24px',
+                                        position: 'relative',
+                                        zIndex: 20,
+                                        boxShadow: hasFilter ? '0 2px 4px rgba(0, 120, 212, 0.2)' : 'none'
                                     }}
                                     onMouseEnter={(e) => {
+                                        const target = e.target as HTMLElement;
                                         if (!hasFilter) {
-                                            (e.target as HTMLElement).style.backgroundColor = '#f3f2f1';
+                                            target.style.backgroundColor = 'rgba(0, 120, 212, 0.05)';
+                                            target.style.borderColor = 'rgba(0, 120, 212, 0.2)';
+                                            target.style.transform = 'scale(1.05)';
+                                        } else {
+                                            target.style.backgroundColor = 'rgba(0, 120, 212, 0.15)';
+                                            target.style.transform = 'scale(1.05)';
+                                            target.style.boxShadow = '0 4px 8px rgba(0, 120, 212, 0.3)';
                                         }
                                     }}
                                     onMouseLeave={(e) => {
+                                        const target = e.target as HTMLElement;
                                         if (!hasFilter) {
-                                            (e.target as HTMLElement).style.backgroundColor = 'transparent';
+                                            target.style.backgroundColor = 'transparent';
+                                            target.style.borderColor = 'transparent';
+                                            target.style.transform = 'scale(1)';
+                                        } else {
+                                            target.style.backgroundColor = 'rgba(0, 120, 212, 0.1)';
+                                            target.style.transform = 'scale(1)';
+                                            target.style.boxShadow = '0 2px 4px rgba(0, 120, 212, 0.2)';
                                         }
                                     }}
                                 >
-                                    {/* Funnel icon - filled when active, bigger size */}
+                                    {/* Enhanced Funnel icon with better styling */}
                                     <svg
-                                        width="16" // Increased from 12
-                                        height="16" // Increased from 12
-                                        viewBox="0 0 16 16" // Updated viewBox for new size
+                                        width="14"
+                                        height="14"
+                                        viewBox="0 0 16 16"
                                         fill={hasFilter ? '#0078d4' : 'none'}
-                                        stroke={hasFilter ? '#0078d4' : '#605e5c'}
-                                        strokeWidth="1.2" // Slightly thicker for visibility
-                                        style={{ display: 'block' }}
+                                        stroke={hasFilter ? '#0078d4' : '#8a8886'}
+                                        strokeWidth="1.5"
+                                        style={{ 
+                                            display: 'block',
+                                            filter: hasFilter ? 'drop-shadow(0 1px 2px rgba(0, 120, 212, 0.3))' : 'none'
+                                        }}
                                     >
-                                        <path d="M2 3h12l-4 5v5l-4-1.5V8L2 3z" />
+                                        <path d="M2 3h12l-4 5v4.5a0.5 0.5 0 0 1-0.276 0.447l-2 1A0.5 0.5 0 0 1 7 13.5V8L2 3z" />
+                                        {/* Add a dot indicator when filter is active */}
+                                        {hasFilter && (
+                                            <circle cx="12" cy="4" r="2" fill="#ff6b35" stroke="white" strokeWidth="0.5" />
+                                        )}
                                     </svg>
                                 </span>
                             )}
                         </div>
 
-                        {/* Column resize handle - Make it wider for easier interaction */}
+                        {/* Column resize handle - Adjusted positioning to avoid filter icon overlap */}
                         {column.isResizable && (
                             <div
                                 className="column-resize-handle"
                                 style={{
                                     position: 'absolute',
-                                    right: 0,
+                                    right: '-6px', // Moved slightly outside to prevent overlap
                                     top: 0,
                                     bottom: 0,
-                                    width: '12px', // Wider for easier grabbing
+                                    width: '8px', // Reduced width to minimize overlap potential
                                     cursor: 'col-resize',
                                     backgroundColor: isResizing === columnKey ? '#0078d4' : 'transparent',
-                                    transition: 'background-color 0.2s',
-                                    zIndex: 10
+                                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    zIndex: 5, // Lower than filter icon
+                                    borderRadius: '2px'
                                 }}
                                 onMouseDown={(e: React.MouseEvent) => {
                                     e.preventDefault();
@@ -935,12 +963,14 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                 }}
                                 onMouseEnter={(e: React.MouseEvent) => {
                                     if (isResizing !== columnKey) {
-                                        (e.target as HTMLElement).style.backgroundColor = '#e1dfdd';
+                                        (e.target as HTMLElement).style.backgroundColor = 'rgba(0, 120, 212, 0.2)';
+                                        (e.target as HTMLElement).style.boxShadow = '0 0 4px rgba(0, 120, 212, 0.3)';
                                     }
                                 }}
                                 onMouseLeave={(e: React.MouseEvent) => {
                                     if (isResizing !== columnKey) {
                                         (e.target as HTMLElement).style.backgroundColor = 'transparent';
+                                        (e.target as HTMLElement).style.boxShadow = 'none';
                                     }
                                 }}
                             />

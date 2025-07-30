@@ -279,24 +279,51 @@ export const ExcelLikeColumnFilter: React.FC<IExcelLikeColumnFilterProps> = ({
                                         transform: `translateY(${virtualItem.start}px)`,
                                         display: 'flex',
                                         alignItems: 'center',
-                                        padding: '0 12px'
+                                        padding: '0 12px',
+                                        gap: '8px',
+                                        overflow: 'hidden'
                                     }}
                                 >
-                                    <Stack horizontal verticalAlign="center" style={{ width: '100%' }}>
-                                        <Checkbox
-                                            checked={item.selected}
-                                            onChange={(_, checked) => handleValueToggle(item.value, checked || false)}
-                                            styles={{ 
-                                                root: { marginRight: 8 }
-                                            }}
-                                        />
-                                        <Text style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                            {item.displayValue || '(Blank)'}
-                                        </Text>
-                                        <Text variant="small" style={{ color: '#666', marginLeft: 8 }}>
-                                            ({item.count.toString()})
-                                        </Text>
-                                    </Stack>
+                                    <Checkbox
+                                        checked={item.selected}
+                                        onChange={(_, checked) => handleValueToggle(item.value, checked || false)}
+                                        styles={{ 
+                                            root: { 
+                                                marginRight: 0,
+                                                flexShrink: 0
+                                            },
+                                            checkbox: { width: 16, height: 16 }
+                                        }}
+                                    />
+                                    <Text style={{ 
+                                        flex: 1, 
+                                        overflow: 'hidden', 
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                        fontSize: '12px',
+                                        marginRight: '4px'
+                                    }}>
+                                        {item.displayValue || '(Blank)'}
+                                    </Text>
+                                    <Text 
+                                        variant="small" 
+                                        style={{ 
+                                            color: '#666', 
+                                            backgroundColor: '#f3f2f1',
+                                            padding: '1px 4px',
+                                            borderRadius: '6px',
+                                            fontSize: '10px',
+                                            minWidth: '20px',
+                                            maxWidth: '50px',
+                                            textAlign: 'center',
+                                            flexShrink: 0,
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis'
+                                        }}
+                                    >
+                                        {item.count.toString()}
+                                    </Text>
                                 </div>
                             );
                         })}

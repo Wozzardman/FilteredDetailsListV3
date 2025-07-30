@@ -112,8 +112,8 @@ export const FilterMenu: React.FC<IFilterMenuProps> = ({
             isBeakVisible={false}
             setInitialFocus
             calloutMaxHeight={450}
-            calloutMinWidth={320}
-            calloutMaxWidth={320}
+            calloutMinWidth={400}
+            calloutMaxWidth={450}
         >
             <FocusTrapZone>
                 <div className="filter-menu-dialog">
@@ -167,40 +167,67 @@ export const FilterMenu: React.FC<IFilterMenuProps> = ({
                                         />
                                     </div>
 
-                                    {/* Enhanced value checkboxes */}
+                                    {/* Enhanced value checkboxes - Optimized layout to prevent horizontal scrolling */}
                                     {filteredValues.length > 0 ? (
                                         filteredValues.map((item, index) => (
                                             <div key={`${item.value}-${index}`} className="filter-menu-value-item">
-                                                <Stack horizontal verticalAlign="center" tokens={{ childrenGap: 8 }}>
+                                                <div style={{ 
+                                                    display: 'flex', 
+                                                    alignItems: 'center', 
+                                                    width: '100%',
+                                                    gap: '8px',
+                                                    overflow: 'hidden'
+                                                }}>
                                                     <Checkbox
-                                                        label={item.value.toString()}
                                                         checked={selectedValues.has(item.value)}
                                                         onChange={(_, checked) =>
                                                             handleValueChange(item.value, checked)
                                                         }
                                                         styles={{
-                                                            root: { flex: 1 },
-                                                            label: { fontSize: '12px' },
+                                                            root: { 
+                                                                flexShrink: 0,
+                                                                marginRight: 0
+                                                            },
+                                                            checkbox: { 
+                                                                width: '16px', 
+                                                                height: '16px' 
+                                                            }
                                                         }}
                                                     />
                                                     <Text
                                                         variant="small"
-                                                        styles={{
-                                                            root: {
-                                                                color: '#605e5c',
-                                                                backgroundColor: '#f3f2f1',
-                                                                padding: '2px 6px',
-                                                                borderRadius: '10px',
-                                                                fontSize: '11px',
-                                                                fontWeight: 600,
-                                                                minWidth: '24px',
-                                                                textAlign: 'center',
-                                                            },
+                                                        style={{
+                                                            flex: 1,
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis',
+                                                            whiteSpace: 'nowrap',
+                                                            fontSize: '12px',
+                                                            marginRight: '8px'
+                                                        }}
+                                                    >
+                                                        {item.value.toString()}
+                                                    </Text>
+                                                    <Text
+                                                        variant="small"
+                                                        style={{
+                                                            color: '#605e5c',
+                                                            backgroundColor: '#f3f2f1',
+                                                            padding: '1px 4px',
+                                                            borderRadius: '8px',
+                                                            fontSize: '10px',
+                                                            fontWeight: 600,
+                                                            minWidth: '20px',
+                                                            maxWidth: '50px',
+                                                            textAlign: 'center',
+                                                            flexShrink: 0,
+                                                            whiteSpace: 'nowrap',
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis'
                                                         }}
                                                     >
                                                         {item.count}
                                                     </Text>
-                                                </Stack>
+                                                </div>
                                             </div>
                                         ))
                                     ) : (

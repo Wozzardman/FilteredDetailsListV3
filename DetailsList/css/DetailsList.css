@@ -659,15 +659,15 @@ body .PowerAppsPortal .JvtFilteredDetailsListV2,
   box-shadow: var(--jvt-shadow-md);
 }
 
-/* Enhanced Filter Menu Styles */
+/* Enhanced Filter Menu Styles - Optimized for minimal horizontal scrolling */
 .filter-menu-dialog {
   background: var(--jvt-bg-elevated);
   border: 1px solid var(--jvt-border-primary);
   border-radius: var(--jvt-radius-xl);
   box-shadow: var(--jvt-shadow-xl);
   padding: 0;
-  min-width: 320px;
-  max-width: 480px;
+  min-width: 340px; /* Increased from 320px for better content fit */
+  max-width: 400px; /* Reduced from 480px for consistency */
   max-height: 500px;
   z-index: 1000;
   -webkit-backdrop-filter: blur(8px);
@@ -768,7 +768,7 @@ body .PowerAppsPortal .JvtFilteredDetailsListV2,
   border: 1px solid var(--jvt-primary);
 }
 
-/* Enhanced filter menu value item */
+/* Enhanced filter menu value item - Optimized to prevent horizontal scrolling */
 .filter-menu-value-item {
   display: flex;
   align-items: center;
@@ -777,10 +777,36 @@ body .PowerAppsPortal .JvtFilteredDetailsListV2,
   transition: background-color 0.15s ease;
   cursor: pointer;
   margin-bottom: 2px;
+  overflow: hidden; /* Prevent horizontal overflow */
+  gap: 8px; /* Consistent spacing */
 }
 
 .filter-menu-value-item:hover {
   background-color: rgba(0, 120, 212, 0.05);
+}
+
+/* Filter value text optimization */
+.filter-value-text {
+  flex: 1;
+  font-size: var(--jvt-font-size-sm);
+  color: var(--jvt-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 4px; /* Space before count */
+}
+
+/* Filter value count badge - Compact design */
+.filter-value-count {
+  background: var(--jvt-bg-tertiary);
+  color: var(--jvt-text-secondary);
+  padding: 1px 4px; /* More compact padding */
+  border-radius: 6px; /* Smaller radius */
+  font-size: 10px; /* Smaller font */
+  font-weight: 500;
+  min-width: 18px; /* Reduced minimum width */
+  text-align: center;
+  flex-shrink: 0; /* Prevent shrinking */
 }
 
 /* Sticky header for select all */

@@ -712,23 +712,53 @@
     background-color: transparent;
 }
 
-/* Filter Button Enhancements */
+/* Enhanced Filter Icon Styling */
 .virtualized-header-filter-icon {
-    border-radius: 4px;
-    transition: all 0.2s ease;
+    border-radius: 6px;
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
+    z-index: 20; /* Higher than resize handle */
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
 }
 
 .virtualized-header-filter-icon:hover {
-    background-color: rgba(0, 120, 212, 0.1) !important;
-    transform: scale(1.05);
+    transform: scale(1.05) translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 120, 212, 0.25);
 }
 
 .virtualized-header-filter-icon.active {
+    background-color: rgba(0, 120, 212, 0.1) !important;
+    border-color: rgba(0, 120, 212, 0.3) !important;
+    box-shadow: 0 2px 8px rgba(0, 120, 212, 0.2);
+    transform: scale(1.02);
+}
+
+.virtualized-header-filter-icon.active:hover {
     background-color: rgba(0, 120, 212, 0.15) !important;
-    box-shadow: 0 2px 4px rgba(0, 120, 212, 0.2);
+    box-shadow: 0 4px 12px rgba(0, 120, 212, 0.3);
+    transform: scale(1.05) translateY(-1px);
+}
+
+/* Enhanced Column Resize Handle */
+.column-resize-handle {
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 5; /* Lower than filter icon */
+}
+
+.column-resize-handle:hover {
+    background-color: rgba(0, 120, 212, 0.2) !important;
+    box-shadow: 0 0 6px rgba(0, 120, 212, 0.4);
+    transform: scaleX(1.2);
+}
+
+.virtualized-header-cell.resizing .column-resize-handle {
+    background-color: #0078d4 !important;
+    box-shadow: 0 0 8px rgba(0, 120, 212, 0.5);
+    transform: scaleX(1.5);
 }
 
 /* Row Animation and Styling */
