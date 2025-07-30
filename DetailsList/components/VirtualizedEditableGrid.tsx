@@ -215,28 +215,8 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     const [resizeStartX, setResizeStartX] = React.useState<number>(0);
     const [resizeStartWidth, setResizeStartWidth] = React.useState<number>(0);
 
-    // Calculate filtered items based on column filters
-    const filteredItems = React.useMemo(() => {
-        if (Object.keys(columnFilters).length === 0) return items;
-
-        return items.filter(item => {
-            return Object.entries(columnFilters).every(([columnKey, filter]) => {
-                if (!filter || !filter.isActive) return true;
-                
-                const fieldValue = getPCFValue(item, columnKey);
-                
-                // Evaluate all conditions in the filter
-                if (filter.logicalOperator === 'OR') {
-                    return filter.conditions.some(condition => evaluateCondition(fieldValue, condition));
-                } else {
-                    return filter.conditions.every(condition => evaluateCondition(fieldValue, condition));
-                }
-            });
-        });
-    }, [items, columnFilters]);
-
     // Helper function to evaluate a single filter condition
-    const evaluateCondition = (fieldValue: any, condition: any): boolean => {
+    const evaluateCondition = React.useCallback((fieldValue: any, condition: any): boolean => {
         const { operator, value } = condition;
         
         switch (operator) {
@@ -268,7 +248,27 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
             default:
                 return true;
         }
-    };
+    }, []);
+
+    // Calculate filtered items based on column filters
+    const filteredItems = React.useMemo(() => {
+        if (Object.keys(columnFilters).length === 0) return items;
+
+        return items.filter(item => {
+            return Object.entries(columnFilters).every(([columnKey, filter]) => {
+                if (!filter || !filter.isActive) return true;
+                
+                const fieldValue = getPCFValue(item, columnKey);
+                
+                // Evaluate all conditions in the filter
+                if (filter.logicalOperator === 'OR') {
+                    return filter.conditions.some(condition => evaluateCondition(fieldValue, condition));
+                } else {
+                    return filter.conditions.every(condition => evaluateCondition(fieldValue, condition));
+                }
+            });
+        });
+    }, [items, columnFilters, evaluateCondition]);
 
     // Filter handlers
     const handleColumnFilterChange = React.useCallback((columnKey: string, selectedValues: any[]) => {
