@@ -20,6 +20,14 @@ export class SelectionManager {
     private selectedItems: Set<string> = new Set();
     private totalItems: string[] = [];
     private listeners: ((state: SelectionState) => void)[] = [];
+    private debounceTimer: NodeJS.Timeout | null = null;
+    private pendingNotification = false;
+    private performanceThreshold = 500; // Debounce threshold for large datasets
+    
+    // Performance optimization: batch updates for better UX
+    private shouldDebounce(): boolean {
+        return this.totalItems.length > this.performanceThreshold;
+    }
 
     /**
      * Initialize with current dataset items
@@ -28,11 +36,11 @@ export class SelectionManager {
         this.totalItems = [...items];
         // Remove any selected items that no longer exist
         this.selectedItems = new Set([...this.selectedItems].filter(id => items.includes(id)));
-        this.notifyStateChange();
+        this.notifyStateChangeOptimized();
     }
 
     /**
-     * Toggle selection for a specific item
+     * Toggle selection for a specific item with performance optimization
      */
     public toggleItem(itemId: string): void {
         if (this.selectedItems.has(itemId)) {
@@ -40,11 +48,11 @@ export class SelectionManager {
         } else {
             this.selectedItems.add(itemId);
         }
-        this.notifyStateChange();
+        this.notifyStateChangeOptimized();
     }
 
     /**
-     * Select or deselect a specific item
+     * Select or deselect a specific item with performance optimization
      */
     public setItemSelection(itemId: string, selected: boolean): void {
         if (selected) {
@@ -52,23 +60,28 @@ export class SelectionManager {
         } else {
             this.selectedItems.delete(itemId);
         }
-        this.notifyStateChange();
+        this.notifyStateChangeOptimized();
     }
 
     /**
-     * Select all items
+     * Select all items with performance optimization
      */
     public selectAll(): void {
-        this.selectedItems = new Set(this.totalItems);
-        this.notifyStateChange();
+        // For large datasets, use batch processing to avoid UI blocking
+        if (this.totalItems.length > 1000) {
+            this.selectAllBatched();
+        } else {
+            this.selectedItems = new Set(this.totalItems);
+            this.notifyStateChangeImmediate(); // Immediate for smaller datasets
+        }
     }
 
     /**
-     * Clear all selections
+     * Clear all selections with immediate notification
      */
     public clearAll(): void {
         this.selectedItems.clear();
-        this.notifyStateChange();
+        this.notifyStateChangeImmediate(); // Always immediate for clearing
     }
 
     /**
@@ -128,7 +141,7 @@ export class SelectionManager {
             const data = JSON.parse(jsonString);
             if (data.selectedIds && Array.isArray(data.selectedIds)) {
                 this.selectedItems = new Set(data.selectedIds.filter((id: string) => this.totalItems.includes(id)));
-                this.notifyStateChange();
+                this.notifyStateChangeOptimized();
             }
         } catch (error) {
             console.warn('Invalid selection JSON:', error);
@@ -166,9 +179,31 @@ export class SelectionManager {
     }
 
     /**
-     * Notify all listeners of state change
+     * Notify all listeners of state change with performance optimization
      */
-    private notifyStateChange(): void {
+    private notifyStateChangeOptimized(): void {
+        if (this.shouldDebounce()) {
+            // Debounce for large datasets to improve performance
+            if (this.debounceTimer) {
+                clearTimeout(this.debounceTimer);
+            }
+            
+            this.pendingNotification = true;
+            this.debounceTimer = setTimeout(() => {
+                this.notifyStateChangeImmediate();
+                this.pendingNotification = false;
+                this.debounceTimer = null;
+            }, 50); // 50ms debounce for smooth UX
+        } else {
+            // Immediate notification for smaller datasets
+            this.notifyStateChangeImmediate();
+        }
+    }
+
+    /**
+     * Immediate notification without debouncing
+     */
+    private notifyStateChangeImmediate(): void {
         const state = this.getSelectionState();
         this.listeners.forEach(listener => {
             try {
@@ -177,6 +212,47 @@ export class SelectionManager {
                 console.error('Error in selection listener:', error);
             }
         });
+    }
+
+    /**
+     * Batched select all for large datasets
+     */
+    private selectAllBatched(): void {
+        const batchSize = 500;
+        let currentIndex = 0;
+        
+        const processBatch = () => {
+            const endIndex = Math.min(currentIndex + batchSize, this.totalItems.length);
+            
+            // Add items in current batch
+            for (let i = currentIndex; i < endIndex; i++) {
+                this.selectedItems.add(this.totalItems[i]);
+            }
+            
+            currentIndex = endIndex;
+            
+            if (currentIndex < this.totalItems.length) {
+                // Schedule next batch to avoid blocking UI
+                setTimeout(processBatch, 10);
+            } else {
+                // All items processed, notify immediately
+                this.notifyStateChangeImmediate();
+            }
+        };
+        
+        processBatch();
+    }
+
+    /**
+     * Force immediate notification (useful for cleanup)
+     */
+    public flushPendingUpdates(): void {
+        if (this.pendingNotification && this.debounceTimer) {
+            clearTimeout(this.debounceTimer);
+            this.notifyStateChangeImmediate();
+            this.pendingNotification = false;
+            this.debounceTimer = null;
+        }
     }
 
     /**
@@ -199,7 +275,7 @@ export class SelectionManager {
     }
 
     /**
-     * Bulk operations
+     * Bulk operations with performance optimization
      */
     public selectRange(startIndex: number, endIndex: number): void {
         const start = Math.max(0, Math.min(startIndex, endIndex));
@@ -208,7 +284,7 @@ export class SelectionManager {
         for (let i = start; i <= end; i++) {
             this.selectedItems.add(this.totalItems[i]);
         }
-        this.notifyStateChange();
+        this.notifyStateChangeOptimized();
     }
 
     public deselectRange(startIndex: number, endIndex: number): void {
@@ -218,6 +294,6 @@ export class SelectionManager {
         for (let i = start; i <= end; i++) {
             this.selectedItems.delete(this.totalItems[i]);
         }
-        this.notifyStateChange();
+        this.notifyStateChangeOptimized();
     }
 }

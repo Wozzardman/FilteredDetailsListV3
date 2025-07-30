@@ -10,6 +10,7 @@ import { FilterUtils } from './FilterUtils';
 import { performanceMonitor } from './performance/PerformanceMonitor';
 import { AutoUpdateManager, RecordIdentity } from './services/AutoUpdateManager';
 import { PowerAppsFxColumnEditorParser } from './services/PowerAppsFxColumnEditorParser';
+import { SelectionManager, SelectionState } from './services/SelectionManager';
 type DataSet = ComponentFramework.PropertyHelper.DataSetApi.EntityRecord & IObjectWithKey;
 
 // Native Power Apps selection state (similar to ComboBox.SelectedItems)
@@ -74,6 +75,9 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     // Auto-update manager for record identity and smart updates
     private autoUpdateManager: AutoUpdateManager = new AutoUpdateManager();
     
+    // Performance-optimized selection manager
+    private selectionManager: SelectionManager = new SelectionManager();
+    
     // Native Power Apps selection state (like ComboBox.SelectedItems)
     private isSelectionMode: boolean = false;
     private nativeSelectionState: NativeSelectionState = {
@@ -89,6 +93,17 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     private currentNewValue: string = '';
     private lastCommitTrigger: string = '';
     private lastCancelTrigger: string = '';
+    
+    // Dataset state tracking for cancel detection
+    private previousDatasetState: {
+        recordCount: number;
+        lastRefreshTime: number;
+        recordIds: string[];
+    } = {
+        recordCount: 0,
+        lastRefreshTime: 0,
+        recordIds: []
+    };
 
     // Legacy compatibility mode flag
     private isLegacyMode = false; // Always use modern mode
@@ -127,12 +142,19 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         // Initialize native Power Apps selection (similar to ComboBox.SelectedItems)
         // This uses the built-in PCF dataset selection APIs
         this.updateNativeSelectionState();
-        console.log('✅ Native Power Apps selection initialized');
+        
+        // Subscribe to SelectionManager changes with optimized PCF integration
+        this.selectionManager.subscribe((state: SelectionState) => {
+            this.onSelectionManagerChange(state);
+        });
+        
+        console.log('✅ Native Power Apps selection initialized with performance optimization');
     }
 
     /**
      * Update native selection state based on Power Apps dataset.getSelectedRecordIds()
      * This works like ComboBox.SelectedItems - Power Apps handles the selection logic
+     * Also syncs with SelectionManager for performance optimization
      */
     private updateNativeSelectionState(): void {
         try {
@@ -147,6 +169,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             
             console.log(`📊 updateNativeSelectionState: selectedIds from dataset:`, selectedIds);
             
+            // Update native selection state for compatibility
             this.nativeSelectionState.selectedItems = new Set(selectedIds);
             this.nativeSelectionState.selectedCount = selectedIds.length;
             
@@ -157,6 +180,21 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 this.nativeSelectionState.selectAllState = 'all';
             } else {
                 this.nativeSelectionState.selectAllState = 'some';
+            }
+
+            // Sync with SelectionManager if in selection mode for performance optimization
+            if (this.isSelectionMode && this.sortedRecordsIds?.length > 0) {
+                // Only update SelectionManager if it doesn't match (avoid infinite loops)
+                const currentManagerSelection = this.selectionManager.getSelectedItems();
+                const areSelectionsSynced = selectedIds.length === currentManagerSelection.length &&
+                    selectedIds.every(id => currentManagerSelection.includes(id));
+                
+                if (!areSelectionsSynced) {
+                    this.selectionManager.initialize(this.sortedRecordsIds);
+                    // Set selection from Power Apps dataset
+                    selectedIds.forEach(id => this.selectionManager.setItemSelection(id, true));
+                    console.log(`🔄 SelectionManager synced with Power Apps dataset selection`);
+                }
             }
         } catch (error) {
             console.error('❌ Error in updateNativeSelectionState:', error);
@@ -382,6 +420,9 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             // Store context for use in other methods
             this.context = context;
             
+            // Detect dataset refresh/cancel operations BEFORE processing other changes
+            this.detectDatasetCancel(context);
+            
             // Handle selection mode toggle
             this.handleSelectionModeToggle(context);
             
@@ -422,6 +463,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 enableFiltering: false,
                 enableExport: false,
                 enableSelectionMode: false,
+                onCancelChanges: this.handleCancelOperation,
                 headerTextSize: context.parameters.HeaderTextSize?.raw || 14,
                 columnTextSize: context.parameters.ColumnTextSize?.raw || 13
             });
@@ -585,6 +627,12 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
 
             this.records = dataset.records;
             this.sortedRecordsIds = dataset.sortedRecordIds;
+
+            // Initialize SelectionManager with current dataset items for performance optimization
+            if (this.isSelectionMode && this.sortedRecordsIds?.length > 0) {
+                this.selectionManager.initialize(this.sortedRecordsIds);
+                console.log(`🚀 SelectionManager initialized with ${this.sortedRecordsIds.length} items`);
+            }
 
             // Handle legacy vs modern column configuration
             if (this.isLegacyMode) {
@@ -812,10 +860,10 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             // Row styling configuration
             alternateRowColor: context.parameters.AlternateRowColor?.raw || undefined,
             
-            // Selection mode props - using native Power Apps selection
+            // Selection mode props - using performance-optimized SelectionManager
             enableSelectionMode: this.isSelectionMode,
-            selectedItems: this.nativeSelectionState.selectedItems,
-            selectAllState: this.nativeSelectionState.selectAllState,
+            selectedItems: this.isSelectionMode ? this.selectionManager.getSelectionState().selectedItems : this.nativeSelectionState.selectedItems,
+            selectAllState: this.isSelectionMode ? this.selectionManager.getSelectionState().selectAllState : this.nativeSelectionState.selectAllState,
             onItemSelection: this.handleItemSelection,
             onSelectAll: this.handleSelectAll,
             onClearAllSelections: this.handleClearAllSelections,
@@ -825,6 +873,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             onClipboardOperation: this.handleClipboardOperation,
             
             onCellEdit: onCellEditWrapper,
+            onCancelChanges: this.handleCancelOperation,
             getColumnDataType: (columnKey: string) => {
                 const column = gridColumns.find(col => col.key === columnKey);
                 const dataType = column?.dataType || 'string';
@@ -910,6 +959,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 enableFiltering: false,
                 enableExport: false,
                 enableSelectionMode: false,
+                onCancelChanges: this.handleCancelOperation,
                 headerTextSize: 14,
                 columnTextSize: 13
             });
@@ -1025,6 +1075,12 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     public destroy(): void {
         // Clean up auto-recovery timer
         this.clearErrorRecoveryTimer();
+        
+        // Flush any pending SelectionManager updates to ensure Power Apps compatibility
+        if (this.selectionManager) {
+            this.selectionManager.flushPendingUpdates();
+            console.log('🔄 SelectionManager pending updates flushed on destroy');
+        }
     }
 
     /**
@@ -1355,6 +1411,26 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             });
             this.setSelectedRecords(selectedIds);
         }
+    };
+
+    /**
+     * Handle SelectionManager state changes with optimized PCF integration
+     * This provides debounced updates to improve performance while maintaining Power Apps compatibility
+     */
+    private onSelectionManagerChange = (state: SelectionState): void => {
+        // Update native selection state to match SelectionManager
+        this.nativeSelectionState.selectedItems = new Set(state.selectedItems);
+        this.nativeSelectionState.selectAllState = state.selectAllState;
+        this.nativeSelectionState.selectedCount = state.selectedCount;
+
+        // Convert to array for PCF dataset API
+        const selectedIds = Array.from(state.selectedItems);
+        
+        // Update PCF dataset with debounced selections - maintains Power Apps compatibility
+        this.setSelectedRecords(selectedIds);
+        
+        // Trigger UI update
+        this.notifyOutputChanged();
     };
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -1825,12 +1901,8 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         // Handle commit trigger
         const commitTrigger = context.parameters.CommitTrigger?.raw;
         if (commitTrigger && commitTrigger !== this.lastCommitTrigger) {
-            console.log('🔄 CommitTrigger received:', commitTrigger);
-            
             // Instead of just clearing changes, trigger the auto-save workflow
             this.executeAutoSave();
-            
-            console.log('✅ Auto-save executed and changes cleared');
             
             this.lastCommitTrigger = commitTrigger;
             this.notifyOutputChanged();
@@ -1839,8 +1911,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         // Handle cancel trigger
         const cancelTrigger = context.parameters.CancelChangesTrigger?.raw;
         if (cancelTrigger && cancelTrigger !== this.lastCancelTrigger) {
-            console.log('❌ CancelChangesTrigger received:', cancelTrigger);
-            
             // Clear all pending changes without committing
             this.pendingChanges.clear();
             this.autoUpdateManager.clearAllChanges();
@@ -1851,11 +1921,81 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 this.ref.forceUpdate();
             }
             
-            console.log('🚫 All pending changes have been cancelled and cleared');
-            
             this.lastCancelTrigger = cancelTrigger;
             this.notifyOutputChanged();
         }
+    };
+
+    /**
+     * Detect dataset refresh/cancel operations by monitoring dataset state changes
+     */
+    private detectDatasetCancel = (context: ComponentFramework.Context<IInputs>): void => {
+        const dataset = context.parameters.records;
+        const currentTime = Date.now();
+        const currentRecordIds = dataset.sortedRecordIds;
+        const currentRecordCount = dataset.sortedRecordIds.length;
+
+        // Check if we have pending changes and the dataset has been refreshed
+        if (this.pendingChanges.size > 0) {
+            // Detect potential cancel scenarios:
+            // 1. Record count changed unexpectedly
+            // 2. Record IDs order changed significantly 
+            // 3. Dataset was refreshed recently (within reasonable time window)
+            
+            const recordCountChanged = currentRecordCount !== this.previousDatasetState.recordCount;
+            const recordIdsChanged = JSON.stringify(currentRecordIds) !== JSON.stringify(this.previousDatasetState.recordIds);
+            const timeSinceLastRefresh = currentTime - this.previousDatasetState.lastRefreshTime;
+            
+            // If dataset state changed and we have pending changes, this might be a cancel operation
+            if ((recordCountChanged || recordIdsChanged) && timeSinceLastRefresh > 100) {
+                console.log('🔍 Dataset state change detected with pending changes - possible cancel operation');
+                console.log('📊 Record count changed:', recordCountChanged, 'IDs changed:', recordIdsChanged);
+                
+                // Check if all our pending change record IDs still exist in the dataset
+                let allRecordsStillExist = true;
+                for (const recordId of this.pendingChanges.keys()) {
+                    if (!currentRecordIds.includes(recordId)) {
+                        allRecordsStillExist = false;
+                        break;
+                    }
+                }
+                
+                // If records still exist but dataset refreshed, likely a cancel operation
+                if (allRecordsStillExist && (recordIdsChanged || timeSinceLastRefresh < 2000)) {
+                    console.log('🚫 Cancel operation detected - clearing pending changes');
+                    this.handleCancelOperation();
+                }
+            }
+        }
+        
+        // Update tracking state
+        this.previousDatasetState = {
+            recordCount: currentRecordCount,
+            lastRefreshTime: currentTime,
+            recordIds: [...currentRecordIds]
+        };
+    };
+
+    /**
+     * Handle cancel operation - clear all pending changes
+     */
+    private handleCancelOperation = (): void => {
+        console.log('🚫 Executing cancel operation - clearing all pending changes');
+        
+        // Clear all pending changes without committing
+        this.pendingChanges.clear();
+        this.autoUpdateManager.clearAllChanges();
+        this.clearCurrentChange();
+        
+        // Force a UI refresh to clear any visual pending change indicators
+        if (this.ref) {
+            this.ref.forceUpdate();
+        }
+        
+        // Notify Power Apps of the change
+        this.notifyOutputChanged();
+        
+        console.log('✅ Cancel operation completed - all pending changes cleared');
     };
 
     /**
@@ -1931,7 +2071,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     };
 
     /**
-     * Handle selection events - ensure Power Apps' native .Selected property works
+     * Handle selection events with performance optimization - ensures Power Apps' native .Selected property works
      */
     private handleItemSelection = (itemId: string): void => {
         console.log(`🔄 handleItemSelection called with itemId: ${itemId}, isSelectionMode: ${this.isSelectionMode}`);
@@ -1942,51 +2082,30 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 return;
             }
 
-            const dataset = this.context?.parameters?.records;
-            if (!dataset) {
-                console.log(`⚠️ No dataset available for selection`);
-                return;
-            }
-
-            // Safely get current selection
-            const currentSelected = dataset.getSelectedRecordIds() || [];
             const selectionType = this.context.parameters.SelectionType?.raw;
-            
-            console.log(`📊 Current selection:`, currentSelected, `Selection type: ${selectionType}`);
+            console.log(`📊 Selection type: ${selectionType}, using SelectionManager for performance`);
             
             if (selectionType === '1') {
                 // Single selection mode - this enables Power Apps' native .Selected property
-                if (currentSelected.includes(itemId)) {
-                    // Deselect if already selected
-                    dataset.setSelectedRecordIds([]);
+                const isCurrentlySelected = this.selectionManager.isItemSelected(itemId);
+                if (isCurrentlySelected) {
+                    // Deselect all if already selected
+                    this.selectionManager.clearAll();
                     console.log(`✅ Deselected item: ${itemId}`);
                 } else {
-                    // Select only this item - this will populate Power Apps' native .Selected property
-                    dataset.setSelectedRecordIds([itemId]);
+                    // Clear all and select only this item - populates Power Apps' .Selected property
+                    this.selectionManager.clearAll();
+                    this.selectionManager.setItemSelection(itemId, true);
                     console.log(`✅ Selected item: ${itemId} - Power Apps .Selected should now work`);
                 }
             } else {
-                // Multiple selection mode
-                if (currentSelected.includes(itemId)) {
-                    // Remove from selection
-                    const newSelection = currentSelected.filter(id => id !== itemId);
-                    dataset.setSelectedRecordIds(newSelection);
-                    console.log(`✅ Removed from selection: ${itemId}, new selection:`, newSelection);
-                } else {
-                    // Add to selection
-                    const newSelection = [...currentSelected, itemId];
-                    dataset.setSelectedRecordIds(newSelection);
-                    console.log(`✅ Added to selection: ${itemId}, new selection:`, newSelection);
-                }
+                // Multiple selection mode with performance optimization
+                this.selectionManager.toggleItem(itemId);
+                const isSelected = this.selectionManager.isItemSelected(itemId);
+                console.log(`✅ Toggled selection for item: ${itemId}, now selected: ${isSelected}`);
             }
             
-            // Update our internal state to reflect the change
-            this.updateNativeSelectionState();
-            
-            // Trigger Power Apps to update - this ensures .Selected property updates
-            this.notifyOutputChanged();
-            
-            console.log(`🔄 Native selection updated for item: ${itemId} - Power Apps .Selected should be available`);
+            console.log(`🚀 Selection updated using performance-optimized SelectionManager`);
         } catch (error) {
             console.error(`❌ Error in handleItemSelection for item ${itemId}:`, error);
         }
@@ -1999,68 +2118,20 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 return;
             }
 
-            const dataset = this.context?.parameters?.records;
-            if (!dataset) {
-                console.log(`⚠️ No dataset available for select all`);
-                return;
-            }
-
-            // Performance optimization: Use batch operations and avoid DOM updates during selection
+            // Performance optimization: Use SelectionManager's optimized batch operations
             const performanceStart = performance.now();
             
-            const currentSelected = dataset.getSelectedRecordIds() || [];
-            const allItems = this.sortedRecordsIds || [];
+            const stats = this.selectionManager.getSelectionStats();
+            console.log(`🚀 Select All using performance-optimized SelectionManager - Current stats:`, stats);
             
-            // Use Set for faster lookups
-            const selectedSet = new Set(currentSelected);
-            const shouldSelectAll = selectedSet.size !== allItems.length || allItems.some(id => !selectedSet.has(id));
-            
-            // Batch operation with timeout for large datasets
-            if (allItems.length > 1000) {
-                console.log(`🚀 Large dataset detected (${allItems.length} items), using optimized batch selection`);
-                this.performBatchSelection(shouldSelectAll, allItems, dataset);
-            } else {
-                // Standard selection for smaller datasets
-                if (shouldSelectAll) {
-                    dataset.setSelectedRecordIds(allItems);
-                } else {
-                    dataset.setSelectedRecordIds([]);
-                }
-            }
-            
-            this.updateNativeSelectionState();
-            this.notifyOutputChanged();
+            // Use SelectionManager's built-in performance optimization for large datasets
+            this.selectionManager.toggleSelectAll();
             
             const performanceEnd = performance.now();
-            console.log(`🔄 Select all completed in ${(performanceEnd - performanceStart).toFixed(2)}ms`);
+            console.log(`🔄 Select all completed in ${(performanceEnd - performanceStart).toFixed(2)}ms using SelectionManager`);
         } catch (error) {
             console.error('❌ Error in handleSelectAll:', error);
         }
-    };
-
-    /**
-     * Optimized batch selection for large datasets to prevent UI blocking
-     */
-    private performBatchSelection = (selectAll: boolean, allItems: string[], dataset: any): void => {
-        const batchSize = 500; // Process in chunks of 500
-        let currentIndex = 0;
-        
-        const processBatch = () => {
-            const endIndex = Math.min(currentIndex + batchSize, allItems.length);
-            const batch = selectAll ? allItems.slice(0, endIndex) : [];
-            
-            // Set selection for current batch
-            dataset.setSelectedRecordIds(batch);
-            
-            currentIndex = endIndex;
-            
-            if (currentIndex < allItems.length && selectAll) {
-                // Schedule next batch with minimal delay to prevent UI blocking
-                setTimeout(processBatch, 1);
-            }
-        };
-        
-        processBatch();
     };
 
     private handleClearAllSelections = (): void => {
@@ -2070,16 +2141,9 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 return;
             }
 
-            const dataset = this.context?.parameters?.records;
-            if (!dataset) {
-                console.log(`⚠️ No dataset available for clear all selections`);
-                return;
-            }
-
-            dataset.setSelectedRecordIds([]);
-            this.updateNativeSelectionState();
-            this.notifyOutputChanged();
-            console.log('🗑️ All selections cleared using native Power Apps API');
+            // Use SelectionManager's optimized clear operation
+            this.selectionManager.clearAll();
+            console.log('🗑️ All selections cleared using performance-optimized SelectionManager');
         } catch (error) {
             console.error('❌ Error in handleClearAllSelections:', error);
         }
@@ -2201,5 +2265,33 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         // Return the first changed value
         const firstValue = Array.from(recordChanges.values())[0];
         return firstValue?.toString() || '';
+    };
+
+    /**
+     * Public method to clear all pending changes - for test harness compatibility
+     * This method can be called directly when the test harness Cancel Changes button
+     * doesn't properly set the CancelChangesTrigger property
+     */
+    public clearAllPendingChanges = (): void => {
+        console.log('🧹 clearAllPendingChanges called directly (test harness workaround)');
+        console.log('📊 Pending changes size before clear:', this.pendingChanges.size);
+        
+        // Clear all pending changes without committing
+        this.pendingChanges.clear();
+        this.autoUpdateManager.clearAllChanges();
+        this.clearCurrentChange();
+        
+        console.log('📊 Pending changes size after clear:', this.pendingChanges.size);
+        console.log('📊 Pending changes entries after clear:', Array.from(this.pendingChanges.entries()));
+        
+        // Force a UI refresh to clear any visual pending change indicators
+        if (this.ref) {
+            this.ref.forceUpdate();
+        }
+        
+        // Notify PCF framework that outputs have changed
+        this.notifyOutputChanged();
+        
+        console.log('🚫 All pending changes cleared via direct method call');
     };
 }

@@ -40,6 +40,7 @@ export interface IUltimateEnterpriseGridProps {
     columnEditorMapping?: ColumnEditorMapping;
     onItemsChanged?: (items: any[]) => void;
     onCellEdit?: (item: any, column: IUltimateEnterpriseGridColumn, newValue: any) => void;
+    onCancelChanges?: () => void;
     onExport?: (format: 'CSV' | 'Excel' | 'PDF' | 'JSON', data: any[]) => void;
     getColumnDataType?: (columnKey: string) => 'text' | 'number' | 'date' | 'boolean' | 'choice';
     selectionMode?: SelectionMode;
@@ -88,6 +89,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     columnEditorMapping = {},
     onItemsChanged,
     onCellEdit,
+    onCancelChanges,
     onExport,
     getColumnDataType,
     selectionMode = SelectionMode.multiple,
@@ -448,6 +450,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                             handleCellEdit(item, column, newValue);
                         }
                     }}
+                    onCancelChanges={onCancelChanges}
                     getColumnDataType={getColumnDataType}
                     changeManager={changeManager}
                     enablePerformanceMonitoring={enablePerformanceMonitoring}

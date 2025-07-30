@@ -55,6 +55,7 @@ export interface VirtualizedEditableGridProps {
     width?: number | string;
     onCellEdit?: (itemId: string, columnKey: string, newValue: any) => void;
     onCommitChanges?: (changes: any[]) => Promise<void>;
+    onCancelChanges?: () => void;
     enableInlineEditing?: boolean;
     enableDragFill?: boolean;
     enableColumnFilters?: boolean;
@@ -117,6 +118,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     width = '100%',
     onCellEdit,
     onCommitChanges,
+    onCancelChanges,
     enableInlineEditing = true,
     enableDragFill = false,
     enableColumnFilters = true,
@@ -512,7 +514,12 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         if (changeManager) {
             changeManager.cancelAllChanges();
         }
-    }, [pendingChanges, filteredItems, changeManager]);
+        
+        // Call the parent cancel handler if provided
+        if (onCancelChanges) {
+            onCancelChanges();
+        }
+    }, [pendingChanges, filteredItems, changeManager, onCancelChanges]);
 
     // Expose methods through ref
     React.useImperativeHandle(ref, () => ({
