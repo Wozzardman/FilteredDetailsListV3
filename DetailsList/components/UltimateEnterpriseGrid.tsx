@@ -40,6 +40,7 @@ export interface IUltimateEnterpriseGridProps {
     columnEditorMapping?: ColumnEditorMapping;
     onItemsChanged?: (items: any[]) => void;
     onCellEdit?: (item: any, column: IUltimateEnterpriseGridColumn, newValue: any) => void;
+    onCommitChanges?: () => void;
     onCancelChanges?: () => void;
     onExport?: (format: 'CSV' | 'Excel' | 'PDF' | 'JSON', data: any[]) => void;
     getColumnDataType?: (columnKey: string) => 'text' | 'number' | 'date' | 'boolean' | 'choice';
@@ -89,6 +90,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     columnEditorMapping = {},
     onItemsChanged,
     onCellEdit,
+    onCommitChanges,
     onCancelChanges,
     onExport,
     getColumnDataType,
@@ -204,6 +206,11 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
         // Use a Map to track values and their counts efficiently
         const valueCountMap = new Map<any, number>();
         
+        // Find the column configuration to determine data type
+        const columnConfig = columns.find(col => (col.fieldName || col.key) === columnKey);
+        const isDateColumn = columnConfig?.dataType === 'date' || 
+                           (getColumnDataType && ['date'].includes(getColumnDataType(columnKey)));
+        
         items.forEach(item => {
             let value;
             
@@ -227,24 +234,58 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
             
             // Count occurrences of each value (preserve original data type)
             if (value !== null && value !== undefined) {
-                // Don't convert to string - keep original value for proper counting
-                const currentCount = valueCountMap.get(value) || 0;
-                valueCountMap.set(value, currentCount + 1);
+                // For date columns, normalize to date string for proper grouping
+                let normalizedValue = value;
+                if (isDateColumn && value instanceof Date) {
+                    // Use toDateString() to group by date without time
+                    normalizedValue = value.toDateString();
+                } else if (isDateColumn && typeof value === 'string') {
+                    // Try to parse string as date and normalize
+                    const parsedDate = new Date(value);
+                    if (!isNaN(parsedDate.getTime())) {
+                        normalizedValue = parsedDate.toDateString();
+                    }
+                }
+                
+                const currentCount = valueCountMap.get(normalizedValue) || 0;
+                valueCountMap.set(normalizedValue, currentCount + 1);
             }
         });
         
         // Convert to array of objects with value and count
-        const result = Array.from(valueCountMap.entries()).map(([value, count]) => ({
-            value,
-            displayValue: value?.toString() || '(Blank)',
-            count
-        }));
+        const result = Array.from(valueCountMap.entries()).map(([value, count]) => {
+            let displayValue: string;
+            
+            if (isDateColumn && value) {
+                // Format dates as short date string (e.g., "7/8/2025")
+                if (value instanceof Date) {
+                    displayValue = value.toLocaleDateString();
+                } else if (typeof value === 'string') {
+                    const parsedDate = new Date(value);
+                    if (!isNaN(parsedDate.getTime())) {
+                        displayValue = parsedDate.toLocaleDateString();
+                    } else {
+                        displayValue = value;
+                    }
+                } else {
+                    displayValue = value.toString();
+                }
+            } else {
+                displayValue = value?.toString() || '(Blank)';
+            }
+            
+            return {
+                value,
+                displayValue,
+                count
+            };
+        });
         
         // Sort by display value
         result.sort((a, b) => (a.displayValue || '').localeCompare(b.displayValue || ''));
         
         return result;
-    }, [items]);
+    }, [items, columns, getColumnDataType]);
 
     // Handle export functionality
     const handleExport = useCallback(async (format: 'CSV' | 'Excel' | 'PDF' | 'JSON') => {
@@ -290,11 +331,14 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                     gridRef.current.commitAllChanges();
                 }
                 setPendingChangesCount(0); // Reset count after commit
+                
+                // Notify parent component about the save operation
+                onCommitChanges?.();
             } catch (error) {
                 console.error('Error committing changes:', error);
             }
         }
-    }, [changeManager]);
+    }, [changeManager, onCommitChanges]);
 
     // Cancel all pending changes
     const handleCancelChanges = useCallback(() => {

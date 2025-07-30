@@ -9,7 +9,7 @@ export interface IGridColumn extends IColumn {
     cellType?: string;
     showAsSubTextOf?: string;
     subTextRow?: number;
-    childColumns: IGridColumn[];
+    childColumns?: IGridColumn[];
     isLabelAbove?: boolean;
     paddingLeft?: number;
     paddingTop?: number;
@@ -31,6 +31,9 @@ export interface IGridColumn extends IColumn {
     // Drag & Drop properties
     isDragDisabled?: boolean;
     dragData?: any;
+    
+    // Data type for formatting
+    dataType?: string;
 }
 
 export interface ComponentProps {

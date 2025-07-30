@@ -78,6 +78,7 @@ export const enum OutputEvents {
     OnRowSelectionChange = 'OnRowSelectionChange',
     Filter = 'Filter',
     FilterChanged = 'FilterChanged',
+    ButtonClicked = 'ButtonClicked',
 }
 
 export const enum SortDirection {

@@ -105,40 +105,45 @@ export class FilterUtils {
             case '!==':
                 return field !== filter;
             case '>':
-                return (
-                    field != null &&
-                    filter != null &&
-                    typeof field !== 'boolean' &&
-                    typeof filter !== 'boolean' &&
-                    field > filter
-                );
+                return this.performComparison(field, filter, (a, b) => a > b);
             case '>=':
-                return (
-                    field != null &&
-                    filter != null &&
-                    typeof field !== 'boolean' &&
-                    typeof filter !== 'boolean' &&
-                    field >= filter
-                );
+                return this.performComparison(field, filter, (a, b) => a >= b);
             case '<':
-                return (
-                    field != null &&
-                    filter != null &&
-                    typeof field !== 'boolean' &&
-                    typeof filter !== 'boolean' &&
-                    field < filter
-                );
+                return this.performComparison(field, filter, (a, b) => a < b);
             case '<=':
-                return (
-                    field != null &&
-                    filter != null &&
-                    typeof field !== 'boolean' &&
-                    typeof filter !== 'boolean' &&
-                    field <= filter
-                );
+                return this.performComparison(field, filter, (a, b) => a <= b);
             default:
                 return false;
         }
+    }
+
+    private static performComparison(field: any, filter: any, compareFn: (a: any, b: any) => boolean): boolean {
+        if (field == null || filter == null || typeof field === 'boolean' || typeof filter === 'boolean') {
+            return false;
+        }
+
+        // Handle date string comparisons by converting back to Date objects
+        if (typeof field === 'string' && typeof filter === 'string') {
+            const fieldDate = new Date(field);
+            const filterDate = new Date(filter);
+            
+            // If both are valid dates, compare them as dates
+            if (!isNaN(fieldDate.getTime()) && !isNaN(filterDate.getTime())) {
+                return compareFn(fieldDate.getTime(), filterDate.getTime());
+            }
+        }
+
+        // Handle numeric comparisons
+        if (typeof field === 'number' && typeof filter === 'number') {
+            return compareFn(field, filter);
+        }
+
+        // Handle string comparisons
+        if (typeof field === 'string' && typeof filter === 'string') {
+            return compareFn(field, filter);
+        }
+
+        return false;
     }
 
     private static stringContains(fieldValue: unknown, filterValue: string): boolean {
@@ -180,14 +185,22 @@ export class FilterUtils {
             return value;
         }
 
+        // Handle Date objects - normalize to date string for comparison
+        if (value instanceof Date) {
+            return value.toDateString();
+        }
+
         // Try to parse as number if it looks like a number
         if (typeof value === 'string' && !isNaN(Number(value)) && value.trim() !== '') {
             return Number(value);
         }
 
-        // Try to parse as date if it looks like a date
+        // Try to parse as date if it looks like a date string
         if (typeof value === 'string' && !isNaN(Date.parse(value))) {
-            return new Date(value).getTime();
+            const parsedDate = new Date(value);
+            if (!isNaN(parsedDate.getTime())) {
+                return parsedDate.toDateString();
+            }
         }
 
         // Return string or number, or null if it's an object

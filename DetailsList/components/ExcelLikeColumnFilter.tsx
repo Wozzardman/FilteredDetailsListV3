@@ -109,9 +109,17 @@ export const ExcelLikeColumnFilter: React.FC<IExcelLikeColumnFilterProps> = ({
 
             // Calculate distinct values from cascaded data
             const valueMap = new Map<any, { count: number; selected: boolean }>();
+            let blankCount = 0;
             
             cascadedData.forEach(item => {
                 const value = getPCFValue(item, columnKey);
+                
+                // Check if value is blank/empty
+                if (value == null || value === '' || value === undefined) {
+                    blankCount++;
+                    return;
+                }
+                
                 const normalizedValue = normalizeValue(value, dataType);
                 
                 if (valueMap.has(normalizedValue)) {
@@ -134,9 +142,29 @@ export const ExcelLikeColumnFilter: React.FC<IExcelLikeColumnFilterProps> = ({
                 count: info.count,
                 selected: info.selected
             }));
+            
+            // Add "(Blanks)" option if there are blank values
+            if (blankCount > 0) {
+                const isBlankSelected = currentColumnFilter 
+                    ? Array.isArray(currentColumnFilter) 
+                        ? currentColumnFilter.includes('(Blanks)')
+                        : currentColumnFilter === '(Blanks)'
+                    : true;
+                    
+                values.unshift({
+                    value: '(Blanks)',
+                    displayValue: '(Blanks)',
+                    count: blankCount,
+                    selected: isBlankSelected
+                });
+            }
 
-            // Sort based on data type
-            values.sort((a, b) => sortByDataType(a.value, b.value, dataType));
+            // Sort based on data type (but keep blanks at the top)
+            const blanksEntry = values.find(v => v.value === '(Blanks)');
+            const nonBlanksEntries = values.filter(v => v.value !== '(Blanks)');
+            nonBlanksEntries.sort((a, b) => sortByDataType(a.value, b.value, dataType));
+            
+            values = blanksEntry ? [blanksEntry, ...nonBlanksEntries] : nonBlanksEntries;
         }
 
         setDistinctValues(values);

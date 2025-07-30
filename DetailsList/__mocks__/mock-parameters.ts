@@ -22,6 +22,7 @@ export function getMockParameters(): IInputs {
         // Legacy properties that need to be included for compatibility
         CommitTrigger: new MockStringProperty(),
         CancelChangesTrigger: new MockStringProperty(),
+        SaveTriggerReset: new MockStringProperty(),
         PerformanceMode: new MockEnumProperty("1"),
         EnableVirtualization: new MockTwoOptionsProperty(true),
         VirtualizationThreshold: new MockWholeNumberProperty(),

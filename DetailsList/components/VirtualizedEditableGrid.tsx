@@ -18,6 +18,8 @@ import { performanceMonitor } from '../performance/PerformanceMonitor';
 import { VirtualizedFilterDropdown, FilterValue } from './VirtualizedFilterDropdown';
 import { ExcelLikeColumnFilter } from './ExcelLikeColumnFilter';
 import { ColumnEditorMapping } from '../types/ColumnEditor.types';
+import { IGridColumn } from '../Component.types';
+import { IFilterState, FilterOperators, FilterTypes } from '../Filter.types';
 import { HeaderSelectionCheckbox, RowSelectionCheckbox } from './SelectionCheckbox';
 import '../css/VirtualizedEditableGrid.css';
 
@@ -48,9 +50,37 @@ const setPCFValue = (item: any, columnKey: string, value: any): void => {
     }
 };
 
+// Helper function to format cell values based on data type
+const formatCellValue = (value: any, dataType?: string, getColumnDataType?: (columnKey: string) => 'text' | 'number' | 'date' | 'boolean' | 'choice', columnKey?: string): string => {
+    if (value === null || value === undefined) {
+        return '';
+    }
+
+    // Determine if this is a date column
+    const isDateColumn = dataType === 'date' || 
+                        (getColumnDataType && columnKey && ['date'].includes(getColumnDataType(columnKey)));
+
+    // Format dates properly
+    if (isDateColumn) {
+        if (value instanceof Date) {
+            // Format as MM/DD/YYYY for better readability
+            return value.toLocaleDateString();
+        } else if (typeof value === 'string') {
+            // Try to parse string as date
+            const parsedDate = new Date(value);
+            if (!isNaN(parsedDate.getTime())) {
+                return parsedDate.toLocaleDateString();
+            }
+        }
+    }
+
+    // For non-date values, use string conversion
+    return String(value);
+};
+
 export interface VirtualizedEditableGridProps {
     items: any[];
-    columns: IColumn[];
+    columns: IGridColumn[];
     height: number | string;
     width?: number | string;
     onCellEdit?: (itemId: string, columnKey: string, newValue: any) => void;
@@ -174,7 +204,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     const [refreshTrigger, setRefreshTrigger] = React.useState<number>(0);
 
     // Excel-like column filtering state
-    const [columnFilters, setColumnFilters] = React.useState<Record<string, any[]>>({});
+    const [columnFilters, setColumnFilters] = React.useState<IFilterState>({});
     const [activeFilterColumn, setActiveFilterColumn] = React.useState<string | null>(null);
     const [filterTargets, setFilterTargets] = React.useState<Record<string, HTMLElement | null>>({});
     const [originalItems] = React.useState<any[]>(items);
@@ -190,21 +220,125 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         if (Object.keys(columnFilters).length === 0) return items;
 
         return items.filter(item => {
-            return Object.entries(columnFilters).every(([columnKey, selectedValues]) => {
-                if (!selectedValues || selectedValues.length === 0) return true;
-                const value = getPCFValue(item, columnKey);
-                return selectedValues.includes(value);
+            return Object.entries(columnFilters).every(([columnKey, filter]) => {
+                if (!filter || !filter.isActive) return true;
+                
+                const fieldValue = getPCFValue(item, columnKey);
+                
+                // Evaluate all conditions in the filter
+                if (filter.logicalOperator === 'OR') {
+                    return filter.conditions.some(condition => evaluateCondition(fieldValue, condition));
+                } else {
+                    return filter.conditions.every(condition => evaluateCondition(fieldValue, condition));
+                }
             });
         });
     }, [items, columnFilters]);
 
+    // Helper function to evaluate a single filter condition
+    const evaluateCondition = (fieldValue: any, condition: any): boolean => {
+        const { operator, value } = condition;
+        
+        switch (operator) {
+            case FilterOperators.IsEmpty:
+                return fieldValue == null || fieldValue === '' || fieldValue === undefined;
+            case FilterOperators.IsNotEmpty:
+                return fieldValue != null && fieldValue !== '' && fieldValue !== undefined;
+            case FilterOperators.In:
+                if (fieldValue == null || fieldValue === '' || fieldValue === undefined) return false;
+                
+                // Normalize the field value for comparison
+                let normalizedField = fieldValue;
+                if (fieldValue instanceof Date) {
+                    normalizedField = fieldValue.toDateString();
+                } else if (typeof fieldValue === 'string' && !isNaN(Date.parse(fieldValue))) {
+                    const dateValue = new Date(fieldValue);
+                    if (!isNaN(dateValue.getTime())) {
+                        normalizedField = dateValue.toDateString();
+                    }
+                }
+                
+                return (value as any[]).some(filterValue => {
+                    let normalizedFilter = filterValue;
+                    if (filterValue instanceof Date) {
+                        normalizedFilter = filterValue.toDateString();
+                    }
+                    return normalizedField === normalizedFilter || String(normalizedField) === String(normalizedFilter);
+                });
+            default:
+                return true;
+        }
+    };
+
     // Filter handlers
     const handleColumnFilterChange = React.useCallback((columnKey: string, selectedValues: any[]) => {
-        setColumnFilters(prev => ({
-            ...prev,
-            [columnKey]: selectedValues
-        }));
-    }, []);
+        // Convert simple value array to proper IFilterState format
+        if (selectedValues.length === 0) {
+            // Remove filter if no values selected
+            setColumnFilters(prev => {
+                const newFilters = { ...prev };
+                delete newFilters[columnKey];
+                return newFilters;
+            });
+        } else {
+            // Create proper filter condition
+            const columnDisplayName = columns.find(c => c.key === columnKey)?.name || columnKey;
+            const dataType = getColumnDataType?.(columnKey) || 'text';
+            
+            // Map data type to FilterTypes enum
+            const filterType = dataType === 'text' ? FilterTypes.Text :
+                              dataType === 'number' ? FilterTypes.Number :
+                              dataType === 'date' ? FilterTypes.Date :
+                              dataType === 'boolean' ? FilterTypes.Boolean :
+                              dataType === 'choice' ? FilterTypes.Choice :
+                              FilterTypes.Text;
+            
+            // Check if filtering for blanks
+            const isBlankFilter = selectedValues.includes('(Blanks)');
+            const nonBlankValues = selectedValues.filter(v => v !== '(Blanks)');
+            
+            const conditions: any[] = [];
+            
+            // Add blank filter condition if selected
+            if (isBlankFilter) {
+                conditions.push({
+                    field: columnKey,
+                    operator: FilterOperators.IsEmpty,
+                    value: null,
+                    displayValue: '(Blanks)'
+                });
+            }
+            
+            // Add non-blank values condition if any
+            if (nonBlankValues.length > 0) {
+                // Normalize values based on data type for proper comparison
+                const normalizedValues = nonBlankValues.map(v => {
+                    if (dataType === 'date' && v instanceof Date) {
+                        return v.toDateString(); // Convert Date objects to date strings
+                    }
+                    return v;
+                });
+                
+                conditions.push({
+                    field: columnKey,
+                    operator: FilterOperators.In,
+                    value: normalizedValues,
+                    displayValue: `In (${normalizedValues.length} values)`
+                });
+            }
+            
+            setColumnFilters(prev => ({
+                ...prev,
+                [columnKey]: {
+                    columnName: columnDisplayName,
+                    filterType: filterType,
+                    conditions: conditions,
+                    isActive: true,
+                    logicalOperator: 'OR' // Use OR when combining blank and non-blank filters
+                }
+            }));
+        }
+    }, [columns, getColumnDataType]);
 
     const handleFilterButtonClick = React.useCallback((columnKey: string, target: HTMLElement) => {
         setActiveFilterColumn(activeFilterColumn === columnKey ? null : columnKey);
@@ -387,7 +521,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                     minWidth: 40,
                     maxWidth: 40,
                     isResizable: false
-                } as IColumn,
+                } as IGridColumn,
                 ...columns
             ];
         }
@@ -699,11 +833,11 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                             className={`virtualized-cell ${isReadOnly ? 'read-only' : 'editable'}`}
                             style={cellStyle}
                             onClick={() => !isReadOnly && startEdit(index, columnKey)}
-                            title={hasChanges ? `Changed from: ${pendingChanges.get(cellKey)?.oldValue}` : String(cellValue || '')}
+                            title={hasChanges ? `Changed from: ${pendingChanges.get(cellKey)?.oldValue}` : formatCellValue(cellValue, column.dataType, getColumnDataType, columnKey)}
                         >
                             {column.onRender ? 
                                 column.onRender(item, index, column) : 
-                                String(cellValue || '')
+                                formatCellValue(cellValue, column.dataType, getColumnDataType, columnKey)
                             }
                             {!isReadOnly && enableDragFill && !enableSelectionMode && (
                                 <div 
@@ -917,7 +1051,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                     );
                 }
                 
-                const hasFilter = columnFilters[column.key]?.length > 0;
+                const hasFilter = columnFilters[column.key]?.isActive && columnFilters[column.key]?.conditions?.length > 0;
                 const dataType = getColumnDataType?.(column.key) || 'text';
                 
                 return (

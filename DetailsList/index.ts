@@ -93,6 +93,15 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     private currentNewValue: string = '';
     private lastCommitTrigger: string = '';
     private lastCancelTrigger: string = '';
+    private lastSaveTriggerReset: string = '';
+    private lastSaveTimestamp: string = '';
+    
+    // Button event properties
+    private buttonEventName: string = '';
+    private buttonEventType: string = '';
+    private clickedButtonName: string = '';
+    private clickedButtonText: string = '';
+    private buttonEventSequence: number = 0;
     
     // Dataset state tracking for cancel detection
     private previousDatasetState: {
@@ -429,6 +438,9 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             // Handle commit trigger input
             this.handleCommitTrigger(context);
             
+            // Handle SaveTrigger reset
+            this.handleSaveTriggerReset(context);
+            
             // Update native selection state from Power Apps dataset
             if (this.isSelectionMode) {
                 this.updateNativeSelectionState();
@@ -658,13 +670,15 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                             const columnName = columnRecord.getFormattedValue('ColName') || columnRecord.getValue('name');
                             const displayName = columnRecord.getFormattedValue('ColDisplayName') || columnRecord.getValue('displayName') || columnName;
                             const dataType = columnRecord.getValue('ColCellType') || columnRecord.getValue('dataType') || 'SingleLine.Text';
+                            const defaultColumnWidth = context.parameters.DefaultColumnWidth?.raw || 150;
+                            const colWidth = columnRecord.getValue('ColWidth') || defaultColumnWidth; // Use DefaultColumnWidth from manifest as fallback
                             
-                            console.log(`🔧 Processing column: ${columnName} (${displayName})`);
+                            console.log(`🔧 Processing column: ${columnName} (${displayName}) - Width: ${colWidth} (default: ${defaultColumnWidth})`);
                             processedColumns.push({
                                 name: columnName,
                                 displayName: displayName,
                                 dataType: dataType,
-                                visualSizeFactor: 1 // Default width
+                                visualSizeFactor: colWidth // Use the configured column width
                             });
                         } catch (e) {
                             console.warn(`⚠️ Error processing column ${colId}:`, e);
@@ -759,20 +773,36 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         const gridColumns = actualDataColumns
             .filter(col => !metadataColumns.includes(col.name as any))
             .map(col => {
-                // Get default column width from manifest property, fallback to visualSizeFactor or default
-                const defaultWidth = context.parameters.DefaultColumnWidth?.raw || 150;
-                const visualSizeFactor = typeof col.visualSizeFactor === 'number' && !isNaN(col.visualSizeFactor) ? col.visualSizeFactor : 0;
+                // Priority 1: Check if we have column configuration from columns dataset
+                const columnConfig = this.datasetColumns?.find(c => c.name === col.name);
+                const configuredWidth = columnConfig?.visualSizeFactor;
                 
-                // Use DefaultColumnWidth when explicitly configured, otherwise fall back to visualSizeFactor
+                // Priority 2: Use PCF dataset visualSizeFactor
+                const pcfVisualSizeFactor = typeof col.visualSizeFactor === 'number' && !isNaN(col.visualSizeFactor) ? col.visualSizeFactor : 0;
+                
+                // Priority 3: Use DefaultColumnWidth from manifest
+                const defaultWidth = context.parameters.DefaultColumnWidth?.raw || 150;
+                
+                // Determine final column width with priority order
                 let columnWidth = defaultWidth;
-                if (context.parameters.DefaultColumnWidth?.raw === undefined || context.parameters.DefaultColumnWidth?.raw === null) {
-                    // Only use visualSizeFactor if DefaultColumnWidth wasn't explicitly set and visualSizeFactor is reasonable
-                    if (visualSizeFactor > 50 && visualSizeFactor <= 500) {
-                        columnWidth = visualSizeFactor;
+                
+                // Use configured width from columns dataset if available and reasonable
+                if (configuredWidth && configuredWidth > 50 && configuredWidth <= 1000) {
+                    columnWidth = configuredWidth;
+                    console.log(`📏 Using columns dataset width for ${col.name}: ${columnWidth}`);
+                }
+                // Fall back to PCF visualSizeFactor if DefaultColumnWidth wasn't explicitly set
+                else if (context.parameters.DefaultColumnWidth?.raw === undefined || context.parameters.DefaultColumnWidth?.raw === null) {
+                    if (pcfVisualSizeFactor > 50 && pcfVisualSizeFactor <= 500) {
+                        columnWidth = pcfVisualSizeFactor;
+                        console.log(`📏 Using PCF visualSizeFactor for ${col.name}: ${columnWidth}`);
                     }
                 }
+                else {
+                    console.log(`� Using default width for ${col.name}: ${columnWidth}`);
+                }
                 
-                console.log(`🔧 Processing column: ${col.name} (${col.displayName}) - Type: ${col.dataType}, VisualSizeFactor: ${col.visualSizeFactor}, DefaultWidth: ${defaultWidth}, Final Width: ${columnWidth}`);
+                console.log(`🔧 Final column config: ${col.name} (${col.displayName}) - ConfigWidth: ${configuredWidth}, PCF: ${pcfVisualSizeFactor}, Default: ${defaultWidth}, Final: ${columnWidth}`);
                 
                 // Check if column resizing is enabled globally and per-column
                 const globalResizeEnabled = context.parameters.EnableColumnResizing?.raw ?? true;
@@ -983,6 +1013,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             onClipboardOperation: this.handleClipboardOperation,
             
             onCellEdit: onCellEditWrapper,
+            onCommitChanges: this.handleSaveButtonClick,
             onCancelChanges: this.handleCancelOperation,
             getColumnDataType: (columnKey: string) => {
                 const column = gridColumns.find(col => col.key === columnKey);
@@ -1120,6 +1151,16 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                     AllFilters: this.filterEventValues,
                 } as IOutputs;
                 break;
+            case 'ButtonEvent':
+                eventOutputs = {
+                    EventName: this.eventName,
+                    ButtonEventName: this.buttonEventName,
+                    ButtonEventType: this.buttonEventType,
+                    ClickedButtonName: this.clickedButtonName,
+                    ClickedButtonText: this.clickedButtonText,
+                    ButtonEventSequence: this.buttonEventSequence,
+                } as IOutputs;
+                break;
         }
         
         // Add change event outputs
@@ -1154,8 +1195,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             // - dataset.SelectedItems (multiple selection, direct field access like Gallery.SelectedItems.FieldName)
             SelectedCount: this.nativeSelectionState.selectedCount,
             SelectAllState: this.nativeSelectionState.selectAllState === 'none' ? '0' : 
-                           this.nativeSelectionState.selectAllState === 'some' ? '1' : '2',
-            SelectionChangedTrigger: this.isSelectionMode ? Date.now().toString() : ''
+                           this.nativeSelectionState.selectAllState === 'some' ? '1' : '2'
         } as IOutputs;
         
         // Add Power Apps integration outputs for enhanced inline editing
@@ -1172,12 +1212,25 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             PatchChanges: this.getPatchChangesObject(),
             PatchChangesColumn: this.getPatchChangesColumn(),
             PatchChangesValue: this.getPatchChangesValue(),
-            SaveTrigger: this.pendingChanges.size > 0 ? Date.now().toString() : ''
+            SaveTrigger: this.lastSaveTimestamp
         } as any;
         
         // Reset the event so that it does not re-trigger
         this.eventName = '';
         this.filterEventName = '';
+        
+        // Immediately reset button event properties after they've been returned
+        // This prevents them from persisting across subsequent OnChange events
+        if (this.buttonEventName || this.buttonEventType || this.clickedButtonName || this.clickedButtonText) {
+            // Reset on next tick to ensure Power Apps gets the current values first
+            setTimeout(() => {
+                this.buttonEventName = '';
+                this.buttonEventType = '';
+                this.clickedButtonName = '';
+                this.clickedButtonText = '';
+                console.log('🔄 Button event properties cleared after output');
+            }, 0);
+        }
         
         return { ...defaultOutputs, ...eventOutputs, ...changeOutputs, ...autoUpdateOutputs, ...selectionOutputs, ...powerAppsIntegrationOutputs };
     }
@@ -2037,6 +2090,22 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     };
 
     /**
+     * Handle SaveTrigger reset input from Power Apps
+     */
+    private handleSaveTriggerReset = (context: ComponentFramework.Context<IInputs>): void => {
+        const resetTrigger = context.parameters.SaveTriggerReset?.raw;
+        if (resetTrigger && resetTrigger !== this.lastSaveTriggerReset) {
+            console.log('🔄 Resetting SaveTrigger for next use');
+            
+            // Reset the SaveTrigger so it can be triggered again
+            this.lastSaveTimestamp = '';
+            this.lastSaveTriggerReset = resetTrigger;
+            
+            this.notifyOutputChanged();
+        }
+    };
+
+    /**
      * Detect dataset refresh/cancel operations by monitoring dataset state changes
      */
     private detectDatasetCancel = (context: ComponentFramework.Context<IInputs>): void => {
@@ -2091,6 +2160,9 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
      */
     private handleCancelOperation = (): void => {
         console.log('🚫 Executing cancel operation - clearing all pending changes');
+        
+        // Set button event properties
+        this.triggerButtonEvent('Cancel Changes', 'cancel', 'Cancel Changes');
         
         // Clear all pending changes without committing
         this.pendingChanges.clear();
@@ -2148,6 +2220,51 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         } catch (error) {
             console.error('❌ Error during auto-save:', error);
         }
+    };
+
+    /**
+     * Handle save button click from UltimateEnterpriseGrid
+     * Updates SaveTrigger output property to notify Power Apps
+     */
+    private handleSaveButtonClick = (): void => {
+        try {
+            console.log('💾 Save button clicked - triggering SaveTrigger for Power Apps');
+            
+            // Set button event properties
+            this.triggerButtonEvent('Save Changes', 'save', `Save Changes (${this.pendingChanges.size})`);
+            
+            // Execute the auto-save workflow
+            this.executeAutoSave();
+            
+            // Update SaveTrigger with current timestamp to notify Power Apps
+            this.lastSaveTimestamp = Date.now().toString();
+            
+            // Notify output changed to trigger Power Apps OnChange
+            this.notifyOutputChanged();
+            
+        } catch (error) {
+            console.error('❌ Error handling save button click:', error);
+        }
+    };
+
+    /**
+     * Trigger a button event that can be detected in Power Apps OnChange/OnSelect
+     * EventName is set to "ButtonEvent" to signal that button properties should be checked.
+     * Note: Button event properties are automatically cleared after getOutputs() 
+     * to prevent persistence across subsequent OnChange events
+     */
+    private triggerButtonEvent = (buttonName: string, buttonType: string, buttonText: string): void => {
+        console.log(`🔘 Button event: ${buttonName} (${buttonType})`);
+        
+        // Increment sequence number for proper event ordering
+        this.buttonEventSequence++;
+        
+        // Set EventName to "ButtonEvent" to signal button click detection
+        this.eventName = 'ButtonEvent';
+        this.buttonEventName = buttonName;
+        this.buttonEventType = buttonType;
+        this.clickedButtonName = buttonName;
+        this.clickedButtonText = buttonText;
     };
 
     /**

@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest>
-  <control namespace="JVT" constructor="FilteredDetailsListV2" version="10.0.0" display-name-key="FilteredDetailsListV2" description-key="FilteredDetailsListV2_Desc" control-type="virtual">
+  <control namespace="JVT" constructor="FilteredDetailsListV2" version="10.0.8" display-name-key="FilteredDetailsListV2" description-key="FilteredDetailsListV2_Desc" control-type="virtual">
     <external-service-usage enabled="false">
       <!-- Explicitly declare no external services to avoid CORS issues -->
     </external-service-usage>
@@ -71,12 +71,20 @@
       <value name="Descending" display-name-key="Descending">1</value>
     </property>
     
+    <!-- Button Event Properties -->
+    <property name="ButtonEventName" display-name-key="ButtonEventName" of-type="SingleLine.Text" usage="output" />
+    <property name="ButtonEventType" display-name-key="ButtonEventType" of-type="SingleLine.Text" usage="output" />
+    <property name="ClickedButtonName" display-name-key="ClickedButtonName" of-type="SingleLine.Text" usage="output" />
+    <property name="ClickedButtonText" display-name-key="ClickedButtonText" of-type="SingleLine.Text" usage="output" />
+    <property name="ButtonEventSequence" display-name-key="ButtonEventSequence" of-type="Whole.None" usage="output" />
+    
     <!-- Change Management Properties -->
     <property name="PendingChanges" display-name-key="PendingChanges" of-type="SingleLine.Text" usage="output" />
     <property name="HasPendingChanges" display-name-key="HasPendingChanges" of-type="TwoOptions" usage="output" />
     <property name="ChangeCount" display-name-key="ChangeCount" of-type="Whole.None" usage="output" />
     <property name="CommitTrigger" display-name-key="CommitTrigger" of-type="SingleLine.Text" usage="input" required="false" />
     <property name="CancelChangesTrigger" display-name-key="CancelChangesTrigger" of-type="SingleLine.Text" usage="input" required="false" />
+    <property name="SaveTriggerReset" display-name-key="SaveTriggerReset" of-type="SingleLine.Text" usage="input" required="false" />
     <property name="ChangeEventType" display-name-key="ChangeEventType" of-type="SingleLine.Text" usage="output" />
     <property name="ChangedRecordKey" display-name-key="ChangedRecordKey" of-type="SingleLine.Text" usage="output" />
     <property name="ChangedColumn" display-name-key="ChangedColumn" of-type="SingleLine.Text" usage="output" />
