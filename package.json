@@ -1,8 +1,8 @@
 {
-  "name": "filtered-detailslist-v2",
-  "version": "10.0.9",
+  "name": "powerapps-filtered-detailslist",
+  "version": "10.1.0",
   "description": "Enterprise-grade PowerApps Component Framework (PCF) control with advanced filtering, virtualization, and industry-leading performance.",
-  "author": "jvt",
+  "author": "Josh VanTimmeren",
   "keywords": [
     "pcf",
     "powerapps",
@@ -16,7 +16,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/filtered-detailslist-v2.git"
+    "url": "https://github.com/Wozzardman/FilteredDetailsListV3.git"
   },
   "scripts": {
     "build": "pcf-scripts build",

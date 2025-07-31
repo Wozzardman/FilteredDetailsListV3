@@ -13,3 +13,56 @@
 # msbuild output directories
 /bin
 /obj
+
+# IDE and editor files
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Build and test results
+*.log
+test-results/
+playwright-report/
+test-results.xml
+
+# Temporary files
+*.tmp
+*.temp
+Untitled-*
+
+# IDE and editor files
+.vscode/
+.vs/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Personal/temporary files
+*.tmp
+*.temp
+Untitled-*

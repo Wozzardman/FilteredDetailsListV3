@@ -1,20 +1,25 @@
-# FilteredDetailsListV2 Code Component
+# PowerApps Filtered DetailsList PCF Control
 
-The FilteredDetailsListV2 code component is an enhanced version that allows using of the [Fluent UI DetailsList component](https://developer.microsoft.com/en-us/fluentui#/controls/web/detailslist) from inside canvas apps and custom pages with additional filtering capabilities:
+An enterprise-grade PowerApps Component Framework (PCF) control that provides an enhanced version of the [Fluent UI DetailsList component](https://developer.microsoft.com/en-us/fluentui#/controls/web/detailslist) with advanced filtering, virtualization, and performance optimizations.
 
-- Can be bound to a Dataverse dataset or local collection.
-- Supports configurable columns separate to the column metadata provided by the source dataset for flexibility.
-- **Excel-like filtering with comprehensive filter types and operators.**
-- Cell types for links, icons, expand/collapse, and sub text cells.
-- Support for paging.
-- Support for sorting either using Dataverse sorting or configurable `SortBy` properties.  
+## ✨ Key Features
 
-When configured against a Dataverse connection it can look like the following:  
-![](media/README/DetailsList.gif)
+- 🔍 **Excel-like filtering** with comprehensive filter types and operators
+- ⚡ **Virtualization** for handling large datasets (1000+ records)
+- 📊 **Flexible data binding** to Dataverse datasets or local collections
+- 🎨 **Configurable columns** separate from source dataset metadata
+- 🔗 **Rich cell types** for links, icons, expand/collapse, and sub text
+- 📄 **Pagination support** for large datasets
+- 🔄 **Sorting** with Dataverse integration or custom SortBy properties
+- ♿ **Accessibility** compliant with WCAG standards
+- 🎯 **Performance optimized** for enterprise applications
 
-## New Filtering Features ⭐
+When configured against a Dataverse connection:  
+![DetailsList Demo](media/README/DetailsList.gif)
 
-The component now includes comprehensive Excel-like filtering capabilities:
+## 🔍 Advanced Filtering Features
+
+The component includes comprehensive Excel-like filtering capabilities:
 
 - **Column-level filtering** with filter icons in headers
 - **Multiple filter types**: Text, Number, Date, Boolean, and Choice filters
@@ -22,18 +27,11 @@ The component now includes comprehensive Excel-like filtering capabilities:
 - **Filter bar** showing active filters with edit/remove options
 - **Real-time filtering** with no server round-trips required
 - **Filter persistence** through PowerApps properties
-
-See [FILTERING.md](FILTERING.md) for complete filtering documentation.
+- **Blank value filtering** for all data types
 
 ### Quick Filtering Setup
 
-To enable filtering:
-
-1. Set `EnableFiltering = true` on the component
-2. Set `ColFilterable = true` on columns you want to be filterable
-3. Handle filter events in your app's OnChange event
-
-```powerfl
+```typescript
 // Enable filtering in your app
 FilteredDetailsList.EnableFiltering = true
 
@@ -44,9 +42,67 @@ Table(
 )
 ```
 
-## Legacy Compatibility ⚡
+## 🚀 Getting Started
 
-**New in v5.2.0**: Full backward compatibility with the original control!
+### Prerequisites
+- Node.js (v14 or higher)
+- PowerApps CLI (`npm install -g @microsoft/powerapps-cli`)
+- PowerApps environment
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/Wozzardman/FilteredDetailsListV3.git
+   cd FilteredDetailsListV3
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Build the component**
+   ```bash
+   npm run build
+   ```
+
+4. **Deploy to PowerApps**
+   ```bash
+   pac pcf push --publisher-prefix dev
+   ```
+
+### Development
+
+For development with hot reload:
+```bash
+npm start
+```
+
+Run tests:
+```bash
+npm test
+```
+
+Build for production:
+```bash
+npm run build
+```
+
+## 📖 Documentation
+
+- [Filtering Guide](docs/Documentation/POWERAPP_CONFIGURATION_GUIDE.md) - Complete filtering setup
+- [Configuration Guide](docs/Documentation/CANVAS_APPS_DEPLOYMENT.md) - Canvas app integration
+- [Performance Guide](docs/Documentation/GRID_PERFORMANCE_OPTIMIZATIONS.md) - Optimization tips
+- [API Reference](docs/Documentation/) - Full documentation
+
+## 🤝 Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 If you're upgrading from the original control or getting "Error loading control" when adding Fields, the component now automatically detects and supports both configuration approaches:
 
@@ -380,7 +436,7 @@ Manual Sorting is supported outside of the component to allow for custom connect
    If(Self.EventName="Sort", 
    UpdateContext({
                    ctxSortCol:Self.SortEventColumn,
-                   ctxSortAsc:If(Self.SortEventDirection='jvt.FilteredDetailsListV2.SortEventDirection'.Ascending,true,false)
+                   ctxSortAsc:If(Self.SortEventDirection='JVT.FilteredDetailsListV2.SortEventDirection'.Ascending,true,false)
     })
    );
    ```
@@ -391,8 +447,8 @@ Manual Sorting is supported outside of the component to allow for custom connect
 
    ```vbscript
    If(ctxSortAsc,
-       'jvt.FilteredDetailsListV2.CurrentSortDirection'.Ascending,
-       'jvt.FilteredDetailsListV2.CurrentSortDirection'.Descending) 
+       'JVT.FilteredDetailsListV2.CurrentSortDirection'.Ascending,
+       'JVT.FilteredDetailsListV2.CurrentSortDirection'.Descending) 
    ```
 
 6. Set the input items collection to sort using the context variables set above:
