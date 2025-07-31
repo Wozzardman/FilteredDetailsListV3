@@ -2,6 +2,8 @@
 
 An enterprise-grade PowerApps Component Framework (PCF) control that provides an enhanced version of the [Fluent UI DetailsList component](https://developer.microsoft.com/en-us/fluentui#/controls/web/detailslist) with advanced filtering, virtualization, and performance optimizations.
 
+I'm currently away on my anniversary trip so the ReadMe and portions of the PCF still need updates, consider this the Beta release
+
 ## ✨ Key Features
 
 - 🔍 **Excel-like filtering** with comprehensive filter types and operators
