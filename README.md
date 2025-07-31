@@ -42,6 +42,142 @@ Table(
 )
 ```
 
+## 🎛️ Inline Editing with EditorConfig
+
+The component supports powerful inline editing capabilities through the `editorConfig` dataset. This allows you to configure different editor types for each column.
+
+### EditorConfig Setup
+
+1. **Enable Enhanced Editors**
+   ```powerapp
+   FilteredDetailsList.UseEnhancedEditors = true
+   ```
+
+2. **Configure the EditorConfig Table**
+   Create a table with editor configurations:
+   ```powerapp
+   Table(
+       {ColumnKey: "name", EditorType: "Text", IsRequired: true, Placeholder: "Enter name..."},
+       {ColumnKey: "email", EditorType: "Email", IsRequired: true, ValidationPattern: "^[^\s@]+@[^\s@]+\.[^\s@]+$"},
+       {ColumnKey: "age", EditorType: "Number", MinValue: 0, MaxValue: 120},
+       {ColumnKey: "salary", EditorType: "Currency", CurrencySymbol: "$", DecimalPlaces: 2},
+       {ColumnKey: "department", EditorType: "Dropdown", DropdownOptions: "HR,IT,Finance,Marketing"},
+       {ColumnKey: "startDate", EditorType: "Date", ShowTime: false},
+       {ColumnKey: "rating", EditorType: "Rating", MaxRating: 5, AllowZeroRating: true}
+   )
+   ```
+
+### Supported Editor Types
+
+#### **Text Editor**
+```powerapp
+{ColumnKey: "description", EditorType: "Text", MaxLength: 255, IsMultiline: true, Placeholder: "Enter description..."}
+```
+- `MaxLength`: Maximum character limit
+- `IsMultiline`: Enable multiline text area
+- `ValidationPattern`: Regex pattern for validation
+- `PatternErrorMessage`: Error message for invalid patterns
+
+#### **Email Editor**
+```powerapp
+{ColumnKey: "email", EditorType: "Email", IsRequired: true}
+```
+- Automatically validates email format
+- Built-in email validation
+
+#### **Number Editor**
+```powerapp
+{ColumnKey: "quantity", EditorType: "Number", MinValue: 1, MaxValue: 1000, StepValue: 5}
+```
+- `MinValue`: Minimum allowed value
+- `MaxValue`: Maximum allowed value  
+- `StepValue`: Increment/decrement step
+
+#### **Currency Editor**
+```powerapp
+{ColumnKey: "price", EditorType: "Currency", CurrencySymbol: "$", DecimalPlaces: 2, MinValue: 0}
+```
+- `CurrencySymbol`: Currency symbol to display
+- `DecimalPlaces`: Number of decimal places
+- `MinValue/MaxValue`: Value constraints
+
+#### **Dropdown Editor**
+```powerapp
+{ColumnKey: "status", EditorType: "Dropdown", DropdownOptions: "Active,Inactive,Pending", AllowDirectTextInput: false}
+```
+- `DropdownOptions`: Comma-separated values or JSON array
+- `AllowDirectTextInput`: Allow typing custom values
+
+Advanced dropdown with JSON:
+```powerapp
+{ColumnKey: "priority", EditorType: "Dropdown", DropdownOptions: "[{\"key\":\"high\",\"text\":\"High Priority\"},{\"key\":\"low\",\"text\":\"Low Priority\"}]"}
+```
+
+#### **Date Editor**
+```powerapp
+{ColumnKey: "dueDate", EditorType: "Date", ShowTime: true, DateFormat: "MM/dd/yyyy"}
+```
+- `ShowTime`: Include time picker
+- `DateFormat`: Date display format
+
+#### **Rating Editor**
+```powerapp
+{ColumnKey: "satisfaction", EditorType: "Rating", MaxRating: 5, AllowZeroRating: true}
+```
+- `MaxRating`: Maximum rating stars
+- `AllowZeroRating`: Allow 0-star ratings
+
+#### **Slider Editor**
+```powerapp
+{ColumnKey: "progress", EditorType: "Slider", MinValue: 0, MaxValue: 100, StepValue: 10, ShowSliderValue: true}
+```
+- `MinValue/MaxValue`: Slider range
+- `StepValue`: Step increment
+- `ShowSliderValue`: Display current value
+
+### Common Properties
+
+All editor types support these common properties:
+
+```powerapp
+{
+    ColumnKey: "fieldName",           // Required: Column to edit
+    EditorType: "Text",              // Required: Type of editor
+    IsRequired: true,                // Mark field as required
+    IsReadOnly: false,               // Make field read-only
+    Placeholder: "Enter value...",   // Placeholder text
+    AllowDirectTextInput: true       // Allow direct text input (for dropdowns)
+}
+```
+
+### Complete Example
+
+```powerapp
+Table(
+    // Text fields
+    {ColumnKey: "firstName", EditorType: "Text", IsRequired: true, MaxLength: 50, Placeholder: "First name"},
+    {ColumnKey: "lastName", EditorType: "Text", IsRequired: true, MaxLength: 50, Placeholder: "Last name"},
+    {ColumnKey: "bio", EditorType: "Text", IsMultiline: true, MaxLength: 500, Placeholder: "Tell us about yourself..."},
+    
+    // Contact fields
+    {ColumnKey: "email", EditorType: "Email", IsRequired: true},
+    {ColumnKey: "phone", EditorType: "Phone", ValidationPattern: "^\d{10}$", PatternErrorMessage: "Phone must be 10 digits"},
+    
+    // Numeric fields
+    {ColumnKey: "age", EditorType: "Number", MinValue: 18, MaxValue: 65},
+    {ColumnKey: "salary", EditorType: "Currency", CurrencySymbol: "$", DecimalPlaces: 2, MinValue: 30000},
+    {ColumnKey: "experience", EditorType: "Slider", MinValue: 0, MaxValue: 40, StepValue: 1, ShowSliderValue: true},
+    
+    // Selection fields
+    {ColumnKey: "department", EditorType: "Dropdown", DropdownOptions: "Engineering,Marketing,Sales,HR,Finance"},
+    {ColumnKey: "skillLevel", EditorType: "Rating", MaxRating: 5, AllowZeroRating: false},
+    
+    // Date fields
+    {ColumnKey: "startDate", EditorType: "Date", IsRequired: true},
+    {ColumnKey: "meetingTime", EditorType: "Date", ShowTime: true}
+)
+```
+
 ## 🚀 Getting Started
 
 ### Prerequisites

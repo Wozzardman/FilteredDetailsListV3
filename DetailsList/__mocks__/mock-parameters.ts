@@ -45,11 +45,6 @@ export function getMockParameters(): IInputs {
         // Selection Mode Properties
         EnableSelectionMode: new MockTwoOptionsProperty(false),
         
-
-        
-        // Excel Clipboard Properties
-        EnableExcelClipboard: new MockTwoOptionsProperty(false),
-        
         records: new MockDataSet([]),
         columns: new MockDataSet([]),
     };
