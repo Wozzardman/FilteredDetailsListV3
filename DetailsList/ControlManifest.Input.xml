@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest>
-  <control namespace="JVT" constructor="FilteredDetailsListV2" version="10.5.0" display-name-key="FilteredDetailsListV2" description-key="FilteredDetailsListV2_Desc" control-type="virtual">
+  <control namespace="JVT" constructor="FilteredDetailsListV2" version="10.6.0" display-name-key="FilteredDetailsListV2" description-key="FilteredDetailsListV2_Desc" control-type="virtual">
     <external-service-usage enabled="false">
       <!-- Explicitly declare no external services to avoid CORS issues -->
     </external-service-usage>
@@ -165,6 +165,7 @@
       <property-set name="ColumnName" display-name-key="ColumnName" of-type="SingleLine.Text" usage="bound" required="true" />
       <property-set name="DefaultValue" display-name-key="DefaultValue" of-type="SingleLine.Text" usage="bound" required="false" />
       <property-set name="ValueType" display-name-key="ValueType" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="AutoIncrement" display-name-key="AutoIncrement" of-type="TwoOptions" usage="bound" required="false" />
     </data-set>
     
     <!-- Enhanced Column Editor Configuration -->

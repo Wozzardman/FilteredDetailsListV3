@@ -2330,6 +2330,51 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     };
 
     /**
+     * Apply auto-increment logic to template based on table configuration
+     */
+    private applyAutoIncrementToTemplate = (template: any, incrementIndex: number): void => {
+        // Check for table-based configuration with AutoIncrement settings
+        const templateConfigDataset = (this.context.parameters as any).newRowTemplateConfig;
+        if (templateConfigDataset && templateConfigDataset.records) {
+            try {
+                const records = templateConfigDataset.records;
+                const recordIds = Object.keys(records);
+                
+                for (const recordId of recordIds) {
+                    const record = records[recordId];
+                    const columnName = record.getValue('ColumnName') as string;
+                    const defaultValue = record.getValue('DefaultValue') as string;
+                    const valueType = record.getValue('ValueType') as string;
+                    const autoIncrement = record.getValue('AutoIncrement') as boolean;
+                    
+                    // Only apply auto-increment if the column is configured for it
+                    if (columnName && autoIncrement === true && template.hasOwnProperty(columnName)) {
+                        let baseValue = template[columnName];
+                        
+                        // Convert base value to number if it's a string
+                        if (typeof baseValue === 'string') {
+                            const parsed = parseFloat(baseValue);
+                            if (!isNaN(parsed)) {
+                                baseValue = parsed;
+                            }
+                        }
+                        
+                        // Apply increment based on value type
+                        if (typeof baseValue === 'number') {
+                            template[columnName] = baseValue + incrementIndex;
+                            console.log(`🔢 Auto-increment: ${columnName} = ${template[columnName]} (base: ${baseValue} + ${incrementIndex})`);
+                        } else {
+                            console.warn(`⚠️ Auto-increment skipped for ${columnName}: base value is not numeric (${typeof baseValue})`);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.warn('⚠️ Error applying auto-increment:', error);
+            }
+        }
+    };
+
+    /**
      * Handle add new row button click from the UI
      */
     private handleAddNewRowButtonClick = (count: number = 1): void => {
@@ -2340,11 +2385,17 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         console.log('🆕 Add new row button clicked, creating', count, 'new rows');
         
         // Use the helper method to get template with priority order
-        const newRowTemplate = this.getNewRowTemplate();
+        const baseTemplate = this.getNewRowTemplate();
 
-        // Create the specified number of rows
+        // Create the specified number of rows with auto-increment support
         for (let i = 0; i < count; i++) {
-            this.createNewRow(newRowTemplate);
+            // Clone the template for each row to avoid modifying the original
+            const rowTemplate = { ...baseTemplate };
+            
+            // Apply auto-increment logic for each row
+            this.applyAutoIncrementToTemplate(rowTemplate, i);
+            
+            this.createNewRow(rowTemplate);
         }
         
         this.notifyOutputChanged();
