@@ -42,6 +42,9 @@ export function getMockParameters(): IInputs {
         ColumnEditorFormulas: new MockStringProperty(),
         editorConfig: new MockDataSet([]),
         
+        // New Row Template Configuration
+        newRowTemplateConfig: new MockDataSet([]),
+        
         // Selection Mode Properties
         EnableSelectionMode: new MockTwoOptionsProperty(false),
         

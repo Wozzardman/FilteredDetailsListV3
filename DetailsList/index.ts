@@ -2202,6 +2202,100 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     /**
      * Handle add new row trigger input from Power Apps
      */
+    /**
+     * Get new row template with priority order:
+     * Priority 1: Table-based configuration (newRowTemplateConfig dataset)
+     * Priority 2: JSON string configuration (NewRowTemplate property or column-specific template)
+     */
+    private getNewRowTemplate = (columnSpecificTemplate?: string): any => {
+        let newRowTemplate: any = {};
+        
+        // Priority 1: Check for table-based configuration
+        const templateConfigDataset = (this.context.parameters as any).newRowTemplateConfig;
+        if (templateConfigDataset && templateConfigDataset.records) {
+            try {
+                const records = templateConfigDataset.records;
+                const recordIds = Object.keys(records);
+                console.log('📊 Processing table-based template configuration with', recordIds.length, 'records');
+                
+                for (const recordId of recordIds) {
+                    const record = records[recordId];
+                    const columnName = record.getValue('ColumnName') as string;
+                    const defaultValue = record.getValue('DefaultValue') as string;
+                    const valueType = record.getValue('ValueType') as string;
+                    
+                    if (columnName && defaultValue !== null && defaultValue !== undefined) {
+                        // Convert value based on type
+                        let processedValue: any = defaultValue;
+                        
+                        if (valueType) {
+                            switch (valueType.toLowerCase()) {
+                                case 'number':
+                                case 'decimal':
+                                case 'currency':
+                                    processedValue = parseFloat(defaultValue);
+                                    if (isNaN(processedValue)) processedValue = 0;
+                                    break;
+                                case 'integer':
+                                case 'whole':
+                                    processedValue = parseInt(defaultValue, 10);
+                                    if (isNaN(processedValue)) processedValue = 0;
+                                    break;
+                                case 'boolean':
+                                case 'twooptions':
+                                    processedValue = defaultValue.toLowerCase() === 'true' || defaultValue === '1';
+                                    break;
+                                case 'date':
+                                case 'datetime':
+                                    // Keep as string for now, could be enhanced to parse dates
+                                    processedValue = defaultValue;
+                                    break;
+                                default:
+                                    // Keep as string
+                                    processedValue = defaultValue;
+                                    break;
+                            }
+                        }
+                        
+                        newRowTemplate[columnName] = processedValue;
+                    }
+                }
+                
+                console.log('🎯 Table-based new row template loaded:', newRowTemplate);
+            } catch (error) {
+                console.warn('⚠️ Error processing table-based template configuration:', error);
+            }
+        }
+        
+        // Priority 2: Fall back to JSON string configuration if table is empty or not provided
+        if (Object.keys(newRowTemplate).length === 0) {
+            // First try column-specific template if provided
+            if (columnSpecificTemplate) {
+                try {
+                    newRowTemplate = JSON.parse(columnSpecificTemplate);
+                    console.log('📝 Column-specific template loaded:', newRowTemplate);
+                    return newRowTemplate;
+                } catch (error) {
+                    console.warn('⚠️ Invalid column-specific template JSON:', error);
+                }
+            }
+            
+            // Then try global template
+            const newRowTemplateParam = this.context?.parameters?.NewRowTemplate?.raw;
+            if (newRowTemplateParam) {
+                try {
+                    newRowTemplate = JSON.parse(newRowTemplateParam);
+                    console.log('📝 Global JSON template loaded:', newRowTemplate);
+                } catch (error) {
+                    console.warn('⚠️ Invalid NewRowTemplate JSON:', error);
+                    newRowTemplate = {};
+                }
+            }
+        }
+        
+        return newRowTemplate;
+    };
+
     private handleAddNewRowTrigger = (context: ComponentFramework.Context<IInputs>): void => {
         if (!this.enableAddNewRow) {
             return; // Add new row is not enabled
@@ -2210,7 +2304,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         // Check for add new row trigger from any column
         const columns = context.parameters.columns;
         let triggerFound = false;
-        let newRowTemplate: any = {};
+        let columnSpecificTemplate: string | undefined;
 
         if (columns && columns.columns) {
             for (const column of columns.columns) {
@@ -2219,21 +2313,16 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                     triggerFound = true;
                     this.lastAddNewRowTrigger = addNewRowTrigger;
 
-                    // Get new row template if provided
-                    if ((column as any).NewRowTemplate?.raw) {
-                        try {
-                            newRowTemplate = JSON.parse((column as any).NewRowTemplate.raw);
-                        } catch (error) {
-                            console.warn('⚠️ Invalid NewRowTemplate JSON:', error);
-                            newRowTemplate = {};
-                        }
-                    }
+                    // Get column-specific template if provided
+                    columnSpecificTemplate = (column as any).NewRowTemplate?.raw;
                     break; // Use the first trigger found
                 }
             }
         }
 
         if (triggerFound) {
+            // Use the helper method to get template with priority order
+            const newRowTemplate = this.getNewRowTemplate(columnSpecificTemplate);
             console.log('🆕 Add new row triggered with template:', newRowTemplate);
             this.createNewRow(newRowTemplate);
             this.notifyOutputChanged();
@@ -2250,17 +2339,8 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
 
         console.log('🆕 Add new row button clicked, creating', count, 'new rows');
         
-        // Parse new row template if provided
-        let newRowTemplate: any = {};
-        const newRowTemplateParam = this.context?.parameters?.NewRowTemplate?.raw;
-        if (newRowTemplateParam) {
-            try {
-                newRowTemplate = JSON.parse(newRowTemplateParam);
-            } catch (error) {
-                console.warn('⚠️ Invalid NewRowTemplate JSON:', error);
-                newRowTemplate = {};
-            }
-        }
+        // Use the helper method to get template with priority order
+        const newRowTemplate = this.getNewRowTemplate();
 
         // Create the specified number of rows
         for (let i = 0; i < count; i++) {
