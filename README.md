@@ -1,6 +1,8 @@
 # PowerApps Filtered DetailsList PCF Control
 
-An enterprise-grade PowerApps Component Framework (PCF) control that provides an enhanced version of the [Fluent UI DetailsList component](https://developer.microsoft.com/en-us/fluentui#/controls/web/detailslist) with advanced filtering, virtualization, and performance optimizations.
+An enterprise-grade PowerApps Component Framework (PCF) control that provides an enhanced version of the [Fluent UI DetailsList component](https://developer.microsoft.com/en-us/fluentui#/controls/web/detailslist) with advanced filtering, vir- `ColHorizontalAlign` - The alignment of the cell content if the `ColCellType` is of type `image`, or `clickableimage`.
+- `ColVerticalAlign` -  The alignment of the cell content if the `ColCellType` is of type `image`, or `clickableimage`.
+- `ColMultiLine` - True when the text in the cells should wrap to multiple lines if too long to fit the available width. This affects both display and editing modes.lization, and performance optimizations.
 
 I'm currently away on my anniversary trip so the ReadMe and portions of the PCF still need updates, consider this the Beta release
 
@@ -156,6 +158,67 @@ Table(
     {ColumnKey: "meetingTime", EditorType: "Date", ShowTime: true}
 )
 ```
+
+## 🎯 Column Alignment Configuration
+
+Configure both header and cell alignment for your columns using the `columns` dataset.
+
+### Alignment Properties
+
+#### **Cell Alignment**
+- `ColHorizontalAlign`: Controls horizontal alignment of cell content
+- `ColVerticalAlign`: Controls vertical alignment of cell content
+
+#### **Header Alignment** 
+- `ColHeaderHorizontalAlign`: Controls horizontal alignment of header text (defaults to cell alignment)
+- `ColHeaderVerticalAlign`: Controls vertical alignment of header text (defaults to cell alignment)
+
+### Supported Values
+
+#### **Horizontal Alignment**
+- `start` or `left`: Align to the left (default)
+- `center`: Center alignment
+- `end` or `right`: Align to the right
+
+#### **vertical Alignment**
+- `top` or `start`: Align to the top
+- `center`: Center alignment (default)
+- `bottom` or `end`: Align to the bottom
+
+### Example Alignment Configuration
+
+```powerapp
+// Create a collection with alignment settings
+ClearCollect(ColumnConfig,
+    {ColName: "id", ColDisplayName: "ID", ColWidth: 80, ColHorizontalAlign: "center", ColHeaderHorizontalAlign: "center"},
+    {ColName: "name", ColDisplayName: "Full Name", ColWidth: 200, ColHorizontalAlign: "start"},
+    {ColName: "salary", ColDisplayName: "Salary", ColWidth: 120, ColHorizontalAlign: "end", ColHeaderHorizontalAlign: "end"},
+    {ColName: "department", ColDisplayName: "Department", ColWidth: 150, ColHorizontalAlign: "center"}
+)
+```
+
+### Best Practices
+
+- **Numbers/Currency**: Use `end` alignment for better readability
+- **Text Content**: Use `start` alignment (default)
+- **Short Codes/IDs**: Use `center` alignment
+- **Headers**: Match cell alignment or use `center` for visual consistency
+- **Vertical**: Generally use `center` (default) unless specific layout needs require top/bottom alignment
+- **Multiline Text**: Use `start` horizontal and `start` vertical alignment for best readability
+
+### Multiline Text Support
+
+The `ColMultiLine` property controls text wrapping behavior for both display and editing:
+
+```powerapp
+// Configure multiline columns
+ClearCollect(ColumnConfig,
+    {ColName: "description", ColDisplayName: "Description", ColWidth: 300, ColMultiLine: true, ColVerticalAlign: "start"},
+    {ColName: "comments", ColDisplayName: "Comments", ColWidth: 250, ColMultiLine: true, ColHorizontalAlign: "start"}
+)
+```
+
+**Note**: Multiline columns work best with adequate column width (250px+) and top vertical alignment for optimal text display.
 
 ## 🚀 Getting Started
 

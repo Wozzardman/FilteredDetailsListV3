@@ -673,12 +673,26 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                             const defaultColumnWidth = context.parameters.DefaultColumnWidth?.raw || 150;
                             const colWidth = columnRecord.getValue('ColWidth') || defaultColumnWidth; // Use DefaultColumnWidth from manifest as fallback
                             
+                            // Get alignment properties
+                            const horizontalAlign = columnRecord.getValue('ColHorizontalAlign') || 'start';
+                            const verticalAlign = columnRecord.getValue('ColVerticalAlign') || 'center';
+                            const headerHorizontalAlign = columnRecord.getValue('ColHeaderHorizontalAlign') || horizontalAlign;
+                            const headerVerticalAlign = columnRecord.getValue('ColHeaderVerticalAlign') || verticalAlign;
+                            
+                            // Get multiline property
+                            const isMultiLine = columnRecord.getValue('ColMultiLine') === true;
+                            
                             console.log(`🔧 Processing column: ${columnName} (${displayName}) - Width: ${colWidth} (default: ${defaultColumnWidth})`);
                             processedColumns.push({
                                 name: columnName,
                                 displayName: displayName,
                                 dataType: dataType,
-                                visualSizeFactor: colWidth // Use the configured column width
+                                visualSizeFactor: colWidth, // Use the configured column width
+                                horizontalAlign: horizontalAlign,
+                                verticalAlign: verticalAlign,
+                                headerHorizontalAlign: headerHorizontalAlign,
+                                headerVerticalAlign: headerVerticalAlign,
+                                isMultiLine: isMultiLine
                             });
                         } catch (e) {
                             console.warn(`⚠️ Error processing column ${colId}:`, e);
@@ -777,6 +791,13 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 const columnConfig = this.datasetColumns?.find(c => c.name === col.name);
                 const configuredWidth = columnConfig?.visualSizeFactor;
                 
+                // Get alignment from column config (if available)
+                const horizontalAlign = (columnConfig as any)?.horizontalAlign || 'start';
+                const verticalAlign = (columnConfig as any)?.verticalAlign || 'center';
+                const headerHorizontalAlign = (columnConfig as any)?.headerHorizontalAlign || horizontalAlign;
+                const headerVerticalAlign = (columnConfig as any)?.headerVerticalAlign || verticalAlign;
+                const isMultiLine = (columnConfig as any)?.isMultiLine || false;
+                
                 // Priority 2: Use PCF dataset visualSizeFactor
                 const pcfVisualSizeFactor = typeof col.visualSizeFactor === 'number' && !isNaN(col.visualSizeFactor) ? col.visualSizeFactor : 0;
                 
@@ -825,6 +846,13 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                               col.dataType === 'Decimal' ? 'number' :
                               col.dataType === 'Currency' ? 'number' : // Map currency to number for now
                               col.dataType === 'TwoOptions' ? 'boolean' : 'string') as 'string' | 'number' | 'date' | 'boolean',
+                    // Add alignment properties
+                    horizontalAligned: horizontalAlign,
+                    verticalAligned: verticalAlign,
+                    headerHorizontalAligned: headerHorizontalAlign,
+                    headerVerticalAligned: headerVerticalAlign,
+                    // Add multiline property
+                    isMultiline: isMultiLine,
                     // Add PCF-specific properties for proper data access
                     pcfDataType: col.dataType,
                     pcfColumnName: col.name

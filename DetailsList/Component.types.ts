@@ -23,6 +23,11 @@ export interface IGridColumn extends IColumn {
     imagePadding?: number;
     verticalAligned?: string;
     horizontalAligned?: string;
+    // Header alignment properties
+    headerHorizontalAligned?: string;
+    headerVerticalAligned?: string;
+    // Multiline display property
+    isMultiline?: boolean;
     // Filter properties
     isFilterable?: boolean;
     filterType?: FilterTypes;

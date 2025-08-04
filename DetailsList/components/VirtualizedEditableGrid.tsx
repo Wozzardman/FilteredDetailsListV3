@@ -568,6 +568,46 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         return memoizedColumnWidths.reduce((sum, width) => sum + width, 0);
     }, [memoizedColumnWidths]);
 
+    // Helper function to convert alignment values to CSS properties
+    const getAlignmentStyles = (horizontalAlign?: string, verticalAlign?: string) => {
+        const horizontal = horizontalAlign?.toLowerCase() || 'start';
+        const vertical = verticalAlign?.toLowerCase() || 'center';
+        
+        let justifyContent: string;
+        switch (horizontal) {
+            case 'center':
+                justifyContent = 'center';
+                break;
+            case 'end':
+            case 'right':
+                justifyContent = 'flex-end';
+                break;
+            case 'start':
+            case 'left':
+            default:
+                justifyContent = 'flex-start';
+                break;
+        }
+        
+        let alignItems: string;
+        switch (vertical) {
+            case 'top':
+            case 'start':
+                alignItems = 'flex-start';
+                break;
+            case 'bottom':
+            case 'end':
+                alignItems = 'flex-end';
+                break;
+            case 'center':
+            default:
+                alignItems = 'center';
+                break;
+        }
+        
+        return { justifyContent, alignItems };
+    };
+
     // Get cell key for change tracking
     const getCellKey = (itemIndex: number, columnKey: string) => `${itemIndex}-${columnKey}`;
 
@@ -785,6 +825,9 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                     // PERFORMANCE OPTIMIZATION: Use cached available values to prevent recalculation on scroll
                     const availableValues = memoizedAvailableValues(columnKey);
 
+                    // Get alignment styles for this column
+                    const alignmentStyles = getAlignmentStyles(column.horizontalAligned, column.verticalAligned);
+
                     const cellStyle: React.CSSProperties = {
                         width: memoizedColumnWidths[columnIndex],
                         minWidth: memoizedColumnWidths[columnIndex],
@@ -792,10 +835,10 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                         height: '100%',
                         padding: '0 8px',
                         display: 'flex',
-                        alignItems: 'center',
+                        ...alignmentStyles, // Apply column-specific alignment
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
+                        whiteSpace: column.isMultiline ? 'normal' : 'nowrap', // Support multiline display
                         cursor: isReadOnly ? 'default' : 'pointer',
                         backgroundColor: hasChanges ? '#fff4ce' : 'transparent',
                         borderLeft: hasChanges ? '3px solid #ffb900' : 'none',
@@ -1062,6 +1105,9 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 const hasFilter = columnFilters[column.key]?.isActive && columnFilters[column.key]?.conditions?.length > 0;
                 const dataType = getColumnDataType?.(column.key) || 'text';
                 
+                // Get header alignment styles for this column
+                const headerAlignmentStyles = getAlignmentStyles(column.headerHorizontalAligned, column.headerVerticalAligned);
+                
                 return (
                     <div
                         key={column.key}
@@ -1072,8 +1118,8 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                             maxWidth: memoizedColumnWidths[index],
                             position: 'relative',
                             display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
+                            alignItems: 'center', // Keep center alignment for header container
+                            justifyContent: 'space-between', // Keep space-between for filter icon positioning
                             background: '#faf9f8',
                             padding: '0 12px 0 8px', // More padding on right for filter icon, match data cell left padding
                             boxSizing: 'border-box', // Ensure consistent box model
@@ -1088,7 +1134,9 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                 fontSize: `${headerTextSize}px`, // Apply custom header text size
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap'
+                                whiteSpace: 'nowrap',
+                                textAlign: column.headerHorizontalAligned === 'center' ? 'center' : 
+                                          column.headerHorizontalAligned === 'end' ? 'right' : 'left' // Apply text alignment
                             }}
                         >
                             {column.name}
