@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest>
-  <control namespace="JVT" constructor="FilteredDetailsListV2" version="10.2.1" display-name-key="FilteredDetailsListV2" description-key="FilteredDetailsListV2_Desc" control-type="virtual">
+  <control namespace="JVT" constructor="FilteredDetailsListV2" version="10.4.0" display-name-key="FilteredDetailsListV2" description-key="FilteredDetailsListV2_Desc" control-type="virtual">
     <external-service-usage enabled="false">
       <!-- Explicitly declare no external services to avoid CORS issues -->
     </external-service-usage>
@@ -84,6 +84,14 @@
     <property name="ChangedColumn" display-name-key="ChangedColumn" of-type="SingleLine.Text" usage="output" />
     <property name="OldValue" display-name-key="OldValue" of-type="SingleLine.Text" usage="output" />
     <property name="NewValue" display-name-key="NewValue" of-type="SingleLine.Text" usage="output" />
+    
+    <!-- Add New Row Properties -->
+    <property name="EnableAddNewRow" display-name-key="EnableAddNewRow" of-type="TwoOptions" usage="input" required="false" default-value="false" />
+    <property name="AddNewRowTrigger" display-name-key="AddNewRowTrigger" of-type="SingleLine.Text" usage="input" required="false" />
+    <property name="NewRowTemplate" display-name-key="NewRowTemplate" of-type="SingleLine.TextArea" usage="input" required="false" />
+    <property name="NewRowCreated" display-name-key="NewRowCreated" of-type="SingleLine.TextArea" usage="output" />
+    <property name="NewRowEventType" display-name-key="NewRowEventType" of-type="SingleLine.Text" usage="output" />
+    <property name="NewRowKey" display-name-key="NewRowKey" of-type="SingleLine.Text" usage="output" />
     
     <!-- Power Apps Integration Properties for Patch/ForAll -->
     <property name="EditedRecords" display-name-key="EditedRecords" of-type="SingleLine.TextArea" usage="output" />

@@ -72,6 +72,13 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     // Inline editing state
     private pendingChanges: Map<string, Map<string, any>> = new Map();
     
+    // Add new row functionality
+    private enableAddNewRow = false;
+    private newRowCounter = 0;
+    private newRowTemplate: any = {};
+    private newRowCreated: any = null;
+    private lastAddNewRowTrigger = '';
+    
     // Auto-update manager for record identity and smart updates
     private autoUpdateManager: AutoUpdateManager = new AutoUpdateManager();
     
@@ -441,6 +448,9 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             // Handle SaveTrigger reset
             this.handleSaveTriggerReset(context);
             
+            // Handle Add New Row trigger
+            this.handleAddNewRowTrigger(context);
+            
             // Update native selection state from Power Apps dataset
             if (this.isSelectionMode) {
                 this.updateNativeSelectionState();
@@ -770,6 +780,42 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             
             return enhancedRecord;
         }).filter(item => item !== null);
+
+        // Add new rows from pending changes
+        for (const [recordId, changes] of this.pendingChanges.entries()) {
+            if (changes.get('isNewRow')) {
+                // Create a new row item from the pending changes
+                const newRowItem = {
+                    recordId: recordId,
+                    key: recordId,
+                    isNewRow: true,
+                    // Add a getter method for the grid to access values by column name
+                    getValueByColumn: (columnName: string) => {
+                        return changes.get(columnName) || '';
+                    },
+                    // Add a getter for formatted values (for display)
+                    getFormattedValueByColumn: (columnName: string) => {
+                        const value = changes.get(columnName);
+                        return value ? String(value) : '';
+                    },
+                    // Add getValue method for compatibility
+                    getValue: (columnName: string) => {
+                        return changes.get(columnName) || '';
+                    },
+                    // Add getFormattedValue method for compatibility
+                    getFormattedValue: (columnName: string) => {
+                        const value = changes.get(columnName);
+                        return value ? String(value) : '';
+                    },
+                    // Add missing PCF EntityRecord methods
+                    getRecordId: () => recordId,
+                    getNamedReference: () => ({ id: recordId, name: recordId, entityType: '' })
+                } as any;
+                
+                // Add to the beginning of the items array so new rows appear at the top
+                items.unshift(newRowItem);
+            }
+        }
         
         console.log('📋 Enhanced records for grid (preserving data types):', items.slice(0, 1)); // Log first item for debugging
         
@@ -1005,6 +1051,9 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             }
         }
 
+        // Configure add new row functionality
+        this.enableAddNewRow = context.parameters.EnableAddNewRow?.raw ?? false;
+
         const grid = React.createElement(UltimateEnterpriseGrid, {
             items,
             columns: gridColumns,
@@ -1016,6 +1065,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             enableInlineEditing: this.isSelectionMode ? false : this.enableInlineEditing,
             enableFiltering: true,
             enableExport: true,
+            enableAddNewRow: this.enableAddNewRow,
             enablePerformanceMonitoring: this.enablePerformanceMonitoring,
             enableChangeTracking: !this.isSelectionMode, // Disable change tracking in selection mode
             useEnhancedEditors: this.isSelectionMode ? false : useEnhancedEditors,
@@ -1043,6 +1093,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             onCellEdit: onCellEditWrapper,
             onCommitChanges: this.handleSaveButtonClick,
             onCancelChanges: this.handleCancelOperation,
+            onAddNewRow: this.handleAddNewRowButtonClick,
             getColumnDataType: (columnKey: string) => {
                 const column = gridColumns.find(col => col.key === columnKey);
                 const dataType = column?.dataType || 'string';
@@ -1242,10 +1293,25 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             PatchChangesValue: this.getPatchChangesValue(),
             SaveTrigger: this.lastSaveTimestamp
         } as any;
+
+        // Add new row outputs
+        const newRowOutputs = {
+            NewRowCreated: this.newRowCreated ? JSON.stringify(this.newRowCreated) : '',
+            NewRowEventType: this.newRowCreated ? 'created' : '',
+            NewRowKey: this.newRowCreated ? this.newRowCreated.id : ''
+        } as IOutputs;
         
         // Reset the event so that it does not re-trigger
         this.eventName = '';
         this.filterEventName = '';
+        
+        // Clear new row created event after it's been returned
+        if (this.newRowCreated) {
+            setTimeout(() => {
+                this.newRowCreated = null;
+                console.log('🔄 New row created event cleared after output');
+            }, 0);
+        }
         
         // Immediately reset button event properties after they've been returned
         // This prevents them from persisting across subsequent OnChange events
@@ -1260,7 +1326,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             }, 0);
         }
         
-        return { ...defaultOutputs, ...eventOutputs, ...changeOutputs, ...autoUpdateOutputs, ...selectionOutputs, ...powerAppsIntegrationOutputs };
+        return { ...defaultOutputs, ...eventOutputs, ...changeOutputs, ...autoUpdateOutputs, ...selectionOutputs, ...powerAppsIntegrationOutputs, ...newRowOutputs };
     }
 
     public destroy(): void {
@@ -2131,6 +2197,149 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             
             this.notifyOutputChanged();
         }
+    };
+
+    /**
+     * Handle add new row trigger input from Power Apps
+     */
+    private handleAddNewRowTrigger = (context: ComponentFramework.Context<IInputs>): void => {
+        if (!this.enableAddNewRow) {
+            return; // Add new row is not enabled
+        }
+
+        // Check for add new row trigger from any column
+        const columns = context.parameters.columns;
+        let triggerFound = false;
+        let newRowTemplate: any = {};
+
+        if (columns && columns.columns) {
+            for (const column of columns.columns) {
+                const addNewRowTrigger = (column as any).AddNewRowTrigger?.raw;
+                if (addNewRowTrigger && addNewRowTrigger !== this.lastAddNewRowTrigger) {
+                    triggerFound = true;
+                    this.lastAddNewRowTrigger = addNewRowTrigger;
+
+                    // Get new row template if provided
+                    if ((column as any).NewRowTemplate?.raw) {
+                        try {
+                            newRowTemplate = JSON.parse((column as any).NewRowTemplate.raw);
+                        } catch (error) {
+                            console.warn('⚠️ Invalid NewRowTemplate JSON:', error);
+                            newRowTemplate = {};
+                        }
+                    }
+                    break; // Use the first trigger found
+                }
+            }
+        }
+
+        if (triggerFound) {
+            console.log('🆕 Add new row triggered with template:', newRowTemplate);
+            this.createNewRow(newRowTemplate);
+            this.notifyOutputChanged();
+        }
+    };
+
+    /**
+     * Handle add new row button click from the UI
+     */
+    private handleAddNewRowButtonClick = (count: number = 1): void => {
+        if (!this.enableAddNewRow) {
+            return; // Add new row is not enabled
+        }
+
+        console.log('🆕 Add new row button clicked, creating', count, 'new rows');
+        
+        // Parse new row template if provided
+        let newRowTemplate: any = {};
+        const newRowTemplateParam = this.context?.parameters?.NewRowTemplate?.raw;
+        if (newRowTemplateParam) {
+            try {
+                newRowTemplate = JSON.parse(newRowTemplateParam);
+            } catch (error) {
+                console.warn('⚠️ Invalid NewRowTemplate JSON:', error);
+                newRowTemplate = {};
+            }
+        }
+
+        // Create the specified number of rows
+        for (let i = 0; i < count; i++) {
+            this.createNewRow(newRowTemplate);
+        }
+        
+        this.notifyOutputChanged();
+    };
+
+    /**
+     * Create a new row with the provided template
+     */
+    private createNewRow = (template: any = {}): void => {
+        const dataset = this.context.parameters.records;
+        if (!dataset) {
+            console.warn('⚠️ Cannot create new row: dataset not available');
+            return;
+        }
+
+        // Generate a unique temporary ID for the new row
+        this.newRowCounter++;
+        const tempId = `NEW_ROW_${this.newRowCounter}_${Date.now()}`;
+
+        // Create new row data by merging template with required fields
+        const newRowData: any = {
+            id: tempId,
+            isNewRow: true,
+            ...template
+        };
+
+        // Get the columns to ensure all required fields are included
+        const columns = this.context.parameters.columns;
+        if (columns && columns.columns) {
+            for (const column of columns.columns) {
+                const fieldName = column.name || '';
+                if (fieldName && !newRowData.hasOwnProperty(fieldName)) {
+                    // Set default value based on column type
+                    const dataType = column.dataType || 'SingleLine.Text';
+                    switch (dataType) {
+                        case 'Whole.None':
+                        case 'Decimal':
+                        case 'Currency':
+                            newRowData[fieldName] = 0;
+                            break;
+                        case 'TwoOptions':
+                            newRowData[fieldName] = false;
+                            break;
+                        case 'DateAndTime.DateOnly':
+                        case 'DateAndTime.DateAndTime':
+                            newRowData[fieldName] = null;
+                            break;
+                        default:
+                            newRowData[fieldName] = '';
+                            break;
+                    }
+                }
+            }
+        }
+
+        console.log('🆕 Creating new row with data:', newRowData);
+
+        // Add the new row to pending changes for tracking
+        const changeMap = new Map<string, any>();
+        for (const [key, value] of Object.entries(newRowData)) {
+            changeMap.set(key, value);
+        }
+        changeMap.set('isNewRow', true);
+        changeMap.set('timestamp', Date.now());
+        this.pendingChanges.set(tempId, changeMap);
+
+        // Trigger a refresh to show the new row
+        this.notifyOutputChanged();
+
+        // Set new row created output for Power Apps
+        this.newRowCreated = {
+            id: tempId,
+            template: template,
+            timestamp: new Date().toISOString()
+        };
     };
 
     /**

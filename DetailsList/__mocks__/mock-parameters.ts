@@ -45,6 +45,11 @@ export function getMockParameters(): IInputs {
         // Selection Mode Properties
         EnableSelectionMode: new MockTwoOptionsProperty(false),
         
+        // Add New Row Properties
+        EnableAddNewRow: new MockTwoOptionsProperty(false),
+        AddNewRowTrigger: new MockStringProperty(),
+        NewRowTemplate: new MockStringProperty(),
+        
         records: new MockDataSet([]),
         columns: new MockDataSet([]),
     };

@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { IColumn, SelectionMode, DetailsListLayoutMode, ConstrainMode } from '@fluentui/react';
 import { TextField } from '@fluentui/react/lib/TextField';
 import { DefaultButton, PrimaryButton } from '@fluentui/react/lib/Button';
+import { Dialog, DialogType, DialogFooter } from '@fluentui/react/lib/Dialog';
 import { Stack } from '@fluentui/react/lib/Stack';
 import { DetailsList } from '@fluentui/react/lib/DetailsList';
 import { UltraVirtualizedGrid, useUltraVirtualization } from '../virtualization/UltraVirtualizationEngine';
@@ -34,6 +35,7 @@ export interface IUltimateEnterpriseGridProps {
     enableInlineEditing?: boolean;
     enableFiltering?: boolean;
     enableExport?: boolean;
+    enableAddNewRow?: boolean;
     enablePerformanceMonitoring?: boolean;
     enableChangeTracking?: boolean;
     useEnhancedEditors?: boolean;
@@ -42,6 +44,7 @@ export interface IUltimateEnterpriseGridProps {
     onCellEdit?: (item: any, column: IUltimateEnterpriseGridColumn, newValue: any) => void;
     onCommitChanges?: () => void;
     onCancelChanges?: () => void;
+    onAddNewRow?: (count: number) => void;
     onExport?: (format: 'CSV' | 'Excel' | 'PDF' | 'JSON', data: any[]) => void;
     getColumnDataType?: (columnKey: string) => 'text' | 'number' | 'date' | 'boolean' | 'choice';
     selectionMode?: SelectionMode;
@@ -84,6 +87,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     enableInlineEditing = true,
     enableFiltering = true,
     enableExport = true,
+    enableAddNewRow = false,
     enablePerformanceMonitoring = true,
     enableChangeTracking = true,
     useEnhancedEditors = false,
@@ -92,6 +96,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     onCellEdit,
     onCommitChanges,
     onCancelChanges,
+    onAddNewRow,
     onExport,
     getColumnDataType,
     selectionMode = SelectionMode.multiple,
@@ -128,6 +133,10 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     const [pendingChangesCount, setPendingChangesCount] = useState<number>(0);
     const [changeManager] = useState(() => new EnterpriseChangeManager());
     const [exportService] = useState(() => DataExportService.getInstance());
+    
+    // Add New Row dialog state
+    const [showAddRowDialog, setShowAddRowDialog] = useState<boolean>(false);
+    const [newRowCount, setNewRowCount] = useState<string>('1');
     
     // Ultra virtualization hook
     const {
@@ -352,6 +361,29 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
         }
     }, [changeManager]);
 
+    // Add New Row dialog handlers
+    const handleShowAddRowDialog = useCallback(() => {
+        setShowAddRowDialog(true);
+        setNewRowCount('1'); // Reset to default
+    }, []);
+
+    const handleCloseAddRowDialog = useCallback(() => {
+        setShowAddRowDialog(false);
+        setNewRowCount('1');
+    }, []);
+
+    const handleAddNewRows = useCallback(() => {
+        const count = parseInt(newRowCount, 10);
+        if (count > 0 && count <= 100 && onAddNewRow) { // Limit to 100 rows max
+            onAddNewRow(count);
+            handleCloseAddRowDialog();
+        }
+    }, [newRowCount, onAddNewRow, handleCloseAddRowDialog]);
+
+    const handleRowCountChange = useCallback((event: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>, newValue?: string) => {
+        setNewRowCount(newValue || '1');
+    }, []);
+
     // Determine if virtualization should be used
     const shouldUseVirtualization = enableVirtualization && 
         (filteredItems.length >= virtualizationThreshold || shouldVirtualize);
@@ -450,6 +482,18 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                     </Stack>
                 )}
                 
+                {enableAddNewRow && (
+                    <DefaultButton 
+                        text="Add New Row" 
+                        onClick={handleShowAddRowDialog}
+                        primary
+                        styles={{
+                            root: { minHeight: 32, fontSize: 13 },
+                            label: { fontWeight: 600 }
+                        }}
+                    />
+                )}
+                
                 {/* Combined status display */}
                 <Stack horizontal tokens={{ childrenGap: 12 }}>
                     {performanceDisplay}
@@ -515,6 +559,47 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                     onClipboardOperation={onClipboardOperation}
                 />
             </div>
+            
+            {/* Add New Row Dialog */}
+            <Dialog
+                hidden={!showAddRowDialog}
+                onDismiss={handleCloseAddRowDialog}
+                dialogContentProps={{
+                    type: DialogType.normal,
+                    title: 'Add New Rows',
+                    subText: 'How many blank rows would you like to add?'
+                }}
+                modalProps={{
+                    isBlocking: false,
+                    styles: { main: { maxWidth: 450 } }
+                }}
+            >
+                <Stack tokens={{ childrenGap: 16 }}>
+                    <TextField
+                        label="Number of rows"
+                        type="number"
+                        value={newRowCount}
+                        onChange={handleRowCountChange}
+                        min={1}
+                        max={100}
+                        placeholder="Enter number (1-100)"
+                        styles={{
+                            root: { width: '100%' }
+                        }}
+                    />
+                </Stack>
+                <DialogFooter>
+                    <PrimaryButton 
+                        onClick={handleAddNewRows} 
+                        text="Add Rows"
+                        disabled={!newRowCount || parseInt(newRowCount, 10) < 1 || parseInt(newRowCount, 10) > 100}
+                    />
+                    <DefaultButton 
+                        onClick={handleCloseAddRowDialog} 
+                        text="Cancel" 
+                    />
+                </DialogFooter>
+            </Dialog>
         </div>
     );
 };
