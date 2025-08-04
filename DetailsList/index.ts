@@ -812,9 +812,9 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                     key: col.name,
                     name: col.displayName,
                     fieldName: col.name,
-                    minWidth: Math.min(80, columnWidth), // Reasonable minimum width
-                    width: columnWidth, // Set the default/initial width
-                    maxWidth: columnWidth * 3, // Maximum 3x the default width
+                    minWidth: 50, // Reasonable minimum width for resizing
+                    defaultWidth: columnWidth, // Custom property for the intended column width
+                    maxWidth: Math.max(columnWidth * 3, 300), // Maximum 3x the default width or 300px minimum
                     isResizable: columnResizable,
                     filterable: true,
                     sortable: true,

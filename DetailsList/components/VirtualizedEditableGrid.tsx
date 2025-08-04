@@ -544,8 +544,16 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 return overrideWidth;
             }
             
-            // Use the column's configured width as the default
-            // Don't constrain to container width - allow horizontal scrolling
+            // Use the column's intended width from our custom property
+            if (col.defaultWidth && col.defaultWidth > 0) {
+                return col.defaultWidth;
+            }
+            
+            // Fallback to other width properties
+            if (col.maxWidth && col.maxWidth > col.minWidth) {
+                return col.maxWidth;
+            }
+            
             if (col.minWidth && col.minWidth > 0) {
                 return col.minWidth;
             }

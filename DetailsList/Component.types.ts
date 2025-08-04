@@ -34,6 +34,9 @@ export interface IGridColumn extends IColumn {
     
     // Data type for formatting
     dataType?: string;
+    
+    // Custom width property for proper column sizing
+    defaultWidth?: number;
 }
 
 export interface ComponentProps {
