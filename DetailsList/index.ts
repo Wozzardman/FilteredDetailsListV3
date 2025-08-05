@@ -812,8 +812,8 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                     getNamedReference: () => ({ id: recordId, name: recordId, entityType: '' })
                 } as any;
                 
-                // Add to the beginning of the items array so new rows appear at the top
-                items.unshift(newRowItem);
+                // Add to the end of the items array so new rows appear at the bottom in correct order
+                items.push(newRowItem);
             }
         }
         

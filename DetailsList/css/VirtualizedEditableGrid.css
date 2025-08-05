@@ -276,6 +276,25 @@
     overflow: visible;
 }
 
+/* Dynamic Dropdown Width Support */
+.virtualized-cell.editing .ms-Dropdown {
+    /* Allow dropdown to size based on content */
+    max-width: 400px; /* Prevent overly wide dropdowns */
+}
+
+.virtualized-cell.editing .ms-Dropdown-container {
+    /* Ensure container respects dynamic width */
+    width: auto !important;
+    max-width: 400px;
+}
+
+.virtualized-cell.editing .ms-Dropdown-title {
+    /* Allow title to size dynamically */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* Subtle pulsing animation for active editing */
 .virtualized-cell.editing::before {
     content: '';

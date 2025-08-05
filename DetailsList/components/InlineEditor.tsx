@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { TextField } from '@fluentui/react/lib/TextField';
 import { DatePicker } from '@fluentui/react/lib/DatePicker';
-import { Dropdown, IDropdownOption } from '@fluentui/react/lib/Dropdown';
+import { ComboBox, IComboBoxOption } from '@fluentui/react/lib/ComboBox';
 import { Toggle } from '@fluentui/react/lib/Toggle';
 import { IColumn } from '@fluentui/react/lib/DetailsList';
 
@@ -33,6 +33,7 @@ export const InlineEditor: React.FC<InlineEditorProps> = ({
     const [currentValue, setCurrentValue] = React.useState<any>(value);
     const [hasError, setHasError] = React.useState<boolean>(false);
     const [errorMessage, setErrorMessage] = React.useState<string>('');
+    const [filterText, setFilterText] = React.useState<string>(typeof value === 'string' ? value : '');
 
     React.useEffect(() => {
         setCurrentValue(value);
@@ -155,18 +156,90 @@ export const InlineEditor: React.FC<InlineEditorProps> = ({
             );
 
         case 'choice':
-            const options: IDropdownOption[] = availableValues.map(val => ({
+            // Use all available values as options - let ComboBox handle filtering
+            const options: IComboBoxOption[] = availableValues.map(val => ({
                 key: val,
                 text: val
             }));
             
+            // Calculate dynamic width based on all available values
+            const longestText = availableValues.reduce((longest, current) => {
+                return current.length > longest.length ? current : longest;
+            }, '');
+            
+            const baseCharWidth = 7.5; // Average character width for 14px font
+            const padding = 40; // ComboBox arrow + padding + borders
+            let dynamicWidth = longestText.length * baseCharWidth + padding;
+            
+            // Apply reasonable bounds
+            dynamicWidth = Math.max(90, Math.min(400, Math.round(dynamicWidth)));
+            
             return (
-                <Dropdown
-                    {...commonProps}
+                <ComboBox
                     options={options}
-                    selectedKey={currentValue}
-                    onChange={(_, option) => handleValueChange(option?.key)}
-                    placeholder="Select an option..."
+                    selectedKey={availableValues.includes(currentValue) ? currentValue : undefined}
+                    text={filterText}
+                    placeholder="Select or type an option..."
+                    allowFreeform={true} // Enable typing custom text
+                    autoComplete="on" // Enable built-in filtering
+                    useComboBoxAsMenuWidth={true}
+                    autoFocus={true}
+                    openOnKeyboardFocus={true} // Open dropdown on single click/focus
+                    calloutProps={{
+                        directionalHint: 7, // Opens below the input
+                        isBeakVisible: false,
+                        doNotLayer: false
+                    }}
+                    className={`inline-editor ${className} ${hasError ? 'has-error' : ''}`}
+                    style={{ 
+                        border: 'none', 
+                        background: 'transparent', 
+                        minWidth: `${dynamicWidth}px`,
+                        width: '100%',
+                        ...style 
+                    }}
+                    onChange={(_, option, index, value) => {
+                        if (option) {
+                            // User selected an option from the dropdown
+                            const selectedValue = option.key;
+                            setCurrentValue(selectedValue);
+                            setFilterText(option.text);
+                            handleValueChange(selectedValue);
+                            
+                            // Auto-commit for basic inline editor
+                            setTimeout(() => {
+                                onCommit(selectedValue);
+                            }, 100);
+                        } else if (value !== undefined) {
+                            // User typed text - update filter text for filtering
+                            setFilterText(value);
+                        }
+                    }}
+                    onPendingValueChanged={(_, pendingValue) => {
+                        // Update filter text as user types to filter options
+                        if (pendingValue !== undefined) {
+                            setFilterText(String(pendingValue));
+                        }
+                    }}
+                    onKeyDown={(e) => {
+                        switch (e.key) {
+                            case 'Enter':
+                                e.preventDefault();
+                                const valueToCommit = filterText;
+                                setCurrentValue(valueToCommit);
+                                onCommit(valueToCommit);
+                                break;
+                            case 'Escape':
+                                e.preventDefault();
+                                onCancel();
+                                break;
+                            case 'Tab':
+                                const tabValueToCommit = filterText;
+                                setCurrentValue(tabValueToCommit);
+                                onCommit(tabValueToCommit);
+                                break;
+                        }
+                    }}
                 />
             );
 

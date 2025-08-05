@@ -15,7 +15,9 @@ import { ComboBox, IComboBoxOption } from '@fluentui/react/lib/ComboBox';
 import { SpinButton } from '@fluentui/react/lib/SpinButton';
 import { IconButton } from '@fluentui/react/lib/Button';
 import { Stack } from '@fluentui/react/lib/Stack';
+import { Callout, DirectionalHint } from '@fluentui/react/lib/Callout';
 import { IColumn } from '@fluentui/react/lib/DetailsList';
+import '../css/EnhancedDropdown.css';
 import { 
     ColumnEditorType, 
     ColumnEditorConfig, 
@@ -53,8 +55,10 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
     const [dropdownOptions, setDropdownOptions] = React.useState<DropdownOption[]>([]);
     const [autocompleteOptions, setAutocompleteOptions] = React.useState<AutocompleteOption[]>([]);
     const [isLoadingOptions, setIsLoadingOptions] = React.useState<boolean>(false);
-    const [isAddingNew, setIsAddingNew] = React.useState<boolean>(false);
-    const [newItemText, setNewItemText] = React.useState<string>('');
+    const [filterText, setFilterText] = React.useState<string>(typeof value === 'string' ? value : '');
+    const [isDropdownOpen, setIsDropdownOpen] = React.useState<boolean>(false);
+    const dropdownContainerRef = React.useRef<HTMLDivElement>(null);
+    const [dropdownTarget, setDropdownTarget] = React.useState<HTMLElement | null>(null);
 
     // Default editor config if none provided
     const config: ColumnEditorConfig = editorConfig || {
@@ -66,6 +70,32 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
     React.useEffect(() => {
         setCurrentValue(value);
     }, [value]);
+
+    // Calculate dynamic dropdown width based on content
+    const calculateDropdownWidth = React.useCallback((options: DropdownOption[]): number => {
+        if (!options || options.length === 0) return 120; // Minimum fallback
+        
+        // Find the longest text in the options
+        const longestText = options.reduce((longest, option) => {
+            const text = option.text || String(option.key || '');
+            return text.length > longest.length ? text : longest;
+        }, '');
+        
+        // More accurate width calculation:
+        // - Account for different character widths
+        // - Add padding for dropdown arrow and borders
+        // - Set reasonable min/max bounds
+        const baseCharWidth = 7.5; // Average character width in pixels for 14px font
+        const padding = 30; // Account for dropdown arrow (32px) + padding + borders
+        
+        let estimatedWidth = longestText.length * baseCharWidth + padding;
+        
+        // Apply reasonable bounds
+        estimatedWidth = Math.max(90, estimatedWidth); // Minimum 120px
+        estimatedWidth = Math.min(400, estimatedWidth); // Maximum 400px to prevent overly wide dropdowns
+        
+        return Math.round(estimatedWidth);
+    }, []);
 
     // Load dynamic dropdown options
     React.useEffect(() => {
@@ -89,6 +119,19 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
             setDropdownOptions(config.dropdownOptions);
         }
     }, [config, item, column]);
+
+    // Handle click outside to close dropdown
+    React.useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (isDropdownOpen && dropdownContainerRef.current && 
+                !dropdownContainerRef.current.contains(event.target as Node)) {
+                setIsDropdownOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isDropdownOpen]);
 
     const validateValue = React.useCallback((val: any): boolean => {
         setHasError(false);
@@ -430,89 +473,147 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
             if (isLoadingOptions) {
                 return <div style={style}>Loading options...</div>;
             }
+            
+            // Filter options based on the current filter text for real-time filtering
+            const filteredOptions = filterText 
+                ? dropdownOptions.filter(opt => 
+                    opt.text.toLowerCase().includes(filterText.toLowerCase())
+                  )
+                : dropdownOptions;
 
-            // If in "add new" mode, show text input instead of dropdown
-            if (isAddingNew) {
-                return (
+            // Calculate dynamic width based on all dropdown options
+            const dynamicWidth = calculateDropdownWidth(dropdownOptions);
+
+            // Custom dropdown implementation for reliable filtering
+            return (
+                <div 
+                    ref={dropdownContainerRef}
+                    style={{ 
+                        position: 'relative', 
+                        minWidth: `${dynamicWidth}px`, 
+                        width: '100%',
+                        ...commonProps.style 
+                    }}
+                    className={`enhanced-editor-dropdown ${className} ${hasError ? 'has-error' : ''}`}
+                >
                     <TextField
-                        {...commonProps}
-                        value={newItemText}
-                        placeholder="Enter new value..."
-                        onChange={(_, newValue) => setNewItemText(newValue || '')}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                if (newItemText.trim()) {
-                                    handleValueChange(newItemText.trim());
-                                    onCommit(newItemText.trim());
-                                    setIsAddingNew(false);
-                                    setNewItemText('');
+                        value={filterText}
+                        placeholder={config.placeholder || "Type to search or select..."}
+                        autoFocus={true}
+                        onChange={(_, newValue) => {
+                            const searchText = newValue || '';
+                            setFilterText(searchText);
+                            setCurrentValue(searchText);
+                            setIsDropdownOpen(true); // Show dropdown when typing
+                        }}
+                        onFocus={(e) => {
+                            setIsDropdownOpen(true); // Show dropdown on focus
+                            setDropdownTarget(e.target as HTMLElement); // Set target for Callout positioning
+                        }}
+                        onBlur={(e) => {
+                            // Delay to allow option selection
+                            setTimeout(() => {
+                                setIsDropdownOpen(false);
+                                // Commit the current filter text as the value
+                                const valueToCommit = filterText;
+                                if (validateValue(valueToCommit)) {
+                                    const formattedValue = config.valueFormatter ? 
+                                        config.valueFormatter(valueToCommit, item, column) : 
+                                        valueToCommit;
+                                    onCommit(formattedValue);
                                 }
-                            } else if (e.key === 'Escape') {
-                                setIsAddingNew(false);
-                                setNewItemText('');
-                                onCancel();
+                            }, 150);
+                        }}
+                        onKeyDown={(e) => {
+                            switch (e.key) {
+                                case 'Enter':
+                                    e.preventDefault();
+                                    setIsDropdownOpen(false);
+                                    const valueToCommit = filterText;
+                                    if (validateValue(valueToCommit)) {
+                                        const formattedValue = config.valueFormatter ? 
+                                            config.valueFormatter(valueToCommit, item, column) : 
+                                            valueToCommit;
+                                        onCommit(formattedValue);
+                                    }
+                                    break;
+                                case 'Escape':
+                                    e.preventDefault();
+                                    setIsDropdownOpen(false);
+                                    onCancel();
+                                    break;
+                                case 'ArrowDown':
+                                    e.preventDefault();
+                                    setIsDropdownOpen(true);
+                                    break;
                             }
                         }}
-                        onBlur={() => {
-                            if (newItemText.trim()) {
-                                handleValueChange(newItemText.trim());
-                                onCommit(newItemText.trim());
-                                setIsAddingNew(false);
-                                setNewItemText('');
-                            } else {
-                                setIsAddingNew(false);
-                                setNewItemText('');
-                                onCancel();
+                        styles={{
+                            root: { width: '100%' },
+                            field: { 
+                                border: 'none', 
+                                background: 'transparent',
+                                fontSize: '13px'
                             }
-                        }}
-                        autoFocus
-                        style={{
-                            ...commonProps.style,
-                            minWidth: '120px',
-                            width: '100%'
                         }}
                     />
-                );
-            }
-            
-            let dropdownOptionsFormatted: IDropdownOption[] = dropdownOptions.map(opt => ({
-                key: opt.key,
-                text: opt.text,
-                disabled: opt.disabled,
-                selected: opt.value === currentValue,
-                data: opt
-            }));
-
-            return (
-                <Dropdown
-                    {...commonProps}
-                    options={dropdownOptionsFormatted}
-                    selectedKey={currentValue}
-                    placeholder={config.placeholder || "Select an option..."}
-                    style={{ 
-                        ...commonProps.style,
-                        minWidth: '120px', // Ensure minimum width for visibility
-                        width: '100%'
-                    }}
-                    onChange={(_, option) => {
-                        const newValue = option?.data?.value || option?.key;
-                        handleValueChange(newValue);
-                        // Auto-commit dropdown selections
-                        setTimeout(() => {
-                            const formattedValue = config.valueFormatter ? 
-                                config.valueFormatter(newValue, item, column) : 
-                                newValue;
-                            onCommit(formattedValue);
-                        }, 100);
-                    }}
-                    onDoubleClick={() => {
-                        // Enable custom text input on double-click when AllowDirectTextInput is enabled
-                        if (config.allowDirectTextInput) {
-                            setIsAddingNew(true);
-                            setNewItemText(typeof currentValue === 'string' ? currentValue : '');
-                        }
-                    }}
-                />
+                    
+                    {/* Dropdown arrow */}
+                    <div 
+                        className="enhanced-dropdown-arrow"
+                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    >
+                        ▼
+                    </div>
+                    
+                    {/* Searchable Dropdown using Callout for proper positioning */}
+                    {isDropdownOpen && filteredOptions.length > 0 && dropdownTarget && (
+                        <Callout
+                            target={dropdownTarget}
+                            onDismiss={() => setIsDropdownOpen(false)}
+                            directionalHint={DirectionalHint.rightTopEdge}
+                            isBeakVisible={false}
+                            styles={{
+                                root: { zIndex: 999999 },
+                                calloutMain: { 
+                                    minWidth: 250,
+                                    maxWidth: 400,
+                                    maxHeight: 300,
+                                    border: '1px solid #d1d1d1',
+                                    borderRadius: '4px',
+                                    boxShadow: '0 4px 16px rgba(0,0,0,0.25)'
+                                }
+                            }}
+                        >
+                            <div className="enhanced-dropdown-list" style={{ border: 'none', boxShadow: 'none' }}>
+                                {filteredOptions.map((option, index) => (
+                                    <div
+                                        key={option.key}
+                                        className="enhanced-dropdown-item"
+                                        onMouseDown={(e) => {
+                                            e.preventDefault(); // Prevent blur
+                                            const selectedValue = option.value || option.key;
+                                            setFilterText(option.text);
+                                            setCurrentValue(selectedValue);
+                                            setIsDropdownOpen(false);
+                                            handleValueChange(selectedValue);
+                                            
+                                            // Commit the selection
+                                            setTimeout(() => {
+                                                const formattedValue = config.valueFormatter ? 
+                                                    config.valueFormatter(selectedValue, item, column) : 
+                                                    selectedValue;
+                                                onCommit(formattedValue);
+                                            }, 10);
+                                        }}
+                                    >
+                                        {option.text}
+                                    </div>
+                                ))}
+                            </div>
+                        </Callout>
+                    )}
+                </div>
             );
 
         case 'autocomplete':

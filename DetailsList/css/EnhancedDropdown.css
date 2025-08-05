@@ -1,0 +1,115 @@
+/* Enhanced Dropdown Editor Styles */
+.enhanced-editor-dropdown {
+    position: relative;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.enhanced-editor-dropdown .ms-TextField-field {
+    border: 1px solid #d1d1d1 !important;
+    background: white !important;
+    border-radius: 4px !important;
+    padding-right: 32px !important; /* Space for arrow */
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.enhanced-editor-dropdown .ms-TextField-field:focus {
+    border-color: #0078d4 !important;
+    box-shadow: 0 0 0 1px #0078d4 !important;
+    outline: none !important;
+}
+
+.enhanced-editor-dropdown .ms-TextField-field:hover {
+    border-color: #0078d4 !important;
+}
+
+/* Dropdown List Styling */
+.enhanced-dropdown-list {
+    position: fixed; /* Use fixed positioning to escape cell overflow */
+    max-height: 200px;
+    overflow-y: auto;
+    background-color: white;
+    border: 1px solid #d1d1d1;
+    border-radius: 4px; /* Full border radius since it's a standalone element */
+    box-shadow: 0 4px 16px rgba(0,0,0,0.25); /* Stronger shadow for visibility */
+    z-index: 99999; /* Very high z-index to appear above everything */
+    animation: slideDown 0.1s ease-out;
+    min-width: 120px; /* Ensure minimum width */
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.enhanced-dropdown-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    background-color: white;
+    font-size: 13px;
+    transition: background-color 0.1s ease;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.enhanced-dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.enhanced-dropdown-item:hover {
+    background-color: #f5f5f5 !important;
+}
+
+.enhanced-dropdown-item:active {
+    background-color: #e1e1e1 !important;
+}
+
+/* Dropdown Arrow */
+.enhanced-dropdown-arrow {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    padding: 4px;
+    font-size: 12px;
+    color: #666;
+    pointer-events: auto;
+    transition: color 0.15s ease;
+}
+
+.enhanced-dropdown-arrow:hover {
+    color: #0078d4;
+}
+
+/* Scrollbar styling for dropdown */
+.enhanced-dropdown-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.enhanced-dropdown-list::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.enhanced-dropdown-list::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.enhanced-dropdown-list::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
+}
+
+/* Error state */
+.enhanced-editor-dropdown.has-error .ms-TextField-field {
+    border-color: #d13438 !important;
+}
+
+.enhanced-editor-dropdown.has-error .ms-TextField-field:focus {
+    border-color: #d13438 !important;
+    box-shadow: 0 0 0 1px #d13438 !important;
+}

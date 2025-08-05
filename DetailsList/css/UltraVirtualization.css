@@ -218,25 +218,102 @@
 
 /* Enhanced dropdown editor styles */
 .enhanced-editor [data-is-focusable="true"] {
-    min-width: 120px !important;
     width: 100% !important;
 }
 
-/* Dropdown specific styling */
+/* ComboBox specific styling for enhanced filtering */
+.enhanced-editor .ms-ComboBox {
+    width: 100% !important;
+}
+
+.enhanced-editor .ms-ComboBox-container {
+    width: 100% !important;
+}
+
+.enhanced-editor .ms-ComboBox-Input {
+    font-size: 14px;
+    padding: 6px 8px;
+    border: 2px solid #0969da;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 
+        0 0 0 3px rgba(9, 105, 218, 0.1),
+        0 2px 8px rgba(9, 105, 218, 0.15);
+}
+
+.enhanced-editor .ms-ComboBox-Input:focus {
+    border-color: #0550ae;
+    background: #ffffff;
+    box-shadow: 
+        0 0 0 3px rgba(9, 105, 218, 0.2),
+        0 4px 16px rgba(9, 105, 218, 0.25),
+        0 1px 4px rgba(0, 0, 0, 0.1);
+    transform: scale(1.01);
+    color: #0969da;
+    font-weight: 500;
+}
+
+/* Placeholder text styling for ComboBox */
+.enhanced-editor .ms-ComboBox-Input::placeholder {
+    color: #656d76;
+    font-style: italic;
+    opacity: 0.8;
+}
+
+/* Basic inline editor ComboBox styling */
+.inline-editor .ms-ComboBox {
+    width: 100% !important;
+}
+
+.inline-editor .ms-ComboBox-container {
+    width: 100% !important;
+}
+
+.inline-editor .ms-ComboBox-Input {
+    font-size: 14px;
+    padding: 6px 8px;
+    border: 2px solid #0969da;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 
+        0 0 0 3px rgba(9, 105, 218, 0.1),
+        0 2px 8px rgba(9, 105, 218, 0.15);
+}
+
+.inline-editor .ms-ComboBox-Input:focus {
+    border-color: #0550ae;
+    background: #ffffff;
+    box-shadow: 
+        0 0 0 3px rgba(9, 105, 218, 0.2),
+        0 4px 16px rgba(9, 105, 218, 0.25),
+        0 1px 4px rgba(0, 0, 0, 0.1);
+    transform: scale(1.01);
+    color: #0969da;
+    font-weight: 500;
+}
+
+/* Placeholder text styling for basic ComboBox */
+.inline-editor .ms-ComboBox-Input::placeholder {
+    color: #656d76;
+    font-style: italic;
+    opacity: 0.8;
+}
+
+/* Legacy Dropdown specific styling (for backwards compatibility) */
 .enhanced-editor .ms-Dropdown {
-    min-width: 120px !important;
     width: 100% !important;
 }
 
 .enhanced-editor .ms-Dropdown-container {
-    min-width: 120px !important;
     width: 100% !important;
 }
 
 .enhanced-editor .ms-Dropdown-title {
-    min-width: 100px !important;
     font-size: 14px;
     padding: 6px 8px;
+    /* Allow dynamic width, no fixed min-width */
 }
 
 /* Placeholder text styling for empty dropdowns */
