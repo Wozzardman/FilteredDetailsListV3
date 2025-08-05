@@ -50,6 +50,39 @@ The component supports powerful inline editing capabilities through the `editorC
 
 ### Supported Editor Types
 
+The component supports the following EditorTypes for the `editorConfig` dataset:
+
+#### **Core Input Types**
+- **`Text`** - Single line or multi-line text input with validation
+- **`Number`** - Numeric input with min/max constraints and step values
+- **`Email`** - Email input with built-in validation
+- **`Phone`** - Phone number input with pattern validation
+- **`Url`** - URL input with validation
+- **`Password`** - Password input field
+
+#### **Financial & Numeric Types**
+- **`Currency`** - Monetary values with currency symbols and decimal places
+- **`Percentage`** - Percentage values with % symbol and constraints
+
+#### **Date & Time Types**
+- **`Date`** - Date picker with optional time selection
+- **`DateTime`** - Date and time picker combination
+
+#### **Selection Types**
+- **`Boolean`** - Toggle switch for true/false values
+- **`Dropdown`** - Single selection dropdown with search capability
+- **`Multiselect`** - Multiple selection dropdown (planned)
+- **`Autocomplete`** - Text input with autocomplete suggestions (basic implementation)
+
+#### **Interactive Types**
+- **`Rating`** - Star rating component with configurable maximum
+- **`Slider`** - Range slider with min/max values and steps
+- **`Color`** - Color picker for hex color values
+
+#### **Rich Content Types**
+- **`RichText`** - Rich text editor (planned)
+- **`Custom`** - Custom React component implementation
+
 #### **Text Editor**
 ```powerapp
 {ColumnKey: "description", EditorType: "Text", MaxLength: 255, IsMultiline: true, Placeholder: "Enter description..."}
@@ -94,6 +127,45 @@ Advanced dropdown with JSON:
 {ColumnKey: "priority", EditorType: "Dropdown", DropdownOptions: "[{\"key\":\"high\",\"text\":\"High Priority\"},{\"key\":\"low\",\"text\":\"Low Priority\"}]"}
 ```
 
+#### **Percentage Editor**
+```powerapp
+{ColumnKey: "completion", EditorType: "Percentage", MinValue: 0, MaxValue: 100, DecimalPlaces: 1}
+```
+- `MinValue/MaxValue`: Percentage range constraints
+- `DecimalPlaces`: Number of decimal places to display
+- Automatically adds % symbol
+
+#### **Phone Editor**
+```powerapp
+{ColumnKey: "phone", EditorType: "Phone", ValidationPattern: "^\\+?[1-9]\\d{1,14}$", PatternErrorMessage: "Invalid phone format"}
+```
+- `ValidationPattern`: Regex pattern for phone validation
+- `PatternErrorMessage`: Custom error message
+- Built-in phone number formatting
+
+#### **URL Editor**
+```powerapp
+{ColumnKey: "website", EditorType: "Url", IsRequired: true, Placeholder: "https://example.com"}
+```
+- Automatically validates URL format
+- Supports http/https protocols
+
+#### **Color Editor**
+```powerapp
+{ColumnKey: "brandColor", EditorType: "Color", DefaultValue: "#0078d4"}
+```
+- Visual color picker interface
+- Returns hex color values
+- Supports default color selection
+
+#### **Boolean Editor**
+```powerapp
+{ColumnKey: "isActive", EditorType: "Boolean", DefaultValue: "true"}
+```
+- Renders as toggle switch
+- Returns true/false values
+- Auto-commits on change
+
 #### **Date Editor**
 ```powerapp
 {ColumnKey: "dueDate", EditorType: "Date", ShowTime: true, DateFormat: "MM/dd/yyyy"}
@@ -127,8 +199,38 @@ All editor types support these common properties:
     IsRequired: true,                // Mark field as required
     IsReadOnly: false,               // Make field read-only
     Placeholder: "Enter value...",   // Placeholder text
+    DefaultValue: "Initial value",   // Default value for new records
+    ValueType: "text",              // Type for default value conversion (text, number, boolean, date)
     AllowDirectTextInput: true       // Allow direct text input (for dropdowns)
 }
+```
+
+### Default Values & Conditional Logic
+
+Set default values and create conditional dropdowns based on other column selections:
+
+```powerapp
+Table(
+    // Static default value
+    {ColumnKey: "status", EditorType: "Dropdown", DropdownOptions: "Active,Inactive,Pending", DefaultValue: "Active"},
+    
+    // Conditional dropdown based on department selection
+    {ColumnKey: "role", EditorType: "Dropdown", 
+     DropdownOptions: Switch(
+         ThisItem.department,
+         "IT", "Developer,Analyst,Manager,Support",
+         "HR", "Recruiter,Coordinator,Manager", 
+         "Finance", "Accountant,Controller,Manager",
+         "General"  // Default options
+     ),
+     DefaultValue: Switch(
+         ThisItem.department,
+         "IT", "Developer",
+         "HR", "Recruiter", 
+         "Finance", "Accountant",
+         ""  // Default empty
+     )}
+)
 ```
 
 ### Complete Example

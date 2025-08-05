@@ -291,6 +291,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
             );
 
         case 'number':
+            const stepValue = config.numberConfig?.step || 1;
             return (
                 <SpinButton
                     {...commonProps}
@@ -300,12 +301,40 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                         handleValueChange(numValue);
                         return String(numValue);
                     }}
+                    onIncrement={(value) => {
+                        const currentNum = Number(value) || 0;
+                        const newValue = currentNum + stepValue;
+                        const min = config.numberConfig?.min;
+                        const max = config.numberConfig?.max;
+                        
+                        // Check max constraint
+                        if (max !== undefined && newValue > max) {
+                            return String(max);
+                        }
+                        
+                        handleValueChange(newValue);
+                        return String(newValue);
+                    }}
+                    onDecrement={(value) => {
+                        const currentNum = Number(value) || 0;
+                        const newValue = currentNum - stepValue;
+                        const min = config.numberConfig?.min;
+                        const max = config.numberConfig?.max;
+                        
+                        // Check min constraint
+                        if (min !== undefined && newValue < min) {
+                            return String(min);
+                        }
+                        
+                        handleValueChange(newValue);
+                        return String(newValue);
+                    }}
                     onBlur={handleBlur}
                     min={config.numberConfig?.min}
                     max={config.numberConfig?.max}
-                    step={config.numberConfig?.step || 1}
-                    incrementButtonAriaLabel="Increase value by 1"
-                    decrementButtonAriaLabel="Decrease value by 1"
+                    step={stepValue}
+                    incrementButtonAriaLabel={`Increase value by ${stepValue}`}
+                    decrementButtonAriaLabel={`Decrease value by ${stepValue}`}
                 />
             );
 
