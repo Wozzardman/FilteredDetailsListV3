@@ -113,3 +113,52 @@
     border-color: #d13438 !important;
     box-shadow: 0 0 0 1px #d13438 !important;
 }
+
+/* Narrow Column Adaptations */
+.enhanced-editor-dropdown.narrow-column {
+    font-size: 12px; /* Slightly smaller font for narrow columns */
+}
+
+.enhanced-editor-dropdown.narrow-column .ms-TextField-field {
+    font-size: 12px !important;
+    padding: 4px 24px 4px 8px !important; /* Reduced padding for narrow columns */
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    min-height: 28px !important; /* Ensure minimum height */
+}
+
+.enhanced-editor-dropdown.narrow-column .enhanced-dropdown-arrow {
+    right: 4px !important; /* Move arrow closer for narrow columns */
+    width: 16px !important;
+    height: 16px !important;
+    font-size: 10px !important;
+}
+
+/* Dropdown items in narrow columns - allow text wrapping */
+.enhanced-editor-dropdown.narrow-column + .ms-Callout .enhanced-dropdown-item {
+    white-space: normal !important; /* Allow text wrapping in dropdown */
+    word-wrap: break-word !important;
+    padding: 6px 8px !important; /* Reduced padding */
+    font-size: 12px !important;
+    line-height: 1.3 !important;
+    min-height: 20px !important; /* Explicit minimum height instead of auto */
+}
+
+/* Make dropdown wider than the narrow input for better readability */
+.enhanced-editor-dropdown.narrow-column + .ms-Callout .enhanced-dropdown-list {
+    min-width: 200px !important; /* Force wider dropdown even for narrow columns */
+    max-width: 300px !important;
+}
+
+/* Extra-narrow columns (less than 80px) */
+.enhanced-editor-dropdown.narrow-column .ms-TextField-field[style*="max-width"] {
+    padding: 2px 20px 2px 4px !important; /* Even more compact padding */
+    font-size: 11px !important;
+}
+
+.enhanced-editor-dropdown.narrow-column .enhanced-dropdown-arrow[style*="narrow"] {
+    right: 2px !important;
+    padding: 2px !important;
+    font-size: 8px !important;
+}

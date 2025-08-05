@@ -483,18 +483,37 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
 
             // Calculate dynamic width based on all dropdown options
             const dynamicWidth = calculateDropdownWidth(dropdownOptions);
+            
+            // Get actual column width - prioritize currentWidth which reflects user resizing
+            const columnWidth = column.currentWidth || column.calculatedWidth || column.minWidth || column.maxWidth || 150;
+            const isNarrowColumn = columnWidth < 120;
+            const isExtraNarrow = columnWidth < 80;
+            
+            // Calculate optimal dropdown width based on actual column size
+            let dropdownMinWidth, dropdownMaxWidth;
+            
+            if (isNarrowColumn) {
+                // For narrow columns, prioritize fitting content but stay reasonable
+                dropdownMinWidth = Math.max(columnWidth + 50, 200); // At least 50px wider than column
+                dropdownMaxWidth = 300;
+            } else {
+                // For wider columns, scale dropdown size proportionally with column width
+                // Make dropdown size responsive to column width while respecting content needs
+                const baseWidth = Math.max(columnWidth * 0.75, dynamicWidth); // Use 75% of column width or content width
+                dropdownMinWidth = Math.max(baseWidth, 250);
+                dropdownMaxWidth = Math.max(columnWidth * 1.2, 400); // Allow dropdown to be 20% wider than column
+            }
 
             // Custom dropdown implementation for reliable filtering
             return (
                 <div 
                     ref={dropdownContainerRef}
                     style={{ 
-                        position: 'relative', 
-                        minWidth: `${dynamicWidth}px`, 
-                        width: '100%',
+                        position: 'relative',
+                        width: '100%', // Let it fill the available space like text inputs
                         ...commonProps.style 
                     }}
-                    className={`enhanced-editor-dropdown ${className} ${hasError ? 'has-error' : ''}`}
+                    className={`enhanced-editor-dropdown ${className} ${hasError ? 'has-error' : ''} ${isNarrowColumn ? 'narrow-column' : ''} ${isExtraNarrow ? 'extra-narrow' : ''}`}
                 >
                     <TextField
                         value={filterText}
@@ -576,20 +595,27 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                             styles={{
                                 root: { zIndex: 999999 },
                                 calloutMain: { 
-                                    minWidth: 250,
-                                    maxWidth: 400,
+                                    minWidth: dropdownMinWidth,
+                                    maxWidth: dropdownMaxWidth,
                                     maxHeight: 300,
                                     border: '1px solid #d1d1d1',
                                     borderRadius: '4px',
-                                    boxShadow: '0 4px 16px rgba(0,0,0,0.25)'
+                                    boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+                                    fontSize: isNarrowColumn ? '12px' : '14px'
                                 }
                             }}
                         >
-                            <div className="enhanced-dropdown-list" style={{ border: 'none', boxShadow: 'none' }}>
+                            <div className={`enhanced-dropdown-list ${isNarrowColumn ? 'narrow-column-dropdown' : ''}`} style={{ border: 'none', boxShadow: 'none' }}>
                                 {filteredOptions.map((option, index) => (
                                     <div
                                         key={option.key}
-                                        className="enhanced-dropdown-item"
+                                        className={`enhanced-dropdown-item ${isNarrowColumn ? 'narrow-column-item' : ''}`}
+                                        style={{
+                                            fontSize: isNarrowColumn ? '12px' : '14px',
+                                            whiteSpace: isNarrowColumn ? 'normal' : 'nowrap',
+                                            wordWrap: isNarrowColumn ? 'break-word' : 'normal',
+                                            lineHeight: isNarrowColumn ? '1.3' : '1.5'
+                                        }}
                                         onMouseDown={(e) => {
                                             e.preventDefault(); // Prevent blur
                                             const selectedValue = option.value || option.key;

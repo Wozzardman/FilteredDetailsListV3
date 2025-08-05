@@ -850,12 +850,18 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                     if (isEditing && enableInlineEditing) {
                         const editorConfig = columnEditorMapping[columnKey];
                         
+                        // Create enhanced column object with current width from resizing
+                        const enhancedColumn = {
+                            ...column,
+                            currentWidth: columnWidthOverrides[columnKey] || memoizedColumnWidths[columnIndex] || column.maxWidth || column.minWidth || 150
+                        };
+                        
                         return (
                             <div key={columnKey} style={cellStyle}>
                                 {useEnhancedEditors && editorConfig ? (
                                     <EnhancedInlineEditor
                                         value={editingState.originalValue}
-                                        column={column}
+                                        column={enhancedColumn}
                                         item={item}
                                         editorConfig={editorConfig}
                                         onCommit={commitEdit}
@@ -865,7 +871,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                 ) : (
                                     <InlineEditor
                                         value={editingState.originalValue}
-                                        column={column}
+                                        column={enhancedColumn}
                                         dataType={dataType}
                                         availableValues={availableValues}
                                         isReadOnly={isReadOnly}
