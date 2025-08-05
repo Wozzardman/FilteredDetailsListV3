@@ -687,14 +687,20 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         const item = filteredItems[itemIndex];
         const itemId = item.key || item.id || item.getRecordId?.() || itemIndex.toString();
 
-        if (newValue !== originalValue) {
-            const changeKey = getCellKey(itemIndex, columnKey);
+        const changeKey = getCellKey(itemIndex, columnKey);
+        
+        // Check if we already have a change for this cell - if so, keep the original oldValue
+        const existingChange = pendingChanges.get(changeKey);
+        const actualOldValue = existingChange ? existingChange.oldValue : originalValue;
+        
+        // Only create/update a change if the new value is different from the actual original value
+        if (newValue !== actualOldValue) {
             const change = {
                 itemId,
                 itemIndex,
                 columnKey,
                 newValue,
-                oldValue: originalValue
+                oldValue: actualOldValue
             };
 
             setPendingChanges(prev => new Map(prev.set(changeKey, change)));
@@ -707,12 +713,27 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
 
             // Update change manager
             if (changeManager) {
-                changeManager.addChange(itemId, columnKey, originalValue, newValue);
+                changeManager.addChange(itemId, columnKey, actualOldValue, newValue);
+            }
+        } else {
+            // If the new value equals the actual original value, remove any existing change
+            if (existingChange) {
+                setPendingChanges(prev => {
+                    const newMap = new Map(prev);
+                    newMap.delete(changeKey);
+                    return newMap;
+                });
+                
+                // Revert the item to original value
+                setPCFValue(item, columnKey, actualOldValue);
+                
+                // Note: We don't remove from changeManager since it doesn't track individual
+                // cell changes the same way - the main change tracking is via pendingChanges
             }
         }
 
         setEditingState(null);
-    }, [editingState, filteredItems, onCellEdit, changeManager]);
+    }, [editingState, filteredItems, onCellEdit, changeManager, pendingChanges]);
 
     // Cancel edit
     const cancelEdit = React.useCallback(() => {
