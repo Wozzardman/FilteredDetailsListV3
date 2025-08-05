@@ -620,6 +620,65 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         setEditingState({ itemIndex, columnKey, originalValue });
     }, [enableInlineEditing, readOnlyColumns, filteredItems]);
 
+    // Handle conditional item changes
+    const handleItemChange = React.useCallback((targetColumnKey: string, newValue: any) => {
+        if (!editingState) return;
+
+        const { itemIndex } = editingState;
+        const item = filteredItems[itemIndex];
+        const itemId = item.key || item.id || item.getRecordId?.() || itemIndex.toString();
+
+        // Get the original value BEFORE updating the item
+        const originalValue = getPCFValue(item, targetColumnKey);
+        
+        // Update the item immediately for conditional logic
+        setPCFValue(item, targetColumnKey, newValue);
+
+        // Track as a change if different from original
+        if (newValue !== originalValue) {
+            const changeKey = getCellKey(itemIndex, targetColumnKey);
+            
+            // Check if we already have a change for this cell - if so, keep the original oldValue
+            const existingChange = pendingChanges.get(changeKey);
+            const actualOldValue = existingChange ? existingChange.oldValue : originalValue;
+            
+            const change = {
+                itemId,
+                itemIndex,
+                columnKey: targetColumnKey,
+                newValue,
+                oldValue: actualOldValue
+            };
+
+            setPendingChanges(prev => new Map(prev.set(changeKey, change)));
+
+            // Notify parent
+            onCellEdit?.(itemId, targetColumnKey, newValue);
+
+            // Update change manager
+            if (changeManager) {
+                changeManager.addChange(itemId, targetColumnKey, originalValue, newValue);
+            }
+        }
+    }, [editingState, filteredItems, onCellEdit, changeManager]);
+
+    // Get all column values for conditional logic
+    const getCurrentColumnValues = React.useCallback((): Record<string, any> => {
+        if (!editingState) return {};
+
+        const { itemIndex } = editingState;
+        const item = filteredItems[itemIndex];
+        const values: Record<string, any> = {};
+
+        columns.forEach(column => {
+            if (column.key) {
+                values[column.key] = getPCFValue(item, column.key);
+            }
+        });
+
+        return values;
+    }, [editingState, filteredItems, columns]);
+
     // Commit cell edit
     const commitEdit = React.useCallback((newValue: any) => {
         if (!editingState) return;
@@ -866,6 +925,9 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                         editorConfig={editorConfig}
                                         onCommit={commitEdit}
                                         onCancel={cancelEdit}
+                                        onItemChange={handleItemChange}
+                                        allColumns={getCurrentColumnValues()}
+                                        columnEditorMapping={columnEditorMapping}
                                         style={{ width: '100%', border: 'none', background: 'transparent' }}
                                     />
                                 ) : (

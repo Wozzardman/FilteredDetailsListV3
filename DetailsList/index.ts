@@ -11,6 +11,16 @@ import { performanceMonitor } from './performance/PerformanceMonitor';
 import { AutoUpdateManager, RecordIdentity } from './services/AutoUpdateManager';
 import { PowerAppsFxColumnEditorParser } from './services/PowerAppsFxColumnEditorParser';
 import { SelectionManager, SelectionState } from './services/SelectionManager';
+
+// Initialize global data source registry for conditional lookups
+if (typeof window !== 'undefined') {
+    (window as any).PowerAppsDataSources = (window as any).PowerAppsDataSources || {};
+    (window as any).registerPowerAppsDataSource = (name: string, data: any) => {
+        (window as any).PowerAppsDataSources[name] = data;
+        console.log(`📊 Registered data source: ${name}`, data);
+    };
+}
+
 type DataSet = ComponentFramework.PropertyHelper.DataSetApi.EntityRecord & IObjectWithKey;
 
 // Native Power Apps selection state (similar to ComboBox.SelectedItems)
@@ -957,6 +967,17 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                             const allowZeroRating = record.getValue('AllowZeroRating');
                             const showSliderValue = record.getValue('ShowSliderValue');
                             
+                            // Get conditional logic fields
+                            const dependsOn = record.getValue('DependsOn');
+                            const lookupMappingSource = record.getValue('LookupMappingSource');
+                            const lookupMappingFilter = record.getValue('LookupMappingFilter');
+                            const lookupMappingReturn = record.getValue('LookupMappingReturn');
+                            const lookupDataSource = record.getValue('LookupDataSource');
+                            const lookupFilterColumn = record.getValue('LookupFilterColumn');
+                            const lookupReturnColumn = record.getValue('LookupReturnColumn');
+                            const defaultValueFormula = record.getValue('DefaultValueFormula');
+                            const conditionalFormula = record.getValue('ConditionalFormula');
+                            
                             // Apply common properties
                             if (isRequired !== null && isRequired !== undefined) config.isRequired = isRequired;
                             if (isReadOnly !== null && isReadOnly !== undefined) config.isReadOnly = isReadOnly;
@@ -1019,6 +1040,41 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                                 if (showSliderValue !== null && showSliderValue !== undefined) config.sliderConfig = { ...config.sliderConfig, showValue: showSliderValue };
                             }
                             
+                            // Process conditional logic configuration
+                            if (dependsOn || lookupDataSource || defaultValueFormula || conditionalFormula || lookupMappingSource) {
+                                config.conditional = {};
+                                
+                                if (dependsOn) {
+                                    config.conditional.dependsOn = dependsOn;
+                                }
+                                
+                                // Add lookup mapping if configured
+                                if (lookupMappingSource && lookupMappingFilter && lookupMappingReturn) {
+                                    config.conditional.lookupMapping = {
+                                        dataSource: lookupMappingSource,
+                                        filterColumn: lookupMappingFilter,
+                                        returnColumn: lookupMappingReturn
+                                    };
+                                }
+                                
+                                // Add main lookup if configured
+                                if (lookupDataSource && lookupFilterColumn && lookupReturnColumn) {
+                                    config.conditional.lookup = {
+                                        dataSource: lookupDataSource,
+                                        filterColumn: lookupFilterColumn,
+                                        returnColumn: lookupReturnColumn
+                                    };
+                                }
+                                
+                                if (defaultValueFormula) {
+                                    config.conditional.defaultValueFormula = defaultValueFormula;
+                                }
+                                
+                                if (conditionalFormula) {
+                                    config.conditional.formula = conditionalFormula;
+                                }
+                            }
+                            
                             columnEditorMapping[columnKey] = config;
                         }
                     }
@@ -1028,6 +1084,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                     console.warn('⚠️ Error processing table-based editor configuration:', error);
                 }
             }
+            
             // Priority 2: Power Apps FX formulas (existing implementation)
             else if ((context.parameters as any).ColumnEditorFormulas?.raw) {
                 const formulasProperty = (context.parameters as any).ColumnEditorFormulas;

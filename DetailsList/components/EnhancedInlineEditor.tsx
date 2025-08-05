@@ -21,10 +21,13 @@ import '../css/EnhancedDropdown.css';
 import { 
     ColumnEditorType, 
     ColumnEditorConfig, 
+    ColumnEditorMapping,
     DropdownOption,
     AutocompleteOption,
     CustomEditorProps 
 } from '../types/ColumnEditor.types';
+import { conditionalEngine, ConditionalEngineContext } from '../services/ConditionalLogicEngine';
+import { PowerAppsConditionalProcessor, PowerAppsConditionalConfig } from '../services/PowerAppsConditionalProcessor';
 
 export interface EnhancedInlineEditorProps {
     value: any;
@@ -34,6 +37,9 @@ export interface EnhancedInlineEditorProps {
     onCommit: (value: any) => void;
     onCancel: () => void;
     onValueChange?: (value: any) => void;
+    onItemChange?: (columnKey: string, value: any) => void; // New: For conditional updates
+    allColumns?: Record<string, any>; // New: All column values for conditional logic
+    columnEditorMapping?: ColumnEditorMapping; // New: All editor configurations for conditional logic
     style?: React.CSSProperties;
     className?: string;
 }
@@ -46,6 +52,9 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
     onCommit,
     onCancel,
     onValueChange,
+    onItemChange,
+    allColumns,
+    columnEditorMapping,
     style,
     className = ''
 }) => {
@@ -67,9 +76,121 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
         isRequired: false
     };
 
+    // Register conditional logic for this editor
+    React.useEffect(() => {
+        if (config.conditional && column.key) {
+            // Only register if this is an enterprise conditional config (not PowerApps)
+            const conditional = config.conditional as any;
+            if (typeof conditional.dependsOn !== 'string') {
+                conditionalEngine.registerConditionalConfig(column.key, config.conditional as any);
+            }
+        }
+    }, [config.conditional, column.key]);
+
+    // Conditional logic context
+    const createConditionalContext = React.useCallback((): ConditionalEngineContext => ({
+        item,
+        allColumns: allColumns || {},
+        columnKey: column.key || '',
+        currentValue,
+        onValueChange: (columnKey: string, newValue: any) => {
+            if (columnKey === column.key) {
+                setCurrentValue(newValue);
+                handleValueChange(newValue);
+            } else if (onItemChange) {
+                onItemChange(columnKey, newValue);
+            }
+        },
+        onOptionsChange: (columnKey: string, options: DropdownOption[]) => {
+            if (columnKey === column.key) {
+                setDropdownOptions(options);
+            }
+        },
+        onValidationChange: (columnKey: string, error: string | null) => {
+            if (columnKey === column.key) {
+                setErrorMessage(error || '');
+                setHasError(!!error);
+            }
+        }
+    }), [item, allColumns, column.key, currentValue, onItemChange]);
+
+    // Handle conditional triggers when this editor's value changes
+    const handleConditionalTrigger = React.useCallback(async (
+        triggerType: 'onChange' | 'onFocus' | 'onBlur' | 'onInit',
+        newValue?: any
+    ) => {
+        const valueToUse = newValue !== undefined ? newValue : currentValue;
+        
+        if (column.key && config.conditional) {
+            // Handle enterprise conditional logic
+            const context = createConditionalContext();
+            await conditionalEngine.processTriggers(
+                column.key,
+                valueToUse,
+                triggerType,
+                context
+            );
+        }
+
+        // Handle PowerApps-compatible conditional logic
+        if (column.key && triggerType === 'onChange' && onItemChange && allColumns && columnEditorMapping) {
+            const processor = PowerAppsConditionalProcessor.getInstance();
+            
+            // Build configurations from the column editor mapping
+            const allEditorConfigs: Record<string, { conditional?: PowerAppsConditionalConfig }> = {};
+            
+            Object.keys(columnEditorMapping).forEach(key => {
+                const config = columnEditorMapping[key];
+                if (config.conditional) {
+                    // Check if this is a PowerApps conditional config (has string dependsOn)
+                    const conditional = config.conditional as any;
+                    if (typeof conditional.dependsOn === 'string') {
+                        allEditorConfigs[key] = { conditional: conditional as PowerAppsConditionalConfig };
+                    }
+                }
+            });
+
+            const dependencies = processor.getDependencies(allEditorConfigs);
+            const dependentFields = dependencies[column.key];
+
+            if (dependentFields && dependentFields.length > 0) {
+                const context = {
+                    currentValues: { ...allColumns, [column.key]: valueToUse },
+                    isNewRecord: !item || Object.keys(item).every(key => !item[key]),
+                    globalDataSources: (window as any).PowerAppsDataSources || {}
+                };
+
+                console.log(`🔍 Processing conditional logic for ${column.key} = ${valueToUse}`);
+                console.log(`📋 Dependent fields:`, dependentFields);
+                console.log(`🔄 Current context:`, context.currentValues);
+
+                for (const dependentField of dependentFields) {
+                    const dependentConfig = allEditorConfigs[dependentField]?.conditional;
+                    if (dependentConfig) {
+                        const newValue = processor.processConditional(
+                            dependentField,
+                            dependentConfig,
+                            context
+                        );
+
+                        if (newValue !== undefined && newValue !== allColumns[dependentField]) {
+                            console.log(`🔄 Auto-updating ${dependentField} from ${allColumns[dependentField]} to ${newValue}`);
+                            onItemChange(dependentField, newValue);
+                        }
+                    }
+                }
+            }
+        }
+    }, [column.key, currentValue, config.conditional, createConditionalContext, onItemChange, allColumns, columnEditorMapping]);
+
     React.useEffect(() => {
         setCurrentValue(value);
     }, [value]);
+
+    // Initialize conditional logic on component mount
+    React.useEffect(() => {
+        handleConditionalTrigger('onInit');
+    }, [handleConditionalTrigger]);
 
     // Calculate dynamic dropdown width based on content
     const calculateDropdownWidth = React.useCallback((options: DropdownOption[]): number => {
@@ -231,20 +352,29 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
         }
     }, [hasError, currentValue, onCommit, onCancel, config, item, column]);
 
+    const handleValueChange = React.useCallback((newValue: any) => {
+        setCurrentValue(newValue);
+        onValueChange?.(newValue);
+        validateValue(newValue);
+        
+        // Trigger conditional logic with the new value
+        handleConditionalTrigger('onChange', newValue);
+    }, [onValueChange, validateValue, handleConditionalTrigger]);
+
+    const handleFocus = React.useCallback(() => {
+        handleConditionalTrigger('onFocus');
+    }, [handleConditionalTrigger]);
+
     const handleBlur = React.useCallback(() => {
+        handleConditionalTrigger('onBlur');
+        
         if (!hasError) {
             const formattedValue = config.valueFormatter ? 
                 config.valueFormatter(currentValue, item, column) : 
                 currentValue;
             onCommit(formattedValue);
         }
-    }, [hasError, currentValue, onCommit, config, item, column]);
-
-    const handleValueChange = React.useCallback((newValue: any) => {
-        setCurrentValue(newValue);
-        onValueChange?.(newValue);
-        validateValue(newValue);
-    }, [onValueChange, validateValue]);
+    }, [hasError, currentValue, onCommit, config, item, column, handleConditionalTrigger]);
 
     if (config.isReadOnly) {
         const displayValue = config.displayFormatter ? 
@@ -269,6 +399,8 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
     const commonProps = {
         style: { border: 'none', background: 'transparent', ...style },
         onKeyDown: handleKeyDown,
+        onFocus: handleFocus,
+        onBlur: handleBlur,
         className: `enhanced-editor ${className} ${hasError ? 'has-error' : ''}`,
         autoFocus: true,
         placeholder: config.placeholder

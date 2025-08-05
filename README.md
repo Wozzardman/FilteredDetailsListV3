@@ -207,29 +207,230 @@ All editor types support these common properties:
 
 ### Default Values & Conditional Logic
 
-Set default values and create conditional dropdowns based on other column selections:
+The editor system supports powerful conditional logic for dynamic value calculation, lookups, and field dependencies. This enables sophisticated form behavior that rivals enterprise applications.
+
+#### Simple Value Dependencies
+
+Map values from one field to automatically populate another:
 
 ```powerapp
 Table(
     // Static default value
     {ColumnKey: "status", EditorType: "Dropdown", DropdownOptions: "Active,Inactive,Pending", DefaultValue: "Active"},
     
+    // Simple conditional mapping
+    {ColumnKey: "discount", EditorType: "Number", 
+     ConditionalConfig: ConditionalHelpers.mapValues("customerType", {
+         "VIP": 0.15,
+         "Premium": 0.10, 
+         "Standard": 0.05,
+         "Basic": 0.0
+     })},
+    
     // Conditional dropdown based on department selection
     {ColumnKey: "role", EditorType: "Dropdown", 
-     DropdownOptions: Switch(
-         ThisItem.department,
-         "IT", "Developer,Analyst,Manager,Support",
-         "HR", "Recruiter,Coordinator,Manager", 
-         "Finance", "Accountant,Controller,Manager",
-         "General"  // Default options
-     ),
-     DefaultValue: Switch(
-         ThisItem.department,
-         "IT", "Developer",
-         "HR", "Recruiter", 
-         "Finance", "Accountant",
-         ""  // Default empty
+     ConditionalConfig: ConditionalHelpers.conditionalOptions("department", {
+         "IT": [{key: "dev", text: "Developer"}, {key: "analyst", text: "Analyst"}],
+         "HR": [{key: "recruiter", text: "Recruiter"}, {key: "coordinator", text: "Coordinator"}],
+         "Finance": [{key: "accountant", text: "Accountant"}, {key: "controller", text: "Controller"}]
+     })}
+)
+```
+
+#### Calculated Fields
+
+Create fields that automatically calculate based on other field values:
+
+```powerapp
+Table(
+    {ColumnKey: "quantity", EditorType: "Number", MinValue: 1},
+    {ColumnKey: "unitPrice", EditorType: "Currency", CurrencySymbol: "$"},
+    
+    // Total automatically calculated from quantity × unitPrice
+    {ColumnKey: "total", EditorType: "Currency", CurrencySymbol: "$", IsReadOnly: true,
+     ConditionalConfig: ConditionalHelpers.multiFieldCalculation(
+         ["quantity", "unitPrice"],
+         (values) => (values.quantity || 0) * (values.unitPrice || 0)
+     )},
+     
+    // Tax calculation (7.5% of total)
+    {ColumnKey: "tax", EditorType: "Currency", CurrencySymbol: "$", IsReadOnly: true,
+     ConditionalConfig: ConditionalHelpers.calculate("total", 
+         (totalValue) => (totalValue || 0) * 0.075
+     )},
+     
+    // Final amount with tax
+    {ColumnKey: "finalAmount", EditorType: "Currency", CurrencySymbol: "$", IsReadOnly: true,
+     ConditionalConfig: ConditionalHelpers.multiFieldCalculation(
+         ["total", "tax"],
+         (values) => (values.total || 0) + (values.tax || 0)
      )}
+)
+```
+
+#### API Lookups
+
+Fetch values from external APIs based on field changes:
+
+```powerapp
+Table(
+    {ColumnKey: "productId", EditorType: "Text", Placeholder: "Enter product ID..."},
+    
+    // Product name looked up from API
+    {ColumnKey: "productName", EditorType: "Text", IsReadOnly: true,
+     ConditionalConfig: ConditionalHelpers.lookup("productId",
+         LookupBuilder.fromApi("https://api.company.com/products/{sourceValue}")
+             .withMethod("GET")
+             .withHeaders({"Authorization": "Bearer " + varAuthToken})
+             .withCache(300000) // 5 minute cache
+             .withTransform((response) => response.name)
+             .withFallback("Product not found")
+             .build()
+     )},
+     
+    // Category looked up and cached
+    {ColumnKey: "category", EditorType: "Text", IsReadOnly: true,
+     ConditionalConfig: ConditionalHelpers.lookup("productId",
+         LookupBuilder.fromApi("https://api.company.com/products/{sourceValue}/category")
+             .withCache(600000) // 10 minute cache
+             .withTransform((response) => response.categoryName)
+             .build()
+     )}
+)
+```
+
+#### Advanced Conditional Rules
+
+For complex scenarios, use the full rule-based system:
+
+```powerapp
+Table(
+    {ColumnKey: "orderType", EditorType: "Dropdown", DropdownOptions: "Standard,Express,Priority"},
+    {ColumnKey: "weight", EditorType: "Number", MinValue: 0, Placeholder: "Weight in lbs"},
+    
+    // Shipping cost with complex calculation
+    {ColumnKey: "shippingCost", EditorType: "Currency", CurrencySymbol: "$", IsReadOnly: true,
+     ConditionalConfig: {
+         rules: [
+             // Rule 1: Base shipping calculation on order type and weight
+             new ConditionalRuleBuilder()
+                 .withId("shipping_calculation")
+                 .forColumn("shippingCost")
+                 .withPriority(100)
+                 .whenChanged("orderType", ActionBuilder.calculate(
+                     (orderType, item, allColumns) => {
+                         const weight = allColumns.weight || 0;
+                         const baseRates = {
+                             "Standard": 5.99,
+                             "Express": 12.99,
+                             "Priority": 24.99
+                         };
+                         const baseRate = baseRates[orderType] || 0;
+                         const weightSurcharge = Math.max(0, weight - 5) * 2.50;
+                         return baseRate + weightSurcharge;
+                     }
+                 ))
+                 .build(),
+                 
+             // Rule 2: Recalculate when weight changes
+             new ConditionalRuleBuilder()
+                 .withId("shipping_weight_update")
+                 .forColumn("shippingCost")
+                 .withPriority(90)
+                 .whenChanged("weight", ActionBuilder.calculate(
+                     (weight, item, allColumns) => {
+                         const orderType = allColumns.orderType || "Standard";
+                         const baseRates = {
+                             "Standard": 5.99,
+                             "Express": 12.99,
+                             "Priority": 24.99
+                         };
+                         const baseRate = baseRates[orderType] || 0;
+                         const weightSurcharge = Math.max(0, weight - 5) * 2.50;
+                         return baseRate + weightSurcharge;
+                     }
+                 ))
+                 .build()
+         ]
+     }}
+)
+```
+
+#### Real-Time Validation
+
+Create dynamic validation rules based on other field values:
+
+```powerapp
+Table(
+    {ColumnKey: "startDate", EditorType: "Date", IsRequired: true},
+    {ColumnKey: "endDate", EditorType: "Date", IsRequired: true,
+     ConditionalConfig: {
+         rules: [
+             new ConditionalRuleBuilder()
+                 .withId("end_date_validation")
+                 .forColumn("endDate")
+                 .whenChanged("startDate", ActionBuilder.validate(
+                     (endDate, startDate) => {
+                         if (endDate && startDate && new Date(endDate) <= new Date(startDate)) {
+                             return "End date must be after start date";
+                         }
+                         return null;
+                     }
+                 ))
+                 .build()
+         ]
+     }},
+     
+    {ColumnKey: "duration", EditorType: "Number", IsReadOnly: true,
+     ConditionalConfig: ConditionalHelpers.multiFieldCalculation(
+         ["startDate", "endDate"],
+         (values) => {
+             if (values.startDate && values.endDate) {
+                 const start = new Date(values.startDate);
+                 const end = new Date(values.endDate);
+                 return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+             }
+             return 0;
+         }
+     )}
+)
+```
+
+#### Performance Features
+
+The conditional system includes enterprise-grade performance optimizations:
+
+- **Caching**: API lookups are automatically cached with configurable durations
+- **Debouncing**: Rapid value changes are debounced to prevent excessive API calls
+- **Parallel Processing**: Multiple rules are processed efficiently in parallel
+- **Dependency Tracking**: Only affected fields are recalculated when values change
+- **Error Handling**: Fallback values and graceful degradation for failed lookups
+
+#### Common Patterns
+
+Use pre-built patterns for typical scenarios:
+
+```powerapp
+Table(
+    // Price calculation pattern
+    {ColumnKey: "quantity", EditorType: "Number"},
+    {ColumnKey: "unitPrice", EditorType: "Currency"},
+    {ColumnKey: "total", EditorType: "Currency", IsReadOnly: true,
+     ConditionalConfig: CommonConditionalPatterns.calculateTotal()},
+     
+    // Geographic dependency pattern
+    {ColumnKey: "country", EditorType: "Dropdown", DropdownOptions: "US,CA,UK"},
+    {ColumnKey: "state", EditorType: "Dropdown",
+     ConditionalConfig: CommonConditionalPatterns.stateByCountry({
+         "US": [{key: "CA", text: "California"}, {key: "NY", text: "New York"}],
+         "CA": [{key: "ON", text: "Ontario"}, {key: "BC", text: "British Columbia"}],
+         "UK": [{key: "EN", text: "England"}, {key: "SC", text: "Scotland"}]
+     })},
+     
+    // Customer discount pattern
+    {ColumnKey: "customerType", EditorType: "Dropdown", DropdownOptions: "VIP,Premium,Standard,Basic"},
+    {ColumnKey: "discount", EditorType: "Percentage", IsReadOnly: true,
+     ConditionalConfig: CommonConditionalPatterns.discountByCustomerType()}
 )
 ```
 

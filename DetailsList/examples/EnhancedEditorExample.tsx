@@ -6,6 +6,7 @@
 import * as React from 'react';
 import { VirtualizedEditableGrid } from '../components/VirtualizedEditableGrid';
 import { ColumnEditorConfigHelper, CommonEditorConfigs } from '../services/ColumnEditorConfigHelper';
+import { ConditionalHelpers, ConditionalRuleBuilder, ActionBuilder } from '../services/ConditionalConfigHelpers';
 import { ColumnEditorMapping } from '../types/ColumnEditor.types';
 import { IColumn } from '@fluentui/react/lib/DetailsList';
 
@@ -250,8 +251,19 @@ export const EnhancedGridExample: React.FC = () => {
     );
 };
 
-// Advanced example with custom editor
 export const AdvancedEditorExample: React.FC = () => {
+    const [items, setItems] = React.useState<Employee[]>(sampleEmployees);
+
+    const handleCellEdit = React.useCallback((itemId: string, columnKey: string, newValue: any) => {
+        setItems(currentItems => 
+            currentItems.map(item => 
+                item.id === itemId 
+                    ? { ...item, [columnKey]: newValue }
+                    : item
+            )
+        );
+    }, []);
+
     // Custom editor component
     const SkillLevelEditor: React.FC<any> = ({ value, onChange, onCommit, onCancel }) => {
         const [localValue, setLocalValue] = React.useState(value || 'Beginner');
@@ -260,6 +272,7 @@ export const AdvancedEditorExample: React.FC = () => {
         
         return (
             <select
+                title="Skill Level Selector"
                 value={localValue}
                 onChange={(e) => {
                     setLocalValue(e.target.value);
@@ -312,7 +325,20 @@ export const AdvancedEditorExample: React.FC = () => {
                 <li>Using common editor configurations</li>
                 <li>Custom editor components</li>
                 <li>Advanced validation with regex patterns</li>
+                <li>Conditional logic with {Object.keys(advancedMapping).length} configured editors</li>
             </ul>
+            
+            <VirtualizedEditableGrid
+                items={items}
+                columns={columns}
+                height={600}
+                enableInlineEditing={true}
+                enableDragFill={true}
+                useEnhancedEditors={true}
+                columnEditorMapping={advancedMapping}
+                onCellEdit={handleCellEdit}
+                rowHeight={50}
+            />
         </div>
     );
 };

@@ -1,0 +1,104 @@
+Table(
+    {
+        ColumnKey: "WPSID",
+        EditorType: "dropdown",
+        AllowDirectTextInput: true,
+        DropdownOptions: Concat(
+            Filter(
+                WPSProject,
+                ProjectID = SelectedProjectIDVar
+            ),
+            WPSID,
+            ","
+        )
+    },
+    {
+        ColumnKey: "Stencil",
+        EditorType: "dropdown",
+        AllowDirectTextInput: true,
+        DropdownOptions: Concat(
+            Filter(
+                ProjectWelder,
+                ProjectWelderID = SelectedProjectIDVar
+            ),
+            WelderStencil,
+            ","
+        )
+    },
+    {
+        ColumnKey: "WeldType",
+        EditorType: "dropdown",
+        AllowDirectTextInput: true,
+        DropdownOptions: Concat(
+            Filter(
+                PWeldTypes,
+                ProjectID = SelectedProjectIDVar
+            ),
+            PWT,
+            ","
+        )
+    },
+    {
+        ColumnKey: "WeldDate",
+        EditorType: "date",
+        ShowTime: false,
+        DateFormat: "MM/dd/yyyy",
+        AllowDirectTextInput: true
+    },
+    {
+        ColumnKey: "VTDate",
+        EditorType: "date",
+        ShowTime: false,
+        DateFormat: "MM/dd/yyyy",
+        AllowDirectTextInput: true
+    },
+    {
+        ColumnKey: "WeldMaterial",
+        EditorType: "dropdown",
+        AllowDirectTextInput: true,
+        DropdownOptions: Concat(
+            Filter(
+                PMaterial,
+                ProjectID = SelectedProjectIDVar
+            ),
+            PMaterial,
+            ","
+        )
+    },
+    {
+        ColumnKey: "DrawingNum",
+        EditorType: "dropdown",
+        DropdownOptions: Concat(
+            Filter(
+                DrawingList,
+                ProjectID = SelectedProjectIDVar
+            ),
+            DrawingNumCombined,
+            ","
+        ),
+        AllowDirectTextInput: true
+    },
+    {
+        ColumnKey: "Comments",
+        EditorType: "text",
+        IsMultiline: true
+    },
+    {
+        ColumnKey: "Spec_Service_Req",
+        EditorType: "percentage"
+    },
+    {
+        ColumnKey: "Size",
+        EditorType: "number",
+        MinValue: 0,
+        MaxValue: 2000,
+        StepValue: 1,
+        DependsOn: "DrawingNum",
+        LookupMappingSource: "DirectArray",
+        LookupMappingFilter: ForAll(Filter(DrawingList, ProjectID = SelectedProjectIDVar), {DrawingNumCombined: DrawingNumCombined}),
+        LookupMappingReturn: ForAll(Filter(DrawingList, ProjectID = SelectedProjectIDVar), {DrawingNum: DrawingNum}),
+        LookupDataSource: "DirectArray",
+        LookupFilterColumn: ForAll(LineList, {DrawingNum: DrawingNum}),
+        LookupReturnColumn: ForAll(LineList, {Size: Size})
+    }
+)
