@@ -145,6 +145,22 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     private loadingMessage = 'Loading...';
     private loadingStartTime = 0;
 
+    /**
+     * Parse frozen columns from the input parameter string
+     * @param frozenColumnsInput Comma-separated list of column keys
+     * @returns Array of column keys to freeze
+     */
+    private parseFrozenColumns(frozenColumnsInput?: string): string[] {
+        if (!frozenColumnsInput || typeof frozenColumnsInput !== 'string') {
+            return [];
+        }
+        
+        return frozenColumnsInput
+            .split(',')
+            .map(col => col.trim())
+            .filter(col => col.length > 0);
+    }
+
     public init(context: ComponentFramework.Context<IInputs>, notifyOutputChanged: () => void): void {
         const endMeasurement = performanceMonitor.startMeasure('component-init');
 
@@ -1132,6 +1148,9 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             headerTextSize: context.parameters.HeaderTextSize?.raw || 14,
             columnTextSize: context.parameters.ColumnTextSize?.raw || 13,
             
+            // Frozen columns configuration - ZERO PERFORMANCE COST
+            frozenColumns: this.parseFrozenColumns(context.parameters.FrozenColumns?.raw || undefined),
+            
             // Row styling configuration
             alternateRowColor: context.parameters.AlternateRowColor?.raw || undefined,
             
@@ -1151,6 +1170,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             onCommitChanges: this.handleSaveButtonClick,
             onCancelChanges: this.handleCancelOperation,
             onAddNewRow: this.handleAddNewRowButtonClick,
+            onDeleteNewRow: this.handleDeleteNewRow,
             getColumnDataType: (columnKey: string) => {
                 const column = gridColumns.find(col => col.key === columnKey);
                 const dataType = column?.dataType || 'string';
@@ -2517,6 +2537,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         }
         changeMap.set('isNewRow', true);
         changeMap.set('timestamp', Date.now());
+        changeMap.set('template', newRowData); // Store the original template for cancel operations
         this.pendingChanges.set(tempId, changeMap);
 
         // Trigger a refresh to show the new row
@@ -2528,6 +2549,50 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             template: template,
             timestamp: new Date().toISOString()
         };
+    };
+
+    /**
+     * Handle delete new row operation - remove a specific newly created row
+     */
+    private handleDeleteNewRow = (itemId: string): void => {
+        console.log('🗑️ Deleting new row:', itemId);
+        
+        try {
+            // Check if this is actually a new row in pending changes
+            const changes = this.pendingChanges.get(itemId);
+            if (!changes || !changes.get('isNewRow')) {
+                console.warn('⚠️ Attempted to delete non-new row or row not found:', itemId);
+                return;
+            }
+            
+            // Remove the entire new row from pending changes
+            this.pendingChanges.delete(itemId);
+            console.log('🗑️ Removed new row from pending changes:', itemId);
+            
+            // Remove any related cell-level changes for this row
+            const cellKeysToRemove: string[] = [];
+            this.pendingChanges.forEach((_, key) => {
+                if (key.startsWith(`${itemId}_`)) {
+                    cellKeysToRemove.push(key);
+                }
+            });
+            
+            cellKeysToRemove.forEach(key => {
+                this.pendingChanges.delete(key);
+            });
+            
+            if (cellKeysToRemove.length > 0) {
+                console.log('🗑️ Removed cell-level changes for deleted row:', cellKeysToRemove);
+            }
+            
+            // Trigger a refresh to update the grid
+            this.notifyOutputChanged();
+            
+            console.log('✅ Successfully deleted new row:', itemId);
+            
+        } catch (error) {
+            console.error('❌ Error deleting new row:', error);
+        }
     };
 
     /**
@@ -2581,18 +2646,89 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     };
 
     /**
-     * Handle cancel operation - clear all pending changes
+     * Handle cancel operation - clear pending changes but preserve new rows
      */
     private handleCancelOperation = (): void => {
-        console.log('🚫 Executing cancel operation - clearing all pending changes');
+        console.log('🚫 Executing cancel operation - clearing pending changes but preserving new rows');
         
         // Set button event properties
         this.triggerButtonEvent('Cancel Changes', 'cancel', 'Cancel Changes');
         
-        // Clear all pending changes without committing
-        this.pendingChanges.clear();
+        // Preserve new rows but reset their edits to template values
+        const newRowsToPreserve = new Map<string, Map<string, any>>();
+        
+        // First, identify all new rows and their template data
+        this.pendingChanges.forEach((changes, recordId) => {
+            if (changes.get('isNewRow')) {
+                // Create a clean template for this new row
+                const cleanTemplate = new Map<string, any>();
+                cleanTemplate.set('isNewRow', true);
+                cleanTemplate.set('timestamp', changes.get('timestamp')); // Keep original timestamp
+                
+                // Reset to template defaults if they exist
+                const templateData = changes.get('template');
+                if (templateData && typeof templateData === 'object') {
+                    Object.entries(templateData).forEach(([key, value]) => {
+                        cleanTemplate.set(key, value);
+                    });
+                }
+                
+                newRowsToPreserve.set(recordId, cleanTemplate);
+                console.log('🔄 Preserving new row with reset template:', recordId, Object.fromEntries(cleanTemplate));
+            }
+        });
+        
+        // For new rows, clear non-template field changes while preserving template fields
+        newRowsToPreserve.forEach((cleanTemplate, newRowId) => {
+            const currentChanges = this.pendingChanges.get(newRowId);
+            if (currentChanges) {
+                // Iterate through all changes for this new row
+                const keysToRemove: string[] = [];
+                currentChanges.forEach((value, columnKey) => {
+                    // Skip system fields
+                    if (columnKey === 'isNewRow' || columnKey === 'timestamp' || columnKey === 'template') {
+                        return;
+                    }
+                    
+                    // If this column is NOT in the template, remove it (user edit to be cancelled)
+                    // If it IS in the template, keep it (template value like auto-incremented WeldNum)
+                    if (!cleanTemplate.has(columnKey)) {
+                        keysToRemove.push(columnKey);
+                    } else {
+                        console.log('🔒 Preserving template field:', newRowId + '.' + columnKey, '=', value);
+                    }
+                });
+                
+                // Remove non-template field changes
+                keysToRemove.forEach(columnKey => {
+                    currentChanges.delete(columnKey);
+                    console.log('🧹 Removed user edit for new row:', newRowId + '.' + columnKey);
+                });
+            }
+        });
+        
+        // Clear all other pending changes (non-new rows)
+        const recordKeysToRemove: string[] = [];
+        this.pendingChanges.forEach((changes, recordId) => {
+            if (!changes.get('isNewRow')) {
+                // This is not a new row, remove it entirely
+                recordKeysToRemove.push(recordId);
+            }
+        });
+        
+        recordKeysToRemove.forEach(recordId => {
+            this.pendingChanges.delete(recordId);
+            console.log('🧹 Removed changes for existing row:', recordId);
+        });
         this.autoUpdateManager.clearAllChanges();
         this.clearCurrentChange();
+        
+        // Restore the new rows with clean templates
+        newRowsToPreserve.forEach((cleanTemplate, recordId) => {
+            this.pendingChanges.set(recordId, cleanTemplate);
+        });
+        
+        console.log(`✅ Cancel operation completed - preserved ${newRowsToPreserve.size} new rows, cleared other changes`);
         
         // Force a UI refresh to clear any visual pending change indicators
         if (this.ref) {
@@ -2601,8 +2737,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         
         // Notify Power Apps of the change
         this.notifyOutputChanged();
-        
-        console.log('✅ Cancel operation completed - all pending changes cleared');
     };
 
     /**

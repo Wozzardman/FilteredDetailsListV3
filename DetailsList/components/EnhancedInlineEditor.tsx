@@ -487,13 +487,36 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
             );
 
         case 'percentage':
+            // Convert decimal to percentage for editing (0.85 → "85")
+            const percentageDisplayValue = (() => {
+                if (currentValue === null || currentValue === undefined || currentValue === '') {
+                    return '';
+                }
+                const numValue = typeof currentValue === 'number' ? currentValue : parseFloat(String(currentValue));
+                if (isNaN(numValue)) return '';
+                return String(numValue * 100);
+            })();
+            
             return (
                 <TextField
                     {...commonProps}
-                    value={String(currentValue || '')}
+                    value={percentageDisplayValue}
                     onChange={(_, newValue) => {
+                        // Clean the input to only allow numbers and decimal points
                         const cleanValue = newValue?.replace(/[^\d.-]/g, '') || '';
-                        handleValueChange(cleanValue);
+                        
+                        // Convert percentage back to decimal for storage (85 → 0.85)
+                        if (cleanValue === '') {
+                            handleValueChange('');
+                        } else {
+                            const percentageNum = parseFloat(cleanValue);
+                            if (!isNaN(percentageNum)) {
+                                const decimalValue = percentageNum / 100;
+                                handleValueChange(String(decimalValue));
+                            } else {
+                                handleValueChange('');
+                            }
+                        }
                     }}
                     onBlur={handleBlur}
                     suffix="%"

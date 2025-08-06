@@ -45,6 +45,7 @@ export interface IUltimateEnterpriseGridProps {
     onCommitChanges?: () => void;
     onCancelChanges?: () => void;
     onAddNewRow?: (count: number) => void;
+    onDeleteNewRow?: (itemId: string) => void;
     onExport?: (format: 'CSV' | 'Excel' | 'PDF' | 'JSON', data: any[]) => void;
     getColumnDataType?: (columnKey: string) => 'text' | 'number' | 'date' | 'boolean' | 'choice';
     selectionMode?: SelectionMode;
@@ -67,6 +68,10 @@ export interface IUltimateEnterpriseGridProps {
     // Excel Clipboard properties
     enableExcelClipboard?: boolean;
     onClipboardOperation?: (operation: 'copy' | 'paste', data?: any) => void;
+    
+    // Frozen columns feature - ZERO PERFORMANCE COST
+    frozenColumns?: string[];
+    frozenColumnsWidth?: number;
     
     className?: string;
     theme?: 'light' | 'dark' | 'high-contrast';
@@ -97,6 +102,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     onCommitChanges,
     onCancelChanges,
     onAddNewRow,
+    onDeleteNewRow,
     onExport,
     getColumnDataType,
     selectionMode = SelectionMode.multiple,
@@ -122,7 +128,11 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     columnTextSize = 13, // Default 13px for column data
     
     // Row styling props
-    alternateRowColor
+    alternateRowColor,
+    
+    // Frozen columns props - ZERO PERFORMANCE COST
+    frozenColumns = [],
+    frozenColumnsWidth
 }) => {
     // Ref for grid imperative methods
     const gridRef = React.useRef<VirtualizedEditableGridRef>(null);
@@ -374,7 +384,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
 
     const handleAddNewRows = useCallback(() => {
         const count = parseInt(newRowCount, 10);
-        if (count > 0 && count <= 100 && onAddNewRow) { // Limit to 100 rows max
+        if (count > 0 && count <= 1000 && onAddNewRow) { // Limit to 1000 rows max
             onAddNewRow(count);
             handleCloseAddRowDialog();
         }
@@ -539,6 +549,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                         }
                     }}
                     onCancelChanges={onCancelChanges}
+                    onDeleteNewRow={onDeleteNewRow}
                     getColumnDataType={getColumnDataType}
                     changeManager={changeManager}
                     enablePerformanceMonitoring={enablePerformanceMonitoring}
@@ -553,6 +564,10 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                     
                     // Row styling props
                     alternateRowColor={alternateRowColor}
+                    
+                    // Frozen columns props - ZERO PERFORMANCE COST
+                    frozenColumns={frozenColumns}
+                    frozenColumnsWidth={frozenColumnsWidth}
                     
                     // Excel Clipboard props
                     enableExcelClipboard={enableExcelClipboard}
@@ -581,8 +596,8 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                         value={newRowCount}
                         onChange={handleRowCountChange}
                         min={1}
-                        max={100}
-                        placeholder="Enter number (1-100)"
+                        max={1000}
+                        placeholder="Enter number (1-1000)"
                         styles={{
                             root: { width: '100%' }
                         }}
@@ -592,7 +607,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                     <PrimaryButton 
                         onClick={handleAddNewRows} 
                         text="Add Rows"
-                        disabled={!newRowCount || parseInt(newRowCount, 10) < 1 || parseInt(newRowCount, 10) > 100}
+                        disabled={!newRowCount || parseInt(newRowCount, 10) < 1 || parseInt(newRowCount, 10) > 1000}
                     />
                     <DefaultButton 
                         onClick={handleCloseAddRowDialog} 
