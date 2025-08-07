@@ -543,6 +543,36 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         }
     }, [getAvailableValues]);
 
+    // Convert complex IColumnFilter format to simple format expected by ExcelLikeColumnFilter
+    const convertFiltersToSimpleFormat = React.useCallback((filters: IFilterState): Record<string, any[]> => {
+        const simpleFilters: Record<string, any[]> = {};
+        
+        Object.entries(filters).forEach(([columnKey, filter]) => {
+            if (!filter?.isActive || !filter.conditions?.length) return;
+            
+            const selectedValues: any[] = [];
+            
+            filter.conditions.forEach(condition => {
+                if (condition.operator === FilterOperators.IsEmpty) {
+                    // Handle blank filter
+                    selectedValues.push('(Blanks)');
+                } else if (condition.operator === FilterOperators.In && Array.isArray(condition.value)) {
+                    // Handle multi-value selection
+                    selectedValues.push(...condition.value);
+                } else if (condition.operator === FilterOperators.In) {
+                    // Handle single value
+                    selectedValues.push(condition.value);
+                }
+            });
+            
+            if (selectedValues.length > 0) {
+                simpleFilters[columnKey] = selectedValues;
+            }
+        });
+        
+        return simpleFilters;
+    }, []);
+
     // Create effective columns array including selection column if needed
     const effectiveColumns = React.useMemo(() => {
         let result = [...columns];
@@ -1571,7 +1601,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                     dataType={getColumnDataType?.(activeFilterColumn) || 'text'}
                     allData={originalItems}
                     filteredData={filteredItems}
-                    currentFilters={columnFilters}
+                    currentFilters={convertFiltersToSimpleFormat(columnFilters)}
                     onFilterChange={handleColumnFilterChange}
                     target={filterTargets[activeFilterColumn]}
                     onDismiss={() => setActiveFilterColumn(null)}

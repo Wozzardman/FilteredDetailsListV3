@@ -68,7 +68,7 @@ export const ExcelLikeColumnFilter: React.FC<IExcelLikeColumnFilterProps> = ({
     getAvailableValues
 }) => {
     const [searchTerm, setSearchTerm] = React.useState<string>('');
-    const [selectAll, setSelectAll] = React.useState<boolean>(true);
+    const [selectAll, setSelectAll] = React.useState<boolean>(false); // CHANGED: Default to nothing selected
     const [distinctValues, setDistinctValues] = React.useState<IDistinctValue[]>([]);
     const [filteredDistinctValues, setFilteredDistinctValues] = React.useState<IDistinctValue[]>([]);
 
@@ -94,7 +94,7 @@ export const ExcelLikeColumnFilter: React.FC<IExcelLikeColumnFilterProps> = ({
                     ? Array.isArray(currentColumnFilter) 
                         ? currentColumnFilter.includes(item.value)
                         : currentColumnFilter === item.value
-                    : true
+                    : false  // CHANGED: Default to UNselected when no filter exists - user must explicitly choose what to show
             }));
             
             // Sort based on data type
@@ -129,7 +129,7 @@ export const ExcelLikeColumnFilter: React.FC<IExcelLikeColumnFilterProps> = ({
                         ? Array.isArray(currentColumnFilter) 
                             ? currentColumnFilter.includes(normalizedValue)
                             : currentColumnFilter === normalizedValue
-                        : true;
+                        : false; // CHANGED: Default to UNselected when no filter exists
                     
                     valueMap.set(normalizedValue, { count: 1, selected: isSelected });
                 }
@@ -149,7 +149,7 @@ export const ExcelLikeColumnFilter: React.FC<IExcelLikeColumnFilterProps> = ({
                     ? Array.isArray(currentColumnFilter) 
                         ? currentColumnFilter.includes('(Blanks)')
                         : currentColumnFilter === '(Blanks)'
-                    : true;
+                    : false; // CHANGED: Default to UNselected when no filter exists
                     
                 values.unshift({
                     value: '(Blanks)',
@@ -188,8 +188,17 @@ export const ExcelLikeColumnFilter: React.FC<IExcelLikeColumnFilterProps> = ({
         if (searchTerm && filteredDistinctValues.length > 0) {
             // When searching, check if all filtered values are selected
             const allFilteredSelected = filteredDistinctValues.every(v => v.selected);
-            setSelectAll(allFilteredSelected);
-        } else if (!searchTerm) {
+            const noFilteredSelected = filteredDistinctValues.every(v => !v.selected);
+            
+            if (allFilteredSelected) {
+                setSelectAll(true);
+            } else if (noFilteredSelected) {
+                setSelectAll(false);
+            } else {
+                // Some but not all are selected - this should show indeterminate
+                setSelectAll(false);
+            }
+        } else if (!searchTerm && distinctValues.length > 0) {
             // When not searching, check if all values are selected
             const allSelected = distinctValues.every(v => v.selected);
             setSelectAll(allSelected);
@@ -233,12 +242,15 @@ export const ExcelLikeColumnFilter: React.FC<IExcelLikeColumnFilterProps> = ({
                 filteredValueSet.has(v.value) ? { ...v, selected: checked } : v
             );
             setDistinctValues(newValues);
+            
+            // Update selectAll state immediately for search context
+            setSelectAll(checked);
         } else {
             // When not searching, apply to all values
             const newValues = distinctValues.map(v => ({ ...v, selected: checked }));
             setDistinctValues(newValues);
+            setSelectAll(checked);
         }
-        setSelectAll(checked);
     }, [distinctValues, filteredDistinctValues, searchTerm]);
 
     // Apply filter
@@ -303,7 +315,15 @@ export const ExcelLikeColumnFilter: React.FC<IExcelLikeColumnFilterProps> = ({
                     <Checkbox
                         label={`(Select All) - ${filteredDistinctValues.length} items`}
                         checked={selectAll}
-                        indeterminate={!selectAll && filteredDistinctValues.some(v => v.selected)}
+                        indeterminate={(() => {
+                            if (searchTerm && filteredDistinctValues.length > 0) {
+                                const selectedCount = filteredDistinctValues.filter(v => v.selected).length;
+                                return selectedCount > 0 && selectedCount < filteredDistinctValues.length;
+                            } else {
+                                const selectedCount = distinctValues.filter(v => v.selected).length;
+                                return selectedCount > 0 && selectedCount < distinctValues.length;
+                            }
+                        })()}
                         onChange={(_, checked) => handleSelectAll(checked || false)}
                         styles={{ root: { margin: '4px 12px' } }}
                     />
