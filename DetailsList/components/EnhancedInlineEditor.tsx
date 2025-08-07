@@ -631,141 +631,106 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                 placeholder: config.placeholder
             };
 
-            if (config.allowDirectTextInput) {
-                // Date picker with clear button when direct text input is enabled
-                return (
-                    <Stack horizontal verticalAlign="center" style={style}>
-                        <div 
-                            style={{ flexGrow: 1 }}
-                        >
-                            <DatePicker
-                                {...datePickerProps}
-                                value={currentValue instanceof Date ? currentValue : 
-                                       currentValue ? new Date(currentValue) : undefined}
-                                onSelectDate={(date) => {
-                                    const formattedValue = config.valueFormatter ? 
-                                        config.valueFormatter(date, item, column) : 
-                                        date;
-                                    handleValueChange(formattedValue);
-                                    onCommit(formattedValue);
-                                }}
-                                textField={{
-                                    onChange: (_, newValue) => {
-                                        // Handle direct text input
-                                        if (newValue) {
-                                            const date = new Date(newValue);
-                                            if (!isNaN(date.getTime())) {
-                                                const formattedValue = config.valueFormatter ? 
-                                                    config.valueFormatter(date, item, column) : 
-                                                    date;
-                                                handleValueChange(formattedValue);
-                                                onCommit(formattedValue);
-                                            }
-                                        }
-                                    }
-                                }}
-                                formatDate={(date: Date | undefined) => date?.toLocaleDateString() || ''}
-                                minDate={config.dateTimeConfig?.minDate}
-                                maxDate={config.dateTimeConfig?.maxDate}
-                                styles={{
-                                    root: { width: '100%' },
-                                    textField: {
-                                        fieldGroup: {
-                                            border: 'none',
-                                            background: 'transparent',
-                                            selectors: {
-                                                ':hover': {
-                                                    border: 'none'
-                                                },
-                                                ':focus': {
-                                                    border: 'none'
-                                                },
-                                                ':active': {
-                                                    border: 'none'
-                                                }
-                                            }
-                                        }
-                                    }
-                                }}
-                            />
-                        </div>
-                        <IconButton
-                            iconProps={{ iconName: 'Clear' }}
-                            title="Clear Date"
-                            ariaLabel="Clear Date"
-                            onClick={() => {
-                                handleValueChange(null);
-                                onCommit(null);
-                            }}
-                            styles={{
-                                root: {
-                                    marginLeft: '4px',
-                                    minWidth: '32px',
-                                    height: '32px'
-                                }
-                            }}
-                        />
-                    </Stack>
-                );
-            } else {
-                // Standard date picker without clear button
-                return (
-                    <div 
-                        style={{ width: '100%' }}
-                    >
-                        <DatePicker
-                            {...datePickerProps}
-                            value={currentValue instanceof Date ? currentValue : 
-                                   currentValue ? new Date(currentValue) : undefined}
-                            onSelectDate={(date) => {
-                                const formattedValue = config.valueFormatter ? 
-                                    config.valueFormatter(date, item, column) : 
-                                    date;
-                                handleValueChange(formattedValue);
-                                onCommit(formattedValue);
-                            }}
-                            textField={{
-                                onChange: (_, newValue) => {
-                                    // Handle direct text input
-                                    if (newValue) {
-                                        const date = new Date(newValue);
-                                        if (!isNaN(date.getTime())) {
-                                            const formattedValue = config.valueFormatter ? 
-                                                config.valueFormatter(date, item, column) : 
-                                                date;
-                                            handleValueChange(formattedValue);
-                                            onCommit(formattedValue);
+            // Date picker with clear button positioned over the calendar icon space
+            return (
+                <div style={{ position: 'relative', width: '100%', ...style }}>
+                    <DatePicker
+                        {...datePickerProps}
+                        value={currentValue instanceof Date ? currentValue : 
+                               currentValue ? new Date(currentValue) : undefined}
+                        onSelectDate={(date) => {
+                            const formattedValue = config.valueFormatter ? 
+                                config.valueFormatter(date, item, column) : 
+                                date;
+                            handleValueChange(formattedValue);
+                            onCommit(formattedValue);
+                        }}
+                        formatDate={(date: Date | undefined) => date?.toLocaleDateString() || ''}
+                        minDate={config.dateTimeConfig?.minDate}
+                        maxDate={config.dateTimeConfig?.maxDate}
+                        styles={{
+                            root: { width: '100%' },
+                            textField: {
+                                fieldGroup: {
+                                    border: 'none',
+                                    background: 'transparent',
+                                    selectors: {
+                                        ':hover': {
+                                            border: 'none'
+                                        },
+                                        ':focus': {
+                                            border: 'none'
+                                        },
+                                        ':active': {
+                                            border: 'none'
                                         }
                                     }
                                 }
-                            }}
-                            formatDate={(date: Date | undefined) => date?.toLocaleDateString() || ''}
-                            minDate={config.dateTimeConfig?.minDate}
-                            maxDate={config.dateTimeConfig?.maxDate}
-                            styles={{
-                                root: { width: '100%' },
-                                textField: {
-                                    fieldGroup: {
-                                        border: 'none',
-                                        background: 'transparent',
-                                        selectors: {
-                                            ':hover': {
-                                                border: 'none'
-                                            },
-                                            ':focus': {
-                                                border: 'none'
-                                            },
-                                            ':active': {
-                                                border: 'none'
-                                            }
-                                        }
-                                    }
+                            },
+                            callout: {
+                                // Make the calendar callout align properly
+                                zIndex: 9999
+                            },
+                            icon: {
+                                // Hide the visual calendar icon but keep its functionality
+                                opacity: 0,
+                                // Expand the clickable area to cover most of the text field (leaving space for clear button)
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: '32px', // Leave space for clear button
+                                bottom: 0,
+                                width: 'calc(100% - 32px)',
+                                height: '100%',
+                                background: 'transparent',
+                                cursor: 'pointer',
+                                zIndex: 1
+                            }
+                        }}
+                        textField={{
+                            // Disable text input completely and make it non-selectable
+                            readOnly: true,
+                            styles: {
+                                fieldGroup: {
+                                    cursor: 'pointer',
+                                    userSelect: 'none'
+                                },
+                                field: {
+                                    cursor: 'pointer',
+                                    userSelect: 'none',
+                                    caretColor: 'transparent'
                                 }
-                            }}
-                        />
-                    </div>
-                );
-            }
+                            }
+                        }}
+                    />
+                    {/* Clear button positioned over the calendar icon space */}
+                    <IconButton
+                        iconProps={{ iconName: 'Clear' }}
+                        title="Clear Date"
+                        ariaLabel="Clear Date"
+                        onClick={() => {
+                            handleValueChange(null);
+                            onCommit(null);
+                        }}
+                        styles={{
+                            root: {
+                                position: 'absolute',
+                                top: '50%',
+                                right: '4px',
+                                transform: 'translateY(-50%)',
+                                minWidth: '24px',
+                                width: '24px',
+                                height: '24px',
+                                fontSize: '12px',
+                                zIndex: 2 // Above the calendar clickable area
+                            },
+                            icon: {
+                                fontSize: '12px'
+                            }
+                        }}
+                    />
+                </div>
+            );
 
         case 'boolean':
             return (
