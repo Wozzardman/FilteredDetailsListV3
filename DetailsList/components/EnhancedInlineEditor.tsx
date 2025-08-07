@@ -137,11 +137,6 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
 
         // Handle PowerApps-compatible conditional logic
         if (column.key && triggerType === 'onChange' && onItemChange && allColumns && columnEditorMapping) {
-            // Skip auto-fill logic for new rows (they shouldn't trigger auto-fill)
-            if (item?.isNewRow) {
-                return;
-            }
-            
             const processor = PowerAppsConditionalProcessor.getInstance();
             
             // Build configurations from the column editor mapping
@@ -216,7 +211,10 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                 // If any dependent fields require confirmation, trigger the auto-fill confirmation system
                 if (hasPendingAutoFillConfirmations && onTriggerAutoFillConfirmation) {
                     const itemId = item?.recordId || item?.key || item?.id || 'current-item';
+                    console.log(`🎯 Triggering auto-fill confirmation for item ${itemId}, trigger field: ${column.key}, new value: ${valueToUse}`);
                     onTriggerAutoFillConfirmation(itemId);
+                } else if (autoFillUpdates.length > 0) {
+                    console.log(`ℹ️ No confirmation required for ${autoFillUpdates.length} auto-fill updates`);
                 }
             }
         }
@@ -643,15 +641,19 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                                 value={currentValue instanceof Date ? currentValue : 
                                        currentValue ? new Date(currentValue) : undefined}
                                 onSelectDate={(date) => {
-                                    handleValueChange(date);
+                                    setCurrentValue(date);
                                     setIsDatePickerActive(false);
-                                    // Auto-commit on date selection
+                                    
+                                    // Commit immediately
+                                    const formattedValue = config.valueFormatter ? 
+                                        config.valueFormatter(date, item, column) : 
+                                        date;
+                                    onCommit(formattedValue);
+                                    
+                                    // Trigger conditional logic AFTER commit with a delay to ensure state is updated
                                     setTimeout(() => {
-                                        const formattedValue = config.valueFormatter ? 
-                                            config.valueFormatter(date, item, column) : 
-                                            date;
-                                        onCommit(formattedValue);
-                                    }, 10);
+                                        handleConditionalTrigger('onChange', date);
+                                    }, 100);
                                 }}
                                 formatDate={(date) => date?.toLocaleDateString() || ''}
                                 minDate={config.dateTimeConfig?.minDate}
@@ -923,15 +925,17 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                                             setFilterText(option.text);
                                             setCurrentValue(selectedValue);
                                             setIsDropdownOpen(false);
-                                            handleValueChange(selectedValue);
                                             
-                                            // Commit the selection
+                                            // Commit immediately
+                                            const formattedValue = config.valueFormatter ? 
+                                                config.valueFormatter(selectedValue, item, column) : 
+                                                selectedValue;
+                                            onCommit(formattedValue);
+                                            
+                                            // Trigger conditional logic AFTER commit with a delay to ensure state is updated
                                             setTimeout(() => {
-                                                const formattedValue = config.valueFormatter ? 
-                                                    config.valueFormatter(selectedValue, item, column) : 
-                                                    selectedValue;
-                                                onCommit(formattedValue);
-                                            }, 10);
+                                                handleConditionalTrigger('onChange', selectedValue);
+                                            }, 100);
                                         }}
                                     >
                                         {option.text}
