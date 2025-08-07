@@ -202,6 +202,9 @@ export interface ColumnEditorConfig {
     placeholder?: string;
     allowDirectTextInput?: boolean; // Universal: Allow typing values directly instead of using specialized controls
     
+    // Auto-fill confirmation
+    RequiresAutoFillConfirmation?: boolean;
+    
     // Type-specific configurations
     dropdownOptions?: DropdownOption[];
     autocompleteOptions?: AutocompleteOption[];

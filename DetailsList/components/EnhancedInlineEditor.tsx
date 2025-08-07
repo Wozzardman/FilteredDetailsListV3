@@ -38,6 +38,7 @@ export interface EnhancedInlineEditorProps {
     onCancel: () => void;
     onValueChange?: (value: any) => void;
     onItemChange?: (columnKey: string, value: any) => void; // New: For conditional updates
+    onTriggerAutoFillConfirmation?: (itemId: string) => void; // New: For triggering auto-fill confirmation
     allColumns?: Record<string, any>; // New: All column values for conditional logic
     columnEditorMapping?: ColumnEditorMapping; // New: All editor configurations for conditional logic
     style?: React.CSSProperties;
@@ -53,6 +54,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
     onCancel,
     onValueChange,
     onItemChange,
+    onTriggerAutoFillConfirmation,
     allColumns,
     columnEditorMapping,
     style,
@@ -135,6 +137,11 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
 
         // Handle PowerApps-compatible conditional logic
         if (column.key && triggerType === 'onChange' && onItemChange && allColumns && columnEditorMapping) {
+            // Skip auto-fill logic for new rows (they shouldn't trigger auto-fill)
+            if (item?.isNewRow) {
+                return;
+            }
+            
             const processor = PowerAppsConditionalProcessor.getInstance();
             
             // Build configurations from the column editor mapping
@@ -165,6 +172,10 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                 console.log(`📋 Dependent fields:`, dependentFields);
                 console.log(`🔄 Current context:`, context.currentValues);
 
+                // First pass: Check if ANY dependent field requires auto-fill confirmation
+                let hasPendingAutoFillConfirmations = false;
+                const autoFillUpdates: Array<{ field: string, value: any }> = [];
+
                 for (const dependentField of dependentFields) {
                     const dependentConfig = allEditorConfigs[dependentField]?.conditional;
                     if (dependentConfig) {
@@ -175,10 +186,37 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                         );
 
                         if (newValue !== undefined && newValue !== allColumns[dependentField]) {
-                            console.log(`🔄 Auto-updating ${dependentField} from ${allColumns[dependentField]} to ${newValue}`);
-                            onItemChange(dependentField, newValue);
+                            // Store the potential update
+                            autoFillUpdates.push({ field: dependentField, value: newValue });
+                            
+                            // Check if this dependent field requires auto-fill confirmation
+                            const fieldConfig = columnEditorMapping[dependentField];
+                            const requiresConfirmation = fieldConfig?.RequiresAutoFillConfirmation === true;
+                            
+                            if (requiresConfirmation) {
+                                console.log(`⏸️ Auto-fill for ${dependentField} requires confirmation - will defer ALL auto-fill`);
+                                hasPendingAutoFillConfirmations = true;
+                            }
                         }
                     }
+                }
+
+                // Second pass: Apply updates based on whether confirmation is needed
+                if (hasPendingAutoFillConfirmations) {
+                    console.log(`🚫 Deferring ALL auto-fill updates due to confirmation requirement`);
+                    // Don't apply any changes immediately - let the auto-fill confirmation system handle them all
+                } else {
+                    // Apply all changes immediately as no confirmation is required
+                    for (const update of autoFillUpdates) {
+                        console.log(`🔄 Auto-updating ${update.field} from ${allColumns[update.field]} to ${update.value}`);
+                        onItemChange(update.field, update.value);
+                    }
+                }
+
+                // If any dependent fields require confirmation, trigger the auto-fill confirmation system
+                if (hasPendingAutoFillConfirmations && onTriggerAutoFillConfirmation) {
+                    const itemId = item?.recordId || item?.key || item?.id || 'current-item';
+                    onTriggerAutoFillConfirmation(itemId);
                 }
             }
         }

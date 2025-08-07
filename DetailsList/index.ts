@@ -998,11 +998,15 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                             const defaultValueFormula = record.getValue('DefaultValueFormula');
                             const conditionalFormula = record.getValue('ConditionalFormula');
                             
+                            // Get auto-fill confirmation setting
+                            const requiresAutoFillConfirmation = record.getValue('RequiresAutoFillConfirmation');
+                            
                             // Apply common properties
                             if (isRequired !== null && isRequired !== undefined) config.isRequired = isRequired;
                             if (isReadOnly !== null && isReadOnly !== undefined) config.isReadOnly = isReadOnly;
                             if (placeholder) config.placeholder = placeholder;
                             if (allowDirectTextInput !== null && allowDirectTextInput !== undefined) config.allowDirectTextInput = allowDirectTextInput;
+                            if (requiresAutoFillConfirmation !== null && requiresAutoFillConfirmation !== undefined) config.RequiresAutoFillConfirmation = requiresAutoFillConfirmation;
                             
                             // Apply type-specific configurations
                             if (editorType.toLowerCase() === 'text' || editorType.toLowerCase() === 'email' || editorType.toLowerCase() === 'url' || editorType.toLowerCase() === 'phone') {

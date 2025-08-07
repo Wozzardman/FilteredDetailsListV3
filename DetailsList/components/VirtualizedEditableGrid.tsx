@@ -236,6 +236,9 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     const [resizeStartX, setResizeStartX] = React.useState<number>(0);
     const [resizeStartWidth, setResizeStartWidth] = React.useState<number>(0);
 
+    // Auto-fill confirmation state - tracks which new rows are pending auto-fill
+    const [pendingAutoFillRows, setPendingAutoFillRows] = React.useState<Set<string>>(new Set());
+
     // Helper function to evaluate a single filter condition
     const evaluateCondition = React.useCallback((fieldValue: any, condition: any): boolean => {
         const { operator, value } = condition;
@@ -381,6 +384,189 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         }));
     }, [activeFilterColumn]);
 
+    // Auto-fill confirmation handlers
+    const handleAutoFillConfirmation = React.useCallback((itemId: string) => {
+        // Apply auto-fill for this specific row
+        const item = filteredItems.find(item => (item.recordId || item.key || item.id) === itemId);
+        if (!item || !columnEditorMapping) return;
+        
+        // Apply auto-fill logic for each configured column that requires confirmation
+        Object.entries(columnEditorMapping).forEach(([columnKey, editorConfig]) => {
+            // Only process columns that require auto-fill confirmation
+            const requiresConfirmation = editorConfig.RequiresAutoFillConfirmation === true;
+            
+            if (!requiresConfirmation) return;
+            
+            // Handle PowerAppsConditionalConfig style (config.conditional.dependsOn)
+            if (editorConfig.conditional && 'dependsOn' in editorConfig.conditional && typeof editorConfig.conditional.dependsOn === 'string') {
+                // This is a PowerAppsConditionalConfig
+                const powerAppsConfig = editorConfig.conditional as any; // Using any to access PowerApps structure
+                const dependsOnValue = getPCFValue(item, powerAppsConfig.dependsOn);
+                
+                if (dependsOnValue && powerAppsConfig.lookup) {
+                    try {
+                        // Parse the lookup arrays (they come as Power Apps formula strings)
+                        const filterData = JSON.parse(powerAppsConfig.lookup.filterColumn);
+                        const returnData = JSON.parse(powerAppsConfig.lookup.returnColumn);
+                        
+                        // Find matching entry
+                        const matchIndex = filterData.findIndex((filterItem: any) => 
+                            Object.values(filterItem)[0] === dependsOnValue
+                        );
+                        
+                        if (matchIndex >= 0 && returnData[matchIndex]) {
+                            const returnValue = Object.values(returnData[matchIndex])[0];
+                            if (returnValue) {
+                                // Apply the auto-filled value
+                                setPCFValue(item, columnKey, returnValue);
+                                
+                                // Track as a change
+                                const itemIndex = filteredItems.indexOf(item);
+                                const changeKey = getCellKey(itemIndex, columnKey);
+                                const originalValue = getPCFValue(item, columnKey);
+                                
+                                const change = {
+                                    itemId,
+                                    itemIndex,
+                                    columnKey,
+                                    newValue: returnValue,
+                                    oldValue: originalValue
+                                };
+                                
+                                setPendingChanges(prev => new Map(prev.set(changeKey, change)));
+                                onCellEdit?.(itemId, columnKey, returnValue);
+                            }
+                        }
+                    } catch (error) {
+                        console.warn('Failed to parse lookup data for auto-fill:', error);
+                    }
+                }
+            }
+            // Handle direct DependsOn property (your column config style)
+            else if ('DependsOn' in editorConfig && typeof editorConfig.DependsOn === 'string') {
+                const dependsOnField = editorConfig.DependsOn;
+                const dependsOnValue = getPCFValue(item, dependsOnField);
+                
+                if (dependsOnValue && 'LookupFilterColumn' in editorConfig && 'LookupReturnColumn' in editorConfig) {
+                    try {
+                        // Handle your lookup configuration format
+                        const filterData = Array.isArray(editorConfig.LookupFilterColumn) ? 
+                            editorConfig.LookupFilterColumn : JSON.parse(editorConfig.LookupFilterColumn as string);
+                        const returnData = Array.isArray(editorConfig.LookupReturnColumn) ? 
+                            editorConfig.LookupReturnColumn : JSON.parse(editorConfig.LookupReturnColumn as string);
+                        
+                        // Find matching entry based on the dependsOn field
+                        const matchIndex = filterData.findIndex((filterItem: any) => {
+                            const filterValue = Object.values(filterItem)[0];
+                            return filterValue === dependsOnValue;
+                        });
+                        
+                        if (matchIndex >= 0 && returnData[matchIndex]) {
+                            const returnValue = Object.values(returnData[matchIndex])[0];
+                            if (returnValue) {
+                                // Apply the auto-filled value
+                                setPCFValue(item, columnKey, returnValue);
+                                
+                                // Track as a change
+                                const itemIndex = filteredItems.indexOf(item);
+                                const changeKey = getCellKey(itemIndex, columnKey);
+                                const originalValue = getPCFValue(item, columnKey);
+                                
+                                const change = {
+                                    itemId,
+                                    itemIndex,
+                                    columnKey,
+                                    newValue: returnValue,
+                                    oldValue: originalValue
+                                };
+                                
+                                setPendingChanges(prev => new Map(prev.set(changeKey, change)));
+                                onCellEdit?.(itemId, columnKey, returnValue);
+                            }
+                        }
+                    } catch (error) {
+                        console.warn('Failed to parse lookup data for auto-fill:', error);
+                    }
+                }
+            }
+            
+            // Handle camelCase dependsOn property
+            else if ('dependsOn' in editorConfig && typeof editorConfig.dependsOn === 'string') {
+                const dependsOnField = editorConfig.dependsOn;
+                const dependsOnValue = getPCFValue(item, dependsOnField);
+                
+                if (dependsOnValue && 'lookupFilterColumn' in editorConfig && 'lookupReturnColumn' in editorConfig) {
+                    try {
+                        // Handle camelCase lookup configuration format
+                        const filterData = Array.isArray(editorConfig.lookupFilterColumn) ? 
+                            editorConfig.lookupFilterColumn : JSON.parse(editorConfig.lookupFilterColumn as string);
+                        const returnData = Array.isArray(editorConfig.lookupReturnColumn) ? 
+                            editorConfig.lookupReturnColumn : JSON.parse(editorConfig.lookupReturnColumn as string);
+                        
+                        // Find matching entry based on the dependsOn field
+                        const matchIndex = filterData.findIndex((filterItem: any) => {
+                            const filterValue = Object.values(filterItem)[0];
+                            return filterValue === dependsOnValue;
+                        });
+                        
+                        if (matchIndex >= 0 && returnData[matchIndex]) {
+                            const returnValue = Object.values(returnData[matchIndex])[0];
+                            if (returnValue) {
+                                // Apply the auto-filled value
+                                setPCFValue(item, columnKey, returnValue);
+                                
+                                // Track as a change
+                                const itemIndex = filteredItems.indexOf(item);
+                                const changeKey = getCellKey(itemIndex, columnKey);
+                                const originalValue = getPCFValue(item, columnKey);
+                                
+                                const change = {
+                                    itemId,
+                                    itemIndex,
+                                    columnKey,
+                                    newValue: returnValue,
+                                    oldValue: originalValue
+                                };
+                                
+                                setPendingChanges(prev => new Map(prev.set(changeKey, change)));
+                                onCellEdit?.(itemId, columnKey, returnValue);
+                            }
+                        }
+                    } catch (error) {
+                        console.warn('Failed to parse lookup data for auto-fill:', error);
+                    }
+                }
+            }
+        });
+        
+        // Remove from pending auto-fill rows
+        setPendingAutoFillRows(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(itemId);
+            return newSet;
+        });
+    }, [filteredItems, columnEditorMapping, onCellEdit]);
+
+    const addNewRowForAutoFill = React.useCallback((newItem: any) => {
+        // Check if any column requires auto-fill confirmation
+        const hasAutoFillColumns = Object.values(columnEditorMapping).some(config => 
+            config.RequiresAutoFillConfirmation === true
+        );
+        
+        if (hasAutoFillColumns) {
+            // Add to pending auto-fill rows instead of applying immediately
+            const itemId = newItem.recordId || newItem.key || newItem.id;
+            if (itemId) {
+                setPendingAutoFillRows(prev => new Set(prev.add(itemId)));
+            }
+        }
+    }, [columnEditorMapping]);
+
+    // Add an item to pending auto-fill (for field changes that trigger auto-fill requiring confirmation)
+    const triggerAutoFillConfirmation = React.useCallback((itemId: string) => {
+        setPendingAutoFillRows(prev => new Set(prev.add(itemId)));
+    }, []);
+
     // Column resizing handlers
     const handleResizeStart = React.useCallback((columnKey: string, startX: number, startWidth: number) => {
         setIsResizing(columnKey);
@@ -429,6 +615,90 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     React.useEffect(() => {
         return () => endMeasurement();
     }, [endMeasurement]);
+
+    // Auto-fill detection for new rows
+    React.useEffect(() => {
+        if (!columnEditorMapping) return;
+        
+        console.log('🔍 Auto-fill detection running:', {
+            hasColumnEditorMapping: !!columnEditorMapping,
+            columnMappingKeys: Object.keys(columnEditorMapping || {}),
+            filteredItemsCount: filteredItems.length,
+            newRowsCount: filteredItems.filter(item => item.isNewRow).length
+        });
+        
+        // Find new rows that have conditional dependencies with auto-fill confirmation required
+        const newRowsNeedingAutoFill = new Set<string>();
+        
+        filteredItems.forEach(item => {
+            if (item.isNewRow) {
+                const itemId = item.recordId || item.key || item.id;
+                if (itemId) {
+                    // Check if any column has conditional dependencies AND requires auto-fill confirmation
+                    const hasConditionalDependenciesWithConfirmation = Object.values(columnEditorMapping).some(config => {
+                        // Must have RequiresAutoFillConfirmation = true for this column
+                        const requiresConfirmation = config.RequiresAutoFillConfirmation === true;
+                        
+                        if (!requiresConfirmation) return false;
+                        
+                        // Check for PowerAppsConditionalConfig style (config.conditional.dependsOn)
+                        if (config.conditional && 
+                            'dependsOn' in config.conditional && 
+                            typeof config.conditional.dependsOn === 'string') {
+                            console.log('✅ Found PowerApps conditional dependency with confirmation required:', config.conditional.dependsOn);
+                            return true;
+                        }
+                        
+                        // Check for direct DependsOn property (your column config style)
+                        if ('DependsOn' in config && typeof config.DependsOn === 'string') {
+                            console.log('✅ Found DependsOn dependency with confirmation required:', config.DependsOn);
+                            return true;
+                        }
+                        
+                        // Check for camelCase dependsOn property
+                        if ('dependsOn' in config && typeof config.dependsOn === 'string') {
+                            console.log('✅ Found dependsOn dependency with confirmation required:', config.dependsOn);
+                            return true;
+                        }
+                        
+                        return false;
+                    });
+                    
+                    console.log('🎯 Auto-fill check for item:', {
+                        itemId,
+                        isNewRow: item.isNewRow,
+                        hasConditionalDependenciesWithConfirmation,
+                        columnConfigs: Object.keys(columnEditorMapping).map(key => ({
+                            key,
+                            hasDependsOn: 'DependsOn' in columnEditorMapping[key],
+                            hasConditional: 'conditional' in columnEditorMapping[key],
+                            requiresConfirmation: columnEditorMapping[key].RequiresAutoFillConfirmation === true
+                        }))
+                    });
+                    
+                    if (hasConditionalDependenciesWithConfirmation) {
+                        newRowsNeedingAutoFill.add(itemId);
+                        console.log('🚀 Added to auto-fill pending:', itemId);
+                    }
+                }
+            }
+        });
+        
+        // Update pending auto-fill rows
+        setPendingAutoFillRows(prev => {
+            const newSet = new Set(prev);
+            // Add new rows that need auto-fill
+            newRowsNeedingAutoFill.forEach(id => newSet.add(id));
+            // Remove rows that are no longer new rows
+            const currentNewRowIds = new Set(filteredItems.filter(item => item.isNewRow).map(item => item.recordId || item.key || item.id));
+            Array.from(newSet).forEach(id => {
+                if (!currentNewRowIds.has(id)) {
+                    newSet.delete(id);
+                }
+            });
+            return newSet;
+        });
+    }, [columnEditorMapping, filteredItems]);
 
     // Header horizontal scroll synchronization - TRANSFORM APPROACH
     React.useEffect(() => {
@@ -589,10 +859,26 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
             } as IGridColumn);
         }
         
-        // Add delete column after selection column if we have onDeleteNewRow callback AND there are actual new rows
+        // Add auto-fill confirmation column and/or delete column after selection column
         const hasNewRows = filteredItems.some(item => item.isNewRow);
+        const hasRowsNeedingAutoFill = pendingAutoFillRows.size > 0;
+        let insertIndex = enableSelectionMode ? 1 : 0;
+        
+        // Add auto-fill confirmation column if rows need auto-fill
+        if (hasRowsNeedingAutoFill) {
+            result.splice(insertIndex, 0, {
+                key: '__autofill__',
+                name: '',
+                fieldName: '__autofill__',
+                minWidth: 40,
+                maxWidth: 40,
+                isResizable: false
+            } as IGridColumn);
+            insertIndex++; // Increment for next column
+        }
+        
+        // Add delete column if there are new rows (independent of auto-fill)
         if (onDeleteNewRow && hasNewRows) {
-            const insertIndex = enableSelectionMode ? 1 : 0;
             result.splice(insertIndex, 0, {
                 key: '__delete__',
                 name: '',
@@ -604,7 +890,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         }
         
         return result;
-    }, [columns, enableSelectionMode, onDeleteNewRow, filteredItems]);
+    }, [columns, enableSelectionMode, onDeleteNewRow, filteredItems, pendingAutoFillRows]);
 
     // PERFORMANCE OPTIMIZATION: Memoize column widths to prevent recalculation
     const memoizedColumnWidths = React.useMemo(() => {
@@ -1031,6 +1317,57 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                             </div>
                         );
                     }
+
+                    // Special handling for auto-fill confirmation column
+                    if (columnKey === '__autofill__') {
+                        const itemId = item.recordId || item.key || item.id || index.toString();
+                        const needsAutoFill = pendingAutoFillRows.has(itemId);
+                        
+                        return (
+                            <div
+                                key="__autofill__"
+                                className="virtualized-cell autofill-cell"
+                                style={{
+                                    width: memoizedColumnWidths[columnIndex],
+                                    minWidth: memoizedColumnWidths[columnIndex],
+                                    maxWidth: memoizedColumnWidths[columnIndex],
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    padding: '0 8px',
+                                    boxSizing: 'border-box'
+                                }}
+                            >
+                                {needsAutoFill ? (
+                                    <button
+                                        type="button"
+                                        className="autofill-confirm-button"
+                                        style={{
+                                            background: '#0078d4',
+                                            border: 'none',
+                                            color: 'white',
+                                            cursor: 'pointer',
+                                            fontSize: '12px',
+                                            padding: '4px 8px',
+                                            borderRadius: '3px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            height: '24px',
+                                            fontWeight: 600
+                                        }}
+                                        onClick={() => handleAutoFillConfirmation(itemId)}
+                                        title="Apply auto-fill values to this row"
+                                        aria-label="Apply auto-fill values to this row"
+                                    >
+                                        Auto Fill
+                                    </button>
+                                ) : (
+                                    <span style={{ fontSize: '12px', color: '#666' }}>✓</span>
+                                )}
+                            </div>
+                        );
+                    }
                     
                     const cellKey = getCellKey(index, columnKey);
                     const isEditing = editingState?.itemIndex === index && editingState?.columnKey === columnKey;
@@ -1084,6 +1421,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                         onCommit={commitEdit}
                                         onCancel={cancelEdit}
                                         onItemChange={handleItemChange}
+                                        onTriggerAutoFillConfirmation={triggerAutoFillConfirmation}
                                         allColumns={getCurrentColumnValues()}
                                         columnEditorMapping={columnEditorMapping}
                                         style={{ width: '100%', border: 'none', background: 'transparent' }}
@@ -1102,6 +1440,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                         }}
                                         onCommit={commitEdit}
                                         onCancel={cancelEdit}
+                                        onTriggerAutoFillConfirmation={triggerAutoFillConfirmation}
                                         style={{ width: '100%', border: 'none', background: 'transparent' }}
                                     />
                                 )}
@@ -1359,6 +1698,37 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                         >
                             <span style={{ fontSize: '12px', color: '#666' }}>
                                 🗑️
+                            </span>
+                        </div>
+                    );
+                }
+
+                // Special handling for auto-fill confirmation column header
+                if (columnKey === '__autofill__') {
+                    const hasRowsNeedingAutoFill = pendingAutoFillRows.size > 0;
+                    
+                    return (
+                        <div
+                            key="__autofill__"
+                            className="virtualized-header-cell autofill-header"
+                            style={{ 
+                                width: memoizedColumnWidths[index],
+                                minWidth: memoizedColumnWidths[index],
+                                maxWidth: memoizedColumnWidths[index],
+                                position: 'relative',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                background: '#faf9f8',
+                                padding: '0 8px',
+                                boxSizing: 'border-box',
+                                overflow: 'hidden',
+                                opacity: hasRowsNeedingAutoFill ? 1 : 0.6
+                            }}
+                            title={hasRowsNeedingAutoFill ? "Confirm auto-fill for new rows" : "Auto-fill confirmation"}
+                        >
+                            <span style={{ fontSize: '12px', color: '#0078d4', fontWeight: 600 }}>
+                                Auto Fill
                             </span>
                         </div>
                     );
