@@ -641,10 +641,16 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
             const newSet = new Set(prev);
             // Add new rows that need auto-fill
             newRowsNeedingAutoFill.forEach(id => newSet.add(id));
-            // Remove rows that are no longer new rows
+            // Only remove rows that are specifically new rows and no longer exist
+            // Don't remove existing rows that may have been added via triggerAutoFillConfirmation
             const currentNewRowIds = new Set(filteredItems.filter(item => item.isNewRow).map(item => item.recordId || item.key || item.id));
+            const existingRowIds = new Set(filteredItems.filter(item => !item.isNewRow).map(item => item.recordId || item.key || item.id));
+            
             Array.from(newSet).forEach(id => {
-                if (!currentNewRowIds.has(id)) {
+                // Only remove if it was a new row that no longer exists
+                // Keep existing rows that may have triggered auto-fill via dropdown changes
+                if (!currentNewRowIds.has(id) && !existingRowIds.has(id)) {
+                    console.log(`🗑️ Removing ${id} from pendingAutoFillRows (row no longer exists)`);
                     newSet.delete(id);
                 }
             });
@@ -1126,6 +1132,10 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         setPendingChanges(new Map());
         setEditingState(null);
 
+        // Clear auto-fill confirmations since pending changes are being cancelled
+        console.log('🗑️ Clearing auto-fill confirmations');
+        setPendingAutoFillRows(new Set());
+
         if (changeManager) {
             console.log('🔄 Calling changeManager.cancelAllChanges()');
             changeManager.cancelAllChanges();
@@ -1143,7 +1153,8 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         
         console.log('✅ VirtualizedEditableGrid: Cancel operation completed successfully');
         console.log('📊 Final pending changes count:', pendingChanges.size);
-    }, [pendingChanges, filteredItems, changeManager, onCancelChanges, setRefreshTrigger]);
+        console.log('📊 Final auto-fill confirmations count:', 0);
+    }, [pendingChanges, filteredItems, changeManager, onCancelChanges, setRefreshTrigger, setPendingAutoFillRows]);
 
     // Expose methods through ref
     React.useImperativeHandle(ref, () => ({

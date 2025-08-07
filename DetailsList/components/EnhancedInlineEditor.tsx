@@ -124,6 +124,8 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
     ) => {
         const valueToUse = newValue !== undefined ? newValue : currentValue;
         
+        console.log(`🔥 handleConditionalTrigger called: type=${triggerType}, column=${column.key}, newValue=${newValue}, currentValue=${currentValue}, valueToUse=${valueToUse}`);
+        
         if (column.key && config.conditional) {
             // Handle enterprise conditional logic
             const context = createConditionalContext();
@@ -137,6 +139,9 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
 
         // Handle PowerApps-compatible conditional logic
         if (column.key && triggerType === 'onChange' && onItemChange && allColumns && columnEditorMapping) {
+            console.log(`🔍 PowerApps conditional check: column=${column.key}, hasAllColumns=${!!allColumns}, hasMapping=${!!columnEditorMapping}`);
+            console.log(`📊 Current allColumns:`, allColumns);
+            
             const processor = PowerAppsConditionalProcessor.getInstance();
             
             // Build configurations from the column editor mapping
@@ -155,6 +160,8 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
 
             const dependencies = processor.getDependencies(allEditorConfigs);
             const dependentFields = dependencies[column.key];
+            
+            console.log(`📋 Dependencies found for ${column.key}:`, dependentFields);
 
             if (dependentFields && dependentFields.length > 0) {
                 const context = {
@@ -630,32 +637,19 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                     <Stack horizontal verticalAlign="center" style={style}>
                         <div 
                             style={{ flexGrow: 1 }}
-                            onMouseDown={(e) => {
-                                // Prevent parent cell from losing focus when clicking on date picker components
-                                e.stopPropagation();
-                                setIsDatePickerActive(true);
-                            }}
                         >
                             <DatePicker
                                 {...datePickerProps}
                                 value={currentValue instanceof Date ? currentValue : 
                                        currentValue ? new Date(currentValue) : undefined}
                                 onSelectDate={(date) => {
-                                    setCurrentValue(date);
-                                    setIsDatePickerActive(false);
-                                    
-                                    // Commit immediately
                                     const formattedValue = config.valueFormatter ? 
                                         config.valueFormatter(date, item, column) : 
                                         date;
+                                    handleValueChange(formattedValue);
                                     onCommit(formattedValue);
-                                    
-                                    // Trigger conditional logic AFTER commit with a delay to ensure state is updated
-                                    setTimeout(() => {
-                                        handleConditionalTrigger('onChange', date);
-                                    }, 100);
                                 }}
-                                formatDate={(date) => date?.toLocaleDateString() || ''}
+                                formatDate={(date: Date | undefined) => date?.toLocaleDateString() || ''}
                                 minDate={config.dateTimeConfig?.minDate}
                                 maxDate={config.dateTimeConfig?.maxDate}
                                 styles={{
@@ -686,9 +680,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                             ariaLabel="Clear Date"
                             onClick={() => {
                                 handleValueChange(null);
-                                setTimeout(() => {
-                                    onCommit(null);
-                                }, 10);
+                                onCommit(null);
                             }}
                             styles={{
                                 root: {
@@ -704,11 +696,6 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                 // Standard date picker without clear button
                 return (
                     <div 
-                        onMouseDown={(e) => {
-                            // Prevent parent cell from losing focus when clicking on date picker components
-                            e.stopPropagation();
-                            setIsDatePickerActive(true);
-                        }}
                         style={{ width: '100%' }}
                     >
                         <DatePicker
@@ -716,17 +703,13 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                             value={currentValue instanceof Date ? currentValue : 
                                    currentValue ? new Date(currentValue) : undefined}
                             onSelectDate={(date) => {
-                                handleValueChange(date);
-                                setIsDatePickerActive(false);
-                                // Auto-commit on date selection
-                                setTimeout(() => {
-                                    const formattedValue = config.valueFormatter ? 
-                                        config.valueFormatter(date, item, column) : 
-                                        date;
-                                    onCommit(formattedValue);
-                                }, 10);
+                                const formattedValue = config.valueFormatter ? 
+                                    config.valueFormatter(date, item, column) : 
+                                    date;
+                                handleValueChange(formattedValue);
+                                onCommit(formattedValue);
                             }}
-                            formatDate={(date) => date?.toLocaleDateString() || ''}
+                            formatDate={(date: Date | undefined) => date?.toLocaleDateString() || ''}
                             minDate={config.dateTimeConfig?.minDate}
                             maxDate={config.dateTimeConfig?.maxDate}
                             styles={{
