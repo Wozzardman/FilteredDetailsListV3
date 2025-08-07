@@ -649,6 +649,21 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                                     handleValueChange(formattedValue);
                                     onCommit(formattedValue);
                                 }}
+                                textField={{
+                                    onChange: (_, newValue) => {
+                                        // Handle direct text input
+                                        if (newValue) {
+                                            const date = new Date(newValue);
+                                            if (!isNaN(date.getTime())) {
+                                                const formattedValue = config.valueFormatter ? 
+                                                    config.valueFormatter(date, item, column) : 
+                                                    date;
+                                                handleValueChange(formattedValue);
+                                                onCommit(formattedValue);
+                                            }
+                                        }
+                                    }
+                                }}
                                 formatDate={(date: Date | undefined) => date?.toLocaleDateString() || ''}
                                 minDate={config.dateTimeConfig?.minDate}
                                 maxDate={config.dateTimeConfig?.maxDate}
@@ -708,6 +723,21 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                                     date;
                                 handleValueChange(formattedValue);
                                 onCommit(formattedValue);
+                            }}
+                            textField={{
+                                onChange: (_, newValue) => {
+                                    // Handle direct text input
+                                    if (newValue) {
+                                        const date = new Date(newValue);
+                                        if (!isNaN(date.getTime())) {
+                                            const formattedValue = config.valueFormatter ? 
+                                                config.valueFormatter(date, item, column) : 
+                                                date;
+                                            handleValueChange(formattedValue);
+                                            onCommit(formattedValue);
+                                        }
+                                    }
+                                }
                             }}
                             formatDate={(date: Date | undefined) => date?.toLocaleDateString() || ''}
                             minDate={config.dateTimeConfig?.minDate}
