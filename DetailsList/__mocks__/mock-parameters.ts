@@ -53,6 +53,11 @@ export function getMockParameters(): IInputs {
         AddNewRowTrigger: new MockStringProperty(),
         NewRowTemplate: new MockStringProperty(),
         
+        // Jump To Properties
+        EnableJumpTo: new MockTwoOptionsProperty(false),
+        // JumpToColumn: new MockStringProperty(), // Removed - now using JumptoColumn in columns dataset
+        JumpToValue: new MockStringProperty(),
+        
         records: new MockDataSet([]),
         columns: new MockDataSet([]),
     };

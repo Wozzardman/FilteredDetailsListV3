@@ -113,6 +113,12 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     private lastSaveTriggerReset: string = '';
     private lastSaveTimestamp: string = '';
     
+    // Jump To navigation properties
+    private jumpToResult: string = '';
+    private jumpToRowIndex: number = -1;
+    private jumpToColumnName: string = '';
+    private jumpToColumnDisplayName: string = '';
+    
     // Button event properties
     private buttonEventName: string = '';
     private buttonEventType: string = '';
@@ -681,6 +687,10 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             // Process column definitions from the columns dataset (not the records dataset metadata)
             const processedColumns: any[] = [];
             
+            // Track jump-to column information
+            let jumpToColumnName = '';
+            let jumpToColumnDisplayName = '';
+            
             if (columns && columns.sortedRecordIds && columns.sortedRecordIds.length > 0) {
                 console.log('🔍 Processing column definitions from columns dataset:', columns.sortedRecordIds.length);
                 columns.sortedRecordIds.forEach(colId => {
@@ -701,6 +711,16 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                             
                             // Get multiline property
                             const isMultiLine = columnRecord.getValue('ColMultiLine') === true;
+                            
+                            // Check if this is the jump-to column
+                            const isJumpToColumn = columnRecord.getValue('JumptoColumn') === true;
+                            if (isJumpToColumn) {
+                                jumpToColumnName = String(columnName);
+                                jumpToColumnDisplayName = String(displayName);
+                                this.jumpToColumnName = jumpToColumnName;
+                                this.jumpToColumnDisplayName = jumpToColumnDisplayName;
+                                console.log(`🎯 Found Jump To column: ${columnName} (${displayName})`);
+                            }
                             
                             console.log(`🔧 Processing column: ${columnName} (${displayName}) - Width: ${colWidth} (default: ${defaultColumnWidth})`);
                             processedColumns.push({
@@ -1152,6 +1172,14 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             onCancelChanges: this.handleCancelOperation,
             onAddNewRow: this.handleAddNewRowButtonClick,
             onDeleteNewRow: this.handleDeleteNewRow,
+            
+            // Jump To Navigation props
+            enableJumpTo: context.parameters.EnableJumpTo?.raw || false,
+            jumpToColumn: this.jumpToColumnName,
+            jumpToColumnDisplayName: this.jumpToColumnDisplayName,
+            jumpToValue: context.parameters.JumpToValue?.raw || '',
+            onJumpToResult: this.handleJumpToResult,
+            
             getColumnDataType: (columnKey: string) => {
                 const column = gridColumns.find(col => col.key === columnKey);
                 const dataType = column?.dataType || 'string';
@@ -1384,7 +1412,13 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             }, 0);
         }
         
-        return { ...defaultOutputs, ...eventOutputs, ...changeOutputs, ...autoUpdateOutputs, ...selectionOutputs, ...powerAppsIntegrationOutputs, ...newRowOutputs };
+        // Jump To outputs
+        const jumpToOutputs = {
+            JumpToResult: this.jumpToResult || '',
+            JumpToRowIndex: this.jumpToRowIndex || -1,
+        } as IOutputs;
+
+        return { ...defaultOutputs, ...eventOutputs, ...changeOutputs, ...autoUpdateOutputs, ...selectionOutputs, ...powerAppsIntegrationOutputs, ...newRowOutputs, ...jumpToOutputs };
     }
 
     public destroy(): void {
@@ -2835,6 +2869,20 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             
             this.notifyOutputChanged();
         }
+    };
+
+    /**
+     * Handle Jump To navigation result
+     */
+    private handleJumpToResult = (result: string, rowIndex: number): void => {
+        console.log(`🎯 Jump To Result: ${result}, Row Index: ${rowIndex}`);
+        
+        // Update output properties for Power Apps
+        this.jumpToResult = result;
+        this.jumpToRowIndex = rowIndex;
+        
+        // Notify Power Apps that outputs have changed
+        this.notifyOutputChanged();
     };
 
     /**

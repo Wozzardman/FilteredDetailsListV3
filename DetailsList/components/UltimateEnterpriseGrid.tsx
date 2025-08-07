@@ -5,6 +5,7 @@ import { TextField } from '@fluentui/react/lib/TextField';
 import { DefaultButton, PrimaryButton } from '@fluentui/react/lib/Button';
 import { Dialog, DialogType, DialogFooter } from '@fluentui/react/lib/Dialog';
 import { Stack } from '@fluentui/react/lib/Stack';
+import { Text } from '@fluentui/react/lib/Text';
 import { DetailsList } from '@fluentui/react/lib/DetailsList';
 import { UltraVirtualizedGrid, useUltraVirtualization } from '../virtualization/UltraVirtualizationEngine';
 import { EnterpriseChangeManager } from '../services/EnterpriseChangeManager';
@@ -69,6 +70,13 @@ export interface IUltimateEnterpriseGridProps {
     enableExcelClipboard?: boolean;
     onClipboardOperation?: (operation: 'copy' | 'paste', data?: any) => void;
     
+    // Jump To Navigation properties
+    enableJumpTo?: boolean;
+    jumpToColumn?: string;
+    jumpToColumnDisplayName?: string;
+    jumpToValue?: string;
+    onJumpToResult?: (result: string, rowIndex: number) => void;
+    
     className?: string;
     theme?: 'light' | 'dark' | 'high-contrast';
     locale?: string;
@@ -115,6 +123,13 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     enableExcelClipboard = false,
     onClipboardOperation,
     
+    // Jump To Navigation props
+    enableJumpTo = false,
+    jumpToColumn = '',
+    jumpToColumnDisplayName = '',
+    jumpToValue = '',
+    onJumpToResult,
+    
     className = '',
     theme = 'light',
     locale = 'en-US',
@@ -139,6 +154,10 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     // Add New Row dialog state
     const [showAddRowDialog, setShowAddRowDialog] = useState<boolean>(false);
     const [newRowCount, setNewRowCount] = useState<string>('1');
+    
+    // Jump To navigation state
+    const [jumpToSearchValue, setJumpToSearchValue] = useState<string>('');
+    const [lastJumpResult, setLastJumpResult] = useState<{ result: string; rowIndex: number } | null>(null);
     
     // Ultra virtualization hook
     const {
@@ -216,6 +235,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     const getAvailableValues = useCallback((columnKey: string) => {
         // Use a Map to track values and their counts efficiently
         const valueCountMap = new Map<any, number>();
+        let blankCount = 0;
         
         // Find the column configuration to determine data type
         const columnConfig = columns.find(col => (col.fieldName || col.key) === columnKey);
@@ -243,8 +263,10 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                 value = item[columnKey];
             }
             
-            // Count occurrences of each value (preserve original data type)
-            if (value !== null && value !== undefined) {
+            // Count blank values (null, undefined, empty string, or just whitespace)
+            if (value == null || value === undefined || value === '' || (typeof value === 'string' && value.trim() === '')) {
+                blankCount++;
+            } else {
                 // For date columns, normalize to date string for proper grouping
                 let normalizedValue = value;
                 if (isDateColumn && value instanceof Date) {
@@ -282,7 +304,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                     displayValue = value.toString();
                 }
             } else {
-                displayValue = value?.toString() || '(Blank)';
+                displayValue = value?.toString() || '';
             }
             
             return {
@@ -292,10 +314,21 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
             };
         });
         
-        // Sort by display value
-        result.sort((a, b) => (a.displayValue || '').localeCompare(b.displayValue || ''));
+        // Add (Blanks) entry if there are blank values
+        if (blankCount > 0) {
+            result.unshift({
+                value: '(Blanks)',
+                displayValue: '(Blanks)',
+                count: blankCount
+            });
+        }
         
-        return result;
+        // Sort by display value (but keep blanks at the top)
+        const blanksEntry = result.find(item => item.value === '(Blanks)');
+        const nonBlanksEntries = result.filter(item => item.value !== '(Blanks)');
+        nonBlanksEntries.sort((a, b) => (a.displayValue || '').localeCompare(b.displayValue || ''));
+        
+        return blanksEntry ? [blanksEntry, ...nonBlanksEntries] : nonBlanksEntries;
     }, [items, columns, getColumnDataType]);
 
     // Handle export functionality
@@ -362,6 +395,81 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
             setPendingChangesCount(0); // Reset count after cancel
         }
     }, [changeManager]);
+
+    // Jump To navigation handler - reuses the same data access pattern as the filter function
+    const handleJumpTo = useCallback((searchValue: string) => {
+        if (!searchValue.trim() || !jumpToColumn) {
+            setLastJumpResult({ result: 'No search value or column specified', rowIndex: -1 });
+            onJumpToResult?.('No search value or column specified', -1);
+            return;
+        }
+
+        const searchValueLower = searchValue.toLowerCase();
+
+        // Find the item that matches the search value in the specified column
+        // Use the same data access pattern as the global filter for consistency
+        const matchingIndex = filteredItems.findIndex(item => {
+            // Handle PCF EntityRecord objects - same pattern as filter function
+            let value;
+            if (item && typeof item.getValue === 'function') {
+                // PCF EntityRecord - use getValue method
+                try {
+                    value = item.getValue(jumpToColumn);
+                } catch (e) {
+                    value = null;
+                }
+            } else {
+                // Plain object - use property access
+                value = item[jumpToColumn];
+            }
+            
+            if (value == null) return false;
+            
+            // Convert to string for comparison (case insensitive)
+            const itemValue = value.toString().toLowerCase();
+            
+            // Exact match or starts with match
+            return itemValue === searchValueLower || itemValue.startsWith(searchValueLower);
+        });
+
+        if (matchingIndex >= 0) {
+            console.log(`🎯 Jump To: Found record at index ${matchingIndex}`);
+            
+            // ENTERPRISE-GRADE LIGHTNING-FAST SCROLLING - Google/Meta competitive performance
+            // Instant virtualized scrolling with zero performance overhead
+            if (gridRef.current?.scrollToIndex) {
+                gridRef.current.scrollToIndex(matchingIndex);
+                console.log(`⚡ Lightning scroll to index ${matchingIndex} - META/Google competitive performance`);
+            }
+            
+            // No visual feedback text - just silent navigation with row index for Power Apps integration
+            setLastJumpResult({ result: '', rowIndex: matchingIndex });
+            onJumpToResult?.('', matchingIndex);
+        } else {
+            // No visual feedback text - just silent failure indication  
+            setLastJumpResult({ result: '', rowIndex: -1 });
+            onJumpToResult?.('', -1);
+        }
+    }, [filteredItems, jumpToColumn, onJumpToResult, gridRef]);
+
+    // Handle Jump To search box change
+    const handleJumpToSearch = useCallback((event: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>, newValue?: string) => {
+        setJumpToSearchValue(newValue || '');
+    }, []);
+
+    // Handle Jump To search box enter key
+    const handleJumpToKeyPress = useCallback((event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        if (event.key === 'Enter') {
+            handleJumpTo(jumpToSearchValue);
+        }
+    }, [handleJumpTo, jumpToSearchValue]);
+
+    // Auto-trigger jump when jumpToValue prop changes (for external control)
+    useEffect(() => {
+        if (jumpToValue && jumpToValue.trim()) {
+            handleJumpTo(jumpToValue);
+        }
+    }, [jumpToValue, handleJumpTo]);
 
     // Add New Row dialog handlers
     const handleShowAddRowDialog = useCallback(() => {
@@ -467,6 +575,20 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                     />
                 )}
                 
+                {enableJumpTo && jumpToColumn && (
+                    <TextField
+                        placeholder={`Jump to ${jumpToColumnDisplayName || jumpToColumn}...`}
+                        value={jumpToSearchValue}
+                        onChange={handleJumpToSearch}
+                        onKeyPress={handleJumpToKeyPress}
+                        styles={{
+                            root: { minWidth: 200 },
+                            field: { fontSize: 14 }
+                        }}
+                        iconProps={{ iconName: 'Search' }}
+                    />
+                )}
+                
                 {enableExport && (
                     <Stack horizontal tokens={{ childrenGap: 8 }}>
                         <DefaultButton 
@@ -476,10 +598,6 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                         <DefaultButton 
                             text="Export Excel" 
                             onClick={() => handleExport('Excel')}
-                        />
-                        <DefaultButton 
-                            text="Export JSON" 
-                            onClick={() => handleExport('JSON')}
                         />
                     </Stack>
                 )}

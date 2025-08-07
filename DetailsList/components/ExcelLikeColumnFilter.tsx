@@ -183,6 +183,19 @@ export const ExcelLikeColumnFilter: React.FC<IExcelLikeColumnFilterProps> = ({
         }
     }, [distinctValues, searchTerm]);
 
+    // Update Select All checkbox state when filtered values change
+    React.useEffect(() => {
+        if (searchTerm && filteredDistinctValues.length > 0) {
+            // When searching, check if all filtered values are selected
+            const allFilteredSelected = filteredDistinctValues.every(v => v.selected);
+            setSelectAll(allFilteredSelected);
+        } else if (!searchTerm) {
+            // When not searching, check if all values are selected
+            const allSelected = distinctValues.every(v => v.selected);
+            setSelectAll(allSelected);
+        }
+    }, [filteredDistinctValues, distinctValues, searchTerm]);
+
     // Virtualized list for thousands of distinct values
     const virtualizer = useVirtualizer({
         count: filteredDistinctValues.length,
@@ -198,17 +211,35 @@ export const ExcelLikeColumnFilter: React.FC<IExcelLikeColumnFilterProps> = ({
         );
         setDistinctValues(newValues);
         
-        const allSelected = newValues.every(v => v.selected);
-        const noneSelected = newValues.every(v => !v.selected);
-        setSelectAll(allSelected ? true : noneSelected ? false : false);
-    }, [distinctValues]);
+        // Update selectAll state based on current filtered values
+        if (searchTerm) {
+            const filteredSelectedStates = filteredDistinctValues.map(fv => 
+                newValues.find(v => v.value === fv.value)?.selected || false
+            );
+            setSelectAll(filteredSelectedStates.every(selected => selected));
+        } else {
+            const allSelected = newValues.every(v => v.selected);
+            const noneSelected = newValues.every(v => !v.selected);
+            setSelectAll(allSelected ? true : noneSelected ? false : false);
+        }
+    }, [distinctValues, filteredDistinctValues, searchTerm]);
 
     // Handle select all toggle
     const handleSelectAll = React.useCallback((checked: boolean) => {
-        const newValues = distinctValues.map(v => ({ ...v, selected: checked }));
-        setDistinctValues(newValues);
+        if (searchTerm) {
+            // When searching, only apply to filtered values
+            const filteredValueSet = new Set(filteredDistinctValues.map(v => v.value));
+            const newValues = distinctValues.map(v => 
+                filteredValueSet.has(v.value) ? { ...v, selected: checked } : v
+            );
+            setDistinctValues(newValues);
+        } else {
+            // When not searching, apply to all values
+            const newValues = distinctValues.map(v => ({ ...v, selected: checked }));
+            setDistinctValues(newValues);
+        }
         setSelectAll(checked);
-    }, [distinctValues]);
+    }, [distinctValues, filteredDistinctValues, searchTerm]);
 
     // Apply filter
     const handleApplyFilter = React.useCallback(() => {

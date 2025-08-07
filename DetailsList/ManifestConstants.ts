@@ -42,6 +42,7 @@ export const enum ColumnsColumns {
     ColRowHeader = 'ColRowHeader',
     ColFilterable = 'ColFilterable',
     ColFilterType = 'ColFilterType',
+    JumptoColumn = 'JumptoColumn',
 }
 
 export const enum InputProperties {
@@ -49,7 +50,8 @@ export const enum InputProperties {
     LargeDatasetPaging = 'LargeDatasetPaging',
     RaiseOnRowSelectionChangeEvent = 'RaiseOnRowSelectionChangeEvent',
     AlternateRowColor = 'AlternateRowColor',
-    SelectionAlwaysVisible = 'SelectionAlwaysVisible',
+    EnableJumpTo = 'EnableJumpTo',
+    JumpToValue = 'JumpToValue',
 }
 
 export const enum OutputProperties {
@@ -58,6 +60,8 @@ export const enum OutputProperties {
     HasPreviousPage = 'HasPreviousPage',
     TotalRecords = 'TotalRecords',
     TotalPages = 'TotalPages',
+    JumpToResult = 'JumpToResult',
+    JumpToRowIndex = 'JumpToRowIndex',
 }
 
 export const enum InputEvents {
