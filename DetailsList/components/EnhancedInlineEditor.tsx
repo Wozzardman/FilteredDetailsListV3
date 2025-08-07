@@ -68,6 +68,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
     const [isDropdownOpen, setIsDropdownOpen] = React.useState<boolean>(false);
     const dropdownContainerRef = React.useRef<HTMLDivElement>(null);
     const [dropdownTarget, setDropdownTarget] = React.useState<HTMLElement | null>(null);
+    const [isDatePickerActive, setIsDatePickerActive] = React.useState<boolean>(false);
 
     // Default editor config if none provided
     const config: ColumnEditorConfig = editorConfig || {
@@ -368,13 +369,18 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
     const handleBlur = React.useCallback(() => {
         handleConditionalTrigger('onBlur');
         
+        // For date picker, don't commit on blur if the calendar is being used
+        if (config.type === 'date' && isDatePickerActive) {
+            return;
+        }
+        
         if (!hasError) {
             const formattedValue = config.valueFormatter ? 
                 config.valueFormatter(currentValue, item, column) : 
                 currentValue;
             onCommit(formattedValue);
         }
-    }, [hasError, currentValue, onCommit, config, item, column, handleConditionalTrigger]);
+    }, [hasError, currentValue, onCommit, config, item, column, handleConditionalTrigger, isDatePickerActive]);
 
     if (config.isReadOnly) {
         const displayValue = config.displayFormatter ? 
@@ -561,33 +567,79 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
             );
 
         case 'date':
+            // Create special props for DatePicker without the onBlur handler that interferes with date selection
+            const datePickerProps = {
+                style: { border: 'none', background: 'transparent', ...style },
+                onKeyDown: handleKeyDown,
+                onFocus: () => {
+                    setIsDatePickerActive(true);
+                    handleFocus();
+                },
+                // Custom onBlur that respects calendar interactions
+                onBlur: () => {
+                    // Delay the blur handling to allow calendar selection to complete
+                    setTimeout(() => {
+                        setIsDatePickerActive(false);
+                        handleBlur();
+                    }, 200);
+                },
+                className: `enhanced-editor ${className} ${hasError ? 'has-error' : ''}`,
+                autoFocus: true,
+                placeholder: config.placeholder
+            };
+
             if (config.allowDirectTextInput) {
                 // Date picker with clear button when direct text input is enabled
                 return (
                     <Stack horizontal verticalAlign="center" style={style}>
-                        <DatePicker
-                            {...commonProps}
-                            value={currentValue instanceof Date ? currentValue : 
-                                   currentValue ? new Date(currentValue) : undefined}
-                            onSelectDate={(date) => {
-                                handleValueChange(date);
-                                if (date) {
+                        <div 
+                            style={{ flexGrow: 1 }}
+                            onMouseDown={(e) => {
+                                // Prevent parent cell from losing focus when clicking on date picker components
+                                e.stopPropagation();
+                                setIsDatePickerActive(true);
+                            }}
+                        >
+                            <DatePicker
+                                {...datePickerProps}
+                                value={currentValue instanceof Date ? currentValue : 
+                                       currentValue ? new Date(currentValue) : undefined}
+                                onSelectDate={(date) => {
+                                    handleValueChange(date);
+                                    setIsDatePickerActive(false);
                                     // Auto-commit on date selection
                                     setTimeout(() => {
                                         const formattedValue = config.valueFormatter ? 
                                             config.valueFormatter(date, item, column) : 
                                             date;
                                         onCommit(formattedValue);
-                                    }, 100);
-                                }
-                            }}
-                            formatDate={(date) => date?.toLocaleDateString() || ''}
-                            minDate={config.dateTimeConfig?.minDate}
-                            maxDate={config.dateTimeConfig?.maxDate}
-                            styles={{
-                                root: { flexGrow: 1 }
-                            }}
-                        />
+                                    }, 10);
+                                }}
+                                formatDate={(date) => date?.toLocaleDateString() || ''}
+                                minDate={config.dateTimeConfig?.minDate}
+                                maxDate={config.dateTimeConfig?.maxDate}
+                                styles={{
+                                    root: { width: '100%' },
+                                    textField: {
+                                        fieldGroup: {
+                                            border: 'none',
+                                            background: 'transparent',
+                                            selectors: {
+                                                ':hover': {
+                                                    border: 'none'
+                                                },
+                                                ':focus': {
+                                                    border: 'none'
+                                                },
+                                                ':active': {
+                                                    border: 'none'
+                                                }
+                                            }
+                                        }
+                                    }
+                                }}
+                            />
+                        </div>
                         <IconButton
                             iconProps={{ iconName: 'Clear' }}
                             title="Clear Date"
@@ -596,7 +648,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                                 handleValueChange(null);
                                 setTimeout(() => {
                                     onCommit(null);
-                                }, 100);
+                                }, 10);
                             }}
                             styles={{
                                 root: {
@@ -611,27 +663,54 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
             } else {
                 // Standard date picker without clear button
                 return (
-                    <DatePicker
-                        {...commonProps}
-                        value={currentValue instanceof Date ? currentValue : 
-                               currentValue ? new Date(currentValue) : undefined}
-                        onSelectDate={(date) => {
-                            handleValueChange(date);
-                            if (date) {
+                    <div 
+                        onMouseDown={(e) => {
+                            // Prevent parent cell from losing focus when clicking on date picker components
+                            e.stopPropagation();
+                            setIsDatePickerActive(true);
+                        }}
+                        style={{ width: '100%' }}
+                    >
+                        <DatePicker
+                            {...datePickerProps}
+                            value={currentValue instanceof Date ? currentValue : 
+                                   currentValue ? new Date(currentValue) : undefined}
+                            onSelectDate={(date) => {
+                                handleValueChange(date);
+                                setIsDatePickerActive(false);
                                 // Auto-commit on date selection
                                 setTimeout(() => {
                                     const formattedValue = config.valueFormatter ? 
                                         config.valueFormatter(date, item, column) : 
                                         date;
                                     onCommit(formattedValue);
-                                }, 100);
-                            }
-                        }}
-                        formatDate={(date) => date?.toLocaleDateString() || ''}
-                        minDate={config.dateTimeConfig?.minDate}
-                        maxDate={config.dateTimeConfig?.maxDate}
-                        style={style}
-                    />
+                                }, 10);
+                            }}
+                            formatDate={(date) => date?.toLocaleDateString() || ''}
+                            minDate={config.dateTimeConfig?.minDate}
+                            maxDate={config.dateTimeConfig?.maxDate}
+                            styles={{
+                                root: { width: '100%' },
+                                textField: {
+                                    fieldGroup: {
+                                        border: 'none',
+                                        background: 'transparent',
+                                        selectors: {
+                                            ':hover': {
+                                                border: 'none'
+                                            },
+                                            ':focus': {
+                                                border: 'none'
+                                            },
+                                            ':active': {
+                                                border: 'none'
+                                            }
+                                        }
+                                    }
+                                }
+                            }}
+                        />
+                    </div>
                 );
             }
 

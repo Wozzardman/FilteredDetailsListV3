@@ -5,7 +5,6 @@
 
 import React from 'react';
 import { IInputs, IOutputs } from './generated/ManifestTypes';
-import { SimpleEnhancedGridWrapper } from './components/SimpleEnhancedGridWrapper';
 import { VirtualizedEditableGrid } from './components/VirtualizedEditableGrid';
 import { performanceMonitor } from './performance/PerformanceMonitor';
 import { useAccessibility } from './accessibility/AccessibilityManager';
@@ -254,10 +253,27 @@ export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.React
     }
 
     private createStandardGrid(context: ComponentFramework.Context<IInputs>): React.ReactElement {
-        const gridProps = this.getGridProps(context);
-        return React.createElement(SimpleEnhancedGridWrapper, {
-            ...gridProps,
-            useEnhancedFeatures: this.enhancedFeaturesEnabled,
+        // Transform dataset columns to grid columns
+        const gridColumns = (this.datasetColumns || []).map(col => ({
+            key: col.name,
+            name: col.displayName,
+            fieldName: col.name,
+            minWidth: 100,
+            isResizable: true,
+            data: col
+        }));
+
+        // Use VirtualizedEditableGrid as the default component
+        return React.createElement(VirtualizedEditableGrid, {
+            items: Object.values(this.records || {}),
+            columns: gridColumns,
+            height: Number(context.mode.allocatedHeight) || 600,
+            width: Number(context.mode.allocatedWidth) || 800,
+            enableInlineEditing: true,
+            useEnhancedEditors: this.enhancedFeaturesEnabled,
+            onCellEdit: () => {},
+            onCommitChanges: async () => {},
+            onCancelChanges: () => {},
         });
     }
 

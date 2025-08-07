@@ -69,10 +69,6 @@ export interface IUltimateEnterpriseGridProps {
     enableExcelClipboard?: boolean;
     onClipboardOperation?: (operation: 'copy' | 'paste', data?: any) => void;
     
-    // Frozen columns feature - ZERO PERFORMANCE COST
-    frozenColumns?: string[];
-    frozenColumnsWidth?: number;
-    
     className?: string;
     theme?: 'light' | 'dark' | 'high-contrast';
     locale?: string;
@@ -128,11 +124,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     columnTextSize = 13, // Default 13px for column data
     
     // Row styling props
-    alternateRowColor,
-    
-    // Frozen columns props - ZERO PERFORMANCE COST
-    frozenColumns = [],
-    frozenColumnsWidth
+    alternateRowColor
 }) => {
     // Ref for grid imperative methods
     const gridRef = React.useRef<VirtualizedEditableGridRef>(null);
@@ -565,13 +557,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                     // Row styling props
                     alternateRowColor={alternateRowColor}
                     
-                    // Frozen columns props - ZERO PERFORMANCE COST
-                    frozenColumns={frozenColumns}
-                    frozenColumnsWidth={frozenColumnsWidth}
-                    
-                    // Excel Clipboard props
-                    enableExcelClipboard={enableExcelClipboard}
-                    onClipboardOperation={onClipboardOperation}
+
                 />
             </div>
             

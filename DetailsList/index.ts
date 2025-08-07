@@ -1,7 +1,7 @@
 import { IDetailsList, IObjectWithKey, SelectionMode, Selection, IColumn } from '@fluentui/react';
 import * as React from 'react';
 import { IInputs, IOutputs } from './generated/ManifestTypes';
-import { getRecordKey } from './Grid';
+import { getRecordKey } from './utils/RecordUtils';
 import { UltimateEnterpriseGrid } from './components/UltimateEnterpriseGrid';
 import { LoadingOverlay } from './components/LoadingOverlay';
 import { InputEvents, OutputEvents, RecordsColumns, ItemsColumns, SortDirection } from './ManifestConstants';
@@ -144,22 +144,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     private isLoading = false;
     private loadingMessage = 'Loading...';
     private loadingStartTime = 0;
-
-    /**
-     * Parse frozen columns from the input parameter string
-     * @param frozenColumnsInput Comma-separated list of column keys
-     * @returns Array of column keys to freeze
-     */
-    private parseFrozenColumns(frozenColumnsInput?: string): string[] {
-        if (!frozenColumnsInput || typeof frozenColumnsInput !== 'string') {
-            return [];
-        }
-        
-        return frozenColumnsInput
-            .split(',')
-            .map(col => col.trim())
-            .filter(col => col.length > 0);
-    }
 
     public init(context: ComponentFramework.Context<IInputs>, notifyOutputChanged: () => void): void {
         const endMeasurement = performanceMonitor.startMeasure('component-init');
@@ -1147,9 +1131,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             // Text size configuration from Power Apps properties
             headerTextSize: context.parameters.HeaderTextSize?.raw || 14,
             columnTextSize: context.parameters.ColumnTextSize?.raw || 13,
-            
-            // Frozen columns configuration - ZERO PERFORMANCE COST
-            frozenColumns: this.parseFrozenColumns(context.parameters.FrozenColumns?.raw || undefined),
             
             // Row styling configuration
             alternateRowColor: context.parameters.AlternateRowColor?.raw || undefined,

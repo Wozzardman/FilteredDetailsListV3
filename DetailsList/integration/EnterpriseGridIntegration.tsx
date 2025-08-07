@@ -7,7 +7,7 @@
 import * as React from 'react';
 import { useCallback, useMemo, useRef, useEffect, useState } from 'react';
 import { VirtualizedEditableGrid } from '../components/VirtualizedEditableGrid';
-import { Grid } from '../Grid';
+import { getRecordKey } from '../utils/RecordUtils';
 import { PerformanceMonitor } from '../performance/PerformanceMonitor';
 import {
     EnterpriseTestDataGenerator,

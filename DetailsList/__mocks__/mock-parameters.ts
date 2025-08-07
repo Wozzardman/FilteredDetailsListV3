@@ -26,7 +26,6 @@ export function getMockParameters(): IInputs {
         PerformanceMode: new MockEnumProperty("1"),
         EnableVirtualization: new MockTwoOptionsProperty(true),
         VirtualizationThreshold: new MockWholeNumberProperty(),
-        FrozenColumns: new MockStringProperty(),
         DefaultColumnWidth: new MockWholeNumberProperty(),
         EnableColumnResizing: new MockTwoOptionsProperty(true),
         HeaderTextSize: new MockWholeNumberProperty(14),

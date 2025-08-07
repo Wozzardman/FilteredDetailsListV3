@@ -11,7 +11,6 @@ import { IColumn } from '@fluentui/react/lib/DetailsList';
 import { MessageBar, MessageBarType } from '@fluentui/react/lib/MessageBar';
 import { Spinner, SpinnerSize } from '@fluentui/react/lib/Spinner';
 import { DefaultButton } from '@fluentui/react/lib/Button';
-import { InlineEditor } from './InlineEditor';
 import { EnhancedInlineEditor } from './EnhancedInlineEditor';
 import { EnterpriseChangeManager } from '../services/EnterpriseChangeManager';
 import { performanceMonitor } from '../performance/PerformanceMonitor';
@@ -145,10 +144,6 @@ export interface VirtualizedEditableGridProps {
     
     // New row management
     onDeleteNewRow?: (itemId: string) => void; // Callback to delete individual new rows
-    
-    // Frozen columns feature - ZERO PERFORMANCE COST IMPLEMENTATION
-    frozenColumns?: string[]; // Array of column keys to freeze/pin to the left
-    frozenColumnsWidth?: number; // Optional: total width of frozen columns area (auto-calculated if not provided)
 }
 
 export interface VirtualizedEditableGridRef {
@@ -213,11 +208,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     // Excel Clipboard props
     enableExcelClipboard = false,
     clipboardService,
-    onClipboardOperation,
-    
-    // Frozen columns props - ZERO PERFORMANCE COST
-    frozenColumns = [],
-    frozenColumnsWidth
+    onClipboardOperation
 }, ref) => {
     // Refs for scrolling synchronization - DECLARE FIRST BEFORE ALL OTHER LOGIC
     const parentRef = React.useRef<HTMLDivElement>(null);
@@ -572,38 +563,6 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         return result;
     }, [columns, enableSelectionMode, onDeleteNewRow, filteredItems]);
 
-    // ZERO PERFORMANCE COST Frozen Columns Implementation
-    const { frozenColumnsList, scrollableColumnsList, frozenColumnsCalculatedWidth } = React.useMemo(() => {
-        if (!frozenColumns || frozenColumns.length === 0) {
-            return {
-                frozenColumnsList: [],
-                scrollableColumnsList: effectiveColumns,
-                frozenColumnsCalculatedWidth: 0
-            };
-        }
-
-        const frozen: IGridColumn[] = [];
-        const scrollable: IGridColumn[] = [];
-        let calculatedWidth = 0;
-
-        effectiveColumns.forEach((column) => {
-            if (frozenColumns.includes(column.key)) {
-                frozen.push(column);
-                // Calculate frozen column width
-                const width = column.currentWidth || column.maxWidth || column.minWidth || 150;
-                calculatedWidth += width;
-            } else {
-                scrollable.push(column);
-            }
-        });
-
-        return {
-            frozenColumnsList: frozen,
-            scrollableColumnsList: scrollable,
-            frozenColumnsCalculatedWidth: frozenColumnsWidth || calculatedWidth
-        };
-    }, [effectiveColumns, frozenColumns, frozenColumnsWidth]);
-
     // PERFORMANCE OPTIMIZATION: Memoize column widths to prevent recalculation
     const memoizedColumnWidths = React.useMemo(() => {
         return effectiveColumns.map((col, index) => {
@@ -643,81 +602,6 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     const totalGridWidth = React.useMemo(() => {
         return memoizedColumnWidths.reduce((sum, width) => sum + width, 0);
     }, [memoizedColumnWidths]);
-
-    // Separate width calculations for frozen and scrollable columns (ZERO PERFORMANCE COST)
-    const frozenColumnWidths = React.useMemo(() => {
-        return frozenColumnsList.map((col) => {
-            const columnKey = col.key || col.fieldName || '';
-            
-            // Selection column has fixed width
-            if (columnKey === '__selection__') {
-                return 40;
-            }
-            
-            // Check if user has manually resized this column
-            const overrideWidth = columnWidthOverrides[columnKey];
-            if (overrideWidth) {
-                return overrideWidth;
-            }
-            
-            // Use the column's intended width
-            if (col.defaultWidth && col.defaultWidth > 0) {
-                return col.defaultWidth;
-            }
-            
-            if (col.maxWidth && col.maxWidth > col.minWidth) {
-                return col.maxWidth;
-            }
-            
-            if (col.minWidth && col.minWidth > 0) {
-                return col.minWidth;
-            }
-            
-            return 150; // Default width
-        });
-    }, [frozenColumnsList, columnWidthOverrides]);
-
-    const scrollableColumnWidths = React.useMemo(() => {
-        return scrollableColumnsList.map((col) => {
-            const columnKey = col.key || col.fieldName || '';
-            
-            // Selection column has fixed width
-            if (columnKey === '__selection__') {
-                return 40;
-            }
-            
-            // Check if user has manually resized this column
-            const overrideWidth = columnWidthOverrides[columnKey];
-            if (overrideWidth) {
-                return overrideWidth;
-            }
-            
-            // Use the column's intended width
-            if (col.defaultWidth && col.defaultWidth > 0) {
-                return col.defaultWidth;
-            }
-            
-            if (col.maxWidth && col.maxWidth > col.minWidth) {
-                return col.maxWidth;
-            }
-            
-            if (col.minWidth && col.minWidth > 0) {
-                return col.minWidth;
-            }
-            
-            return 150; // Default width
-        });
-    }, [scrollableColumnsList, columnWidthOverrides]);
-
-    // Calculate frozen columns total width
-    const totalFrozenWidth = React.useMemo(() => {
-        return frozenColumnWidths.reduce((sum, width) => sum + width, 0);
-    }, [frozenColumnWidths]);
-
-    // Calculate scrollable columns total width
-    const totalScrollableWidth = React.useMemo(() => {
-        return scrollableColumnWidths.reduce((sum, width) => sum + width, 0);
-    }, [scrollableColumnWidths]);
 
     // Helper function to convert alignment values to CSS properties
     const getAlignmentStyles = (horizontalAlign?: string, verticalAlign?: string) => {
@@ -1149,12 +1033,17 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                         style={{ width: '100%', border: 'none', background: 'transparent' }}
                                     />
                                 ) : (
-                                    <InlineEditor
+                                    <EnhancedInlineEditor
                                         value={editingState.originalValue}
                                         column={enhancedColumn}
-                                        dataType={dataType}
-                                        availableValues={availableValues}
-                                        isReadOnly={isReadOnly}
+                                        item={item}
+                                        editorConfig={{
+                                            type: dataType === 'date' ? 'date' : 
+                                                  dataType === 'number' ? 'number' : 
+                                                  dataType === 'boolean' ? 'boolean' : 'text',
+                                            isReadOnly: isReadOnly,
+                                            dropdownOptions: availableValues?.map(val => ({ key: val, text: val, value: val }))
+                                        }}
                                         onCommit={commitEdit}
                                         onCancel={cancelEdit}
                                         style={{ width: '100%', border: 'none', background: 'transparent' }}
@@ -1328,172 +1217,9 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     }, [filteredItems, columns, memoizedColumnWidths, editingState, pendingChanges, readOnlyColumns, enableInlineEditing, enableDragFill, startEdit, commitEdit, cancelEdit, memoizedAvailableValues, onItemClick, onItemDoubleClick, refreshTrigger]);
 
     // PERFORMANCE OPTIMIZATION: Create stable render function to prevent unnecessary re-renders
-    const renderRow = React.useCallback((virtualRow: any, columnsToRender = effectiveColumns, widthsToUse = memoizedColumnWidths) => {
-        // Update renderRowContent to use the passed parameters
-        const item = filteredItems[virtualRow.index];
-        const index = virtualRow.index;
-        const isEven = index % 2 === 0;
-        
-        // Apply alternating row background color for even rows
-        const rowStyle: React.CSSProperties = {
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: `${virtualRow.size}px`,
-            transform: `translateY(${virtualRow.start}px)`,
-            display: 'flex',
-            alignItems: 'center',
-            borderBottom: '1px solid #e1dfdd',
-            cursor: 'pointer',
-            boxSizing: 'border-box',
-            backgroundColor: alternateRowColor && isEven ? alternateRowColor : 'transparent'
-        };
-
-        return (
-            <div
-                key={index}
-                className="virtualized-row"
-                data-index={index}
-                style={rowStyle}
-                onClick={() => onItemClick?.(item, index)}
-                onDoubleClick={() => onItemDoubleClick?.(item, index)}
-            >
-                {columnsToRender.map((column: IGridColumn, columnIndex: number) => {
-                    const columnKey = column.fieldName || column.key;
-                    const cellKey = getCellKey(index, columnKey);
-                    const isEditing = editingState?.itemIndex === index && editingState?.columnKey === columnKey;
-                    const hasChanges = pendingChanges.has(cellKey);
-                    const isReadOnly = readOnlyColumns.includes(columnKey);
-                    const cellValue = pendingChanges.get(cellKey)?.newValue ?? getPCFValue(item, columnKey);
-                    const dataType = column.data?.dataType || 'string';
-                    const availableValues = memoizedAvailableValues(columnKey);
-
-                    const cellStyle: React.CSSProperties = {
-                        width: widthsToUse[columnIndex],
-                        minWidth: widthsToUse[columnIndex],
-                        maxWidth: widthsToUse[columnIndex],
-                        height: '100%',
-                        padding: '0 8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: column.isMultiline ? 'normal' : 'nowrap',
-                        cursor: isReadOnly ? 'default' : 'pointer',
-                        backgroundColor: hasChanges ? '#fff4ce' : 'transparent',
-                        borderLeft: hasChanges ? '3px solid #ffb900' : 'none',
-                        position: 'relative',
-                        boxSizing: 'border-box',
-                        fontSize: `${columnTextSize}px`
-                    };
-
-                    // Selection column
-                    if (columnKey === '__selection__') {
-                        const itemId = item.recordId || item.key || item.id || index.toString();
-                        const isSelected = selectedItems.has(itemId);
-                        
-                        return (
-                            <div key="__selection__" className="virtualized-cell selection-cell" style={cellStyle}>
-                                <RowSelectionCheckbox
-                                    itemId={itemId}
-                                    selected={isSelected}
-                                    onToggleSelection={(id) => onItemSelection?.(id)}
-                                    rowIndex={index}
-                                />
-                            </div>
-                        );
-                    }
-
-                    // Delete column
-                    if (columnKey === '__delete__' && item.isNewRow && onDeleteNewRow) {
-                        const itemId = item.recordId || item.key || item.id || index.toString();
-                        return (
-                            <div key="__delete__" className="virtualized-cell delete-cell" style={cellStyle}>
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onDeleteNewRow(itemId);
-                                    }}
-                                    style={{
-                                        background: 'transparent',
-                                        border: 'none',
-                                        color: '#d13438',
-                                        cursor: 'pointer',
-                                        fontSize: '16px',
-                                        padding: '4px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center'
-                                    }}
-                                    title="Delete this new row"
-                                >
-                                    ✕
-                                </button>
-                            </div>
-                        );
-                    }
-
-                    if (isEditing && enableInlineEditing && editingState) {
-                        const editorConfig = columnEditorMapping[columnKey];
-                        const enhancedColumn = {
-                            ...column,
-                            currentWidth: columnWidthOverrides[columnKey] || widthsToUse[columnIndex] || column.maxWidth || column.minWidth || 150
-                        };
-                        
-                        return (
-                            <div key={columnKey} style={cellStyle}>
-                                {useEnhancedEditors && editorConfig ? (
-                                    <EnhancedInlineEditor
-                                        value={editingState.originalValue}
-                                        column={enhancedColumn}
-                                        item={item}
-                                        editorConfig={editorConfig}
-                                        onCommit={commitEdit}
-                                        onCancel={cancelEdit}
-                                        onItemChange={handleItemChange}
-                                        allColumns={getCurrentColumnValues()}
-                                        columnEditorMapping={columnEditorMapping}
-                                        style={{ width: '100%', border: 'none', background: 'transparent' }}
-                                    />
-                                ) : (
-                                    <InlineEditor
-                                        value={editingState.originalValue}
-                                        column={enhancedColumn}
-                                        dataType={dataType}
-                                        availableValues={availableValues}
-                                        isReadOnly={isReadOnly}
-                                        onCommit={commitEdit}
-                                        onCancel={cancelEdit}
-                                        style={{ width: '100%', border: 'none', background: 'transparent' }}
-                                    />
-                                )}
-                            </div>
-                        );
-                    }
-
-                    return (
-                        <div
-                            key={columnKey}
-                            className={`virtualized-cell ${isReadOnly ? 'read-only' : 'editable'}`}
-                            style={cellStyle}
-                            onClick={() => !isReadOnly && startEdit(index, columnKey)}
-                            title={hasChanges ? `Changed from: ${pendingChanges.get(cellKey)?.oldValue}` : formatCellValue(cellValue, column.dataType, getColumnDataType, columnKey, columnEditorMapping)}
-                        >
-                            {column.onRender ? 
-                                column.onRender(item, index, column) : 
-                                formatCellValue(cellValue, column.dataType, getColumnDataType, columnKey, columnEditorMapping)
-                            }
-                        </div>
-                    );
-                })}
-            </div>
-        );
-    }, [filteredItems, editingState, pendingChanges, readOnlyColumns, 
-        enableInlineEditing, startEdit, commitEdit, cancelEdit, memoizedAvailableValues, 
-        onItemClick, onItemDoubleClick, alternateRowColor, columnTextSize, selectedItems, onItemSelection, 
-        onDeleteNewRow, columnEditorMapping, useEnhancedEditors, handleItemChange, 
-        getCurrentColumnValues, columnWidthOverrides, formatCellValue, getColumnDataType, getCellKey]);
+    const renderRow = React.useCallback((virtualRow: any) => {
+        return renderRowContent(virtualRow);
+    }, [renderRowContent]);
 
     // Render header with Excel-like filter buttons and column resizing
     const renderHeader = () => (
@@ -1793,155 +1519,21 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 className="virtualized-grid-body"
                 style={{
                     flex: 1,
-                    overflow: 'auto',
+                    overflow: 'auto', // Enable both horizontal and vertical scrolling
                     minHeight: 0,
                     position: 'relative'
                 }}
             >
-                {/* Frozen columns container - ZERO PERFORMANCE COST implementation */}
-                {frozenColumnsList.length > 0 && (
-                    <div
-                        className="frozen-columns-container"
-                        style={{
-                            position: 'sticky',
-                            left: 0,
-                            top: 0,
-                            width: `${totalFrozenWidth}px`,
-                            height: `${virtualizer.getTotalSize()}px`,
-                            backgroundColor: '#f8f9fa',
-                            borderRight: '2px solid #e1e1e1',
-                            zIndex: 20,
-                            pointerEvents: 'auto'
-                        }}
-                    >
-                        {virtualizer.getVirtualItems().map((virtualItem) => {
-                            const item = filteredItems[virtualItem.index];
-                            const index = virtualItem.index;
-                            const isEven = index % 2 === 0;
-                            
-                            const rowStyle: React.CSSProperties = {
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                width: '100%',
-                                height: `${virtualItem.size}px`,
-                                transform: `translateY(${virtualItem.start}px)`,
-                                display: 'flex',
-                                alignItems: 'center',
-                                borderBottom: '1px solid #e1e1e1',
-                                backgroundColor: alternateRowColor && isEven ? alternateRowColor : 'transparent'
-                            };
-
-                            return (
-                                <div key={`frozen-${virtualItem.index}`} style={rowStyle}>
-                                    {frozenColumnsList.map((column, columnIndex) => {
-                                        const columnKey = column.fieldName || column.key;
-                                        const cellKey = getCellKey(index, columnKey);
-                                        const isEditing = editingState?.itemIndex === index && editingState?.columnKey === columnKey;
-                                        const hasChanges = pendingChanges.has(cellKey);
-                                        const isReadOnly = readOnlyColumns.includes(columnKey);
-                                        const cellValue = pendingChanges.get(cellKey)?.newValue ?? getPCFValue(item, columnKey);
-                                        
-                                        const cellStyle: React.CSSProperties = {
-                                            width: frozenColumnWidths[columnIndex],
-                                            minWidth: frozenColumnWidths[columnIndex],
-                                            maxWidth: frozenColumnWidths[columnIndex],
-                                            height: '100%',
-                                            padding: '0 8px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis',
-                                            whiteSpace: 'nowrap',
-                                            cursor: isReadOnly ? 'default' : 'pointer',
-                                            backgroundColor: hasChanges ? '#fff4ce' : 'transparent',
-                                            borderLeft: hasChanges ? '3px solid #ffb900' : 'none',
-                                            borderRight: columnIndex < frozenColumnsList.length - 1 ? '1px solid #e1e1e1' : 'none',
-                                            position: 'relative',
-                                            boxSizing: 'border-box',
-                                            fontSize: `${columnTextSize}px`
-                                        };
-
-                                        // Selection column
-                                        if (columnKey === '__selection__') {
-                                            const itemId = item.recordId || item.key || item.id || index.toString();
-                                            const isSelected = selectedItems.has(itemId);
-                                            
-                                            return (
-                                                <div key="__selection__" style={cellStyle}>
-                                                    <RowSelectionCheckbox
-                                                        itemId={itemId}
-                                                        selected={isSelected}
-                                                        onToggleSelection={(id) => onItemSelection?.(id)}
-                                                        rowIndex={index}
-                                                    />
-                                                </div>
-                                            );
-                                        }
-
-                                        // Delete column
-                                        if (columnKey === '__delete__' && item.isNewRow && onDeleteNewRow) {
-                                            const itemId = item.recordId || item.key || item.id || index.toString();
-                                            return (
-                                                <div key="__delete__" style={cellStyle}>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            onDeleteNewRow(itemId);
-                                                        }}
-                                                        style={{
-                                                            background: 'transparent',
-                                                            border: 'none',
-                                                            color: '#d13438',
-                                                            cursor: 'pointer',
-                                                            fontSize: '16px',
-                                                            padding: '4px'
-                                                        }}
-                                                        title="Delete this new row"
-                                                    >
-                                                        ✕
-                                                    </button>
-                                                </div>
-                                            );
-                                        }
-
-                                        // Regular frozen cell
-                                        return (
-                                            <div
-                                                key={columnKey}
-                                                style={cellStyle}
-                                                onClick={() => !isReadOnly && startEdit(index, columnKey)}
-                                                title={formatCellValue(cellValue, column.dataType, getColumnDataType, columnKey, columnEditorMapping)}
-                                            >
-                                                {column.onRender ? 
-                                                    column.onRender(item, index, column) : 
-                                                    formatCellValue(cellValue, column.dataType, getColumnDataType, columnKey, columnEditorMapping)
-                                                }
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-                
                 <div
                     className="virtualized-grid-inner"
                     style={{
                         height: `${virtualizer.getTotalSize()}px`,
                         width: '100%',
-                        minWidth: `${frozenColumnsList.length > 0 ? totalScrollableWidth : totalGridWidth}px`,
+                        minWidth: `${totalGridWidth}px`, // Enable horizontal scrolling when columns exceed container
                         position: 'relative',
-                        marginLeft: frozenColumnsList.length > 0 ? `${totalFrozenWidth}px` : '0' // Offset for frozen columns
                     }}
                 >
-                    {virtualizer.getVirtualItems().map((virtualItem) => {
-                        const columnsToRender = frozenColumnsList.length > 0 ? scrollableColumnsList : effectiveColumns;
-                        const widthsToUse = frozenColumnsList.length > 0 ? scrollableColumnWidths : memoizedColumnWidths;
-                        
-                        return renderRow(virtualItem, columnsToRender, widthsToUse);
-                    })}
+                    {virtualizer.getVirtualItems().map(renderRow)}
                 </div>
             </div>
 
