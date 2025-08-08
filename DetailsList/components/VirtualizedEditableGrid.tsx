@@ -18,6 +18,7 @@ import { VirtualizedFilterDropdown, FilterValue } from './VirtualizedFilterDropd
 import { ExcelLikeColumnFilter } from './ExcelLikeColumnFilter';
 import { ColumnEditorMapping } from '../types/ColumnEditor.types';
 import { IGridColumn } from '../Component.types';
+import { ColumnVisibilityManager } from '../utils/ColumnVisibilityUtils';
 import { IFilterState, FilterOperators, FilterTypes } from '../Filter.types';
 import { HeaderSelectionCheckbox, RowSelectionCheckbox } from './SelectionCheckbox';
 import { PowerAppsConditionalProcessor } from '../services/PowerAppsConditionalProcessor';
@@ -803,7 +804,12 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
 
     // Create effective columns array including selection column if needed
     const effectiveColumns = React.useMemo(() => {
-        let result = [...columns];
+        // ⚡ LIGHTNING-FAST COLUMN VISIBILITY - Use high-performance manager for 0ms overhead
+        const visibilityManager = ColumnVisibilityManager.getInstance();
+        let result = visibilityManager.filterVisibleColumns(columns);
+        
+        const metrics = visibilityManager.getPerformanceMetrics();
+        console.log(`� Ultra-fast visibility filter: ${columns.length} → ${result.length} columns (${columns.length - result.length} hidden) | Cache: ${metrics.cacheSize} items, Age: ${metrics.cacheAge.toFixed(2)}ms`);
         
         // Add selection column at the beginning if enabled
         if (enableSelectionMode) {

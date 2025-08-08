@@ -20,6 +20,7 @@ export const enum ColumnsColumns {
     ColHorizontalAlign = 'ColHorizontalAlign',
     ColVerticalAlign = 'ColVerticalAlign',
     ColMultiLine = 'ColMultiLine',
+    ColVisible = 'ColVisible',
     ColIsBold = 'ColIsBold',
     ColTagColorColumn = 'ColTagColorColumn',
     ColTagBorderColorColumn = 'ColTagBorderColorColumn',

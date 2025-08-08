@@ -28,6 +28,8 @@ export interface IGridColumn extends IColumn {
     headerVerticalAligned?: string;
     // Multiline display property
     isMultiline?: boolean;
+    // Column visibility property
+    isVisible?: boolean;
     // Filter properties
     isFilterable?: boolean;
     filterType?: FilterTypes;

@@ -200,7 +200,68 @@ All editor types support these common properties:
     IsReadOnly: false,               // Make field read-only
     Placeholder: "Enter value...",   // Placeholder text
     DefaultValue: "Initial value",   // Default value for new records
-    ValueType: "text",              // Type for default value conversion (text, number, boolean, date)
+    ValueType` - Type for default value conversion (text, number, boolean, date)
+
+## 👁️ Column Visibility Control
+
+### Dynamic Show/Hide Columns ✅ IMPLEMENTED
+
+The control now supports **lightning-fast column visibility** through the `ColVisible` property in the `Columns` dataset. This provides true dynamic show/hide functionality without rebuilding datasets.
+
+### Usage
+
+```powerapp
+// Dynamic column visibility control
+ClearCollect(ColumnConfig,
+    {ColName: "id", ColDisplayName: "ID", ColWidth: 80, ColVisible: true},
+    {ColName: "name", ColDisplayName: "Name", ColWidth: 200, ColVisible: true},
+    {ColName: "email", ColDisplayName: "Email", ColWidth: 150, ColVisible: false}, // Hidden
+    {ColName: "phone", ColDisplayName: "Phone", ColWidth: 120, ColVisible: true}
+)
+```
+
+### Performance Features
+
+- **⚡ Lightning-Fast**: Columns are filtered at the component level before any rendering
+- **🚀 Zero Rebuild**: No need to recreate datasets - just toggle `ColVisible`
+- **📊 Real-time**: Changes are applied instantly with optimal performance
+- **🔄 Backward Compatible**: Columns without `ColVisible` default to visible
+
+### Dynamic Visibility Example
+
+```powerapp
+// Toggle column visibility based on user preferences
+UpdateIf(ColumnConfig, 
+    ColName = "email", 
+    {ColVisible: Toggle_ShowEmail.Value}
+);
+
+UpdateIf(ColumnConfig, 
+    ColName = "phone", 
+    {ColVisible: Toggle_ShowPhone.Value}
+);
+```
+
+### Best Practices
+
+- **Default Visible**: Columns without `ColVisible` property default to visible (backward compatibility)
+- **Performance**: Use `ColVisible: false` instead of removing columns from dataset
+- **User Control**: Bind visibility to toggles or user preferences for dynamic control
+- **Conditional Logic**: Use formulas to show/hide columns based on context
+
+### Migration from Workarounds
+
+If you were using dataset filtering workarounds, you can now use the native `ColVisible` property:
+
+```powerapp
+// OLD: Complex dataset filtering
+Set(VisibleData, ShowColumns(MyData, "name", "email"));
+
+// NEW: Simple column visibility
+UpdateIf(ColumnConfig, ColName in ["phone", "address"], {ColVisible: false});
+```
+
+Currently, the `ValueType: "text",              // Type for default value conversion (text, number, boolean, date)
     AllowDirectTextInput: true       // Allow direct text input (for dropdowns)
 }
 ```

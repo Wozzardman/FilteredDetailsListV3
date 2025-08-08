@@ -712,6 +712,9 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                             // Get multiline property
                             const isMultiLine = columnRecord.getValue('ColMultiLine') === true;
                             
+                            // Get visibility property for lightning-fast show/hide
+                            const isVisible = columnRecord.getValue('ColVisible') !== false; // Default to true if not specified
+                            
                             // Check if this is the jump-to column
                             const isJumpToColumn = columnRecord.getValue('JumptoColumn') === true;
                             if (isJumpToColumn) {
@@ -722,7 +725,9 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                                 console.log(`🎯 Found Jump To column: ${columnName} (${displayName})`);
                             }
                             
-                            console.log(`🔧 Processing column: ${columnName} (${displayName}) - Width: ${colWidth} (default: ${defaultColumnWidth})`);
+                            console.log(`🔧 Processing column: ${columnName} (${displayName}) - Width: ${colWidth}, Visible: ${isVisible}`);
+                            
+                            // ⚡ ALWAYS process all columns, but mark visibility for later filtering
                             processedColumns.push({
                                 name: columnName,
                                 displayName: displayName,
@@ -732,8 +737,13 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                                 verticalAlign: verticalAlign,
                                 headerHorizontalAlign: headerHorizontalAlign,
                                 headerVerticalAlign: headerVerticalAlign,
-                                isMultiLine: isMultiLine
+                                isMultiLine: isMultiLine,
+                                isVisible: isVisible // Store visibility for grid component to handle
                             });
+                            
+                            if (!isVisible) {
+                                console.log(`👁️‍🗨️ Column ${columnName} marked as hidden (ColVisible=false)`);
+                            }
                         } catch (e) {
                             console.warn(`⚠️ Error processing column ${colId}:`, e);
                         }
@@ -873,6 +883,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 const headerHorizontalAlign = (columnConfig as any)?.headerHorizontalAlign || horizontalAlign;
                 const headerVerticalAlign = (columnConfig as any)?.headerVerticalAlign || verticalAlign;
                 const isMultiLine = (columnConfig as any)?.isMultiLine || false;
+                const isVisible = (columnConfig as any)?.isVisible !== false; // Default to visible for backward compatibility
                 
                 // Priority 2: Use PCF dataset visualSizeFactor
                 const pcfVisualSizeFactor = typeof col.visualSizeFactor === 'number' && !isNaN(col.visualSizeFactor) ? col.visualSizeFactor : 0;
@@ -899,7 +910,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                     console.log(`� Using default width for ${col.name}: ${columnWidth}`);
                 }
                 
-                console.log(`🔧 Final column config: ${col.name} (${col.displayName}) - ConfigWidth: ${configuredWidth}, PCF: ${pcfVisualSizeFactor}, Default: ${defaultWidth}, Final: ${columnWidth}`);
+                console.log(`🔧 Final column config: ${col.name} (${col.displayName}) - ConfigWidth: ${configuredWidth}, PCF: ${pcfVisualSizeFactor}, Default: ${defaultWidth}, Final: ${columnWidth}, Visible: ${isVisible}`);
                 
                 // Check if column resizing is enabled globally and per-column
                 const globalResizeEnabled = context.parameters.EnableColumnResizing?.raw ?? true;
@@ -929,13 +940,15 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                     headerVerticalAligned: headerVerticalAlign,
                     // Add multiline property
                     isMultiline: isMultiLine,
+                    // Add visibility property for column show/hide functionality
+                    isVisible: isVisible,
                     // Add PCF-specific properties for proper data access
                     pcfDataType: col.dataType,
                     pcfColumnName: col.name
                 };
             });
             
-        console.log(`✅ Final grid columns: ${gridColumns.length}`, gridColumns.map(c => c.name));
+        console.log(`✅ Final grid columns: ${gridColumns.length}`, gridColumns.map(c => ({ name: c.name, visible: (c as any).isVisible })));
 
         // Create a wrapper for handleCellEdit to match the expected signature
         const onCellEditWrapper = (item: any, column: any, newValue: any) => {
