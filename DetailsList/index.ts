@@ -145,11 +145,15 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     private errorRecoveryTimer: number | null = null;
     private errorRecoveryAttempts = 0;
     private maxRecoveryAttempts = 5;
+    private forceRecoveryTimer: number | null = null;
+    private maxForceRecoveryTime = 10000; // 10 seconds max before forcing recovery
 
     // Loading state tracking
     private isLoading = false;
     private loadingMessage = 'Loading...';
     private loadingStartTime = 0;
+    private consecutiveLoadingCalls = 0;
+    private maxConsecutiveLoading = 5;
 
     public init(context: ComponentFramework.Context<IInputs>, notifyOutputChanged: () => void): void {
         const endMeasurement = performanceMonitor.startMeasure('component-init');
@@ -159,6 +163,13 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             this.context = context;
             context.mode.trackContainerResize(true);
             this.resources = context.resources;
+            
+            // Initialize FluentUI Selection object for legacy compatibility
+            this.selection = new Selection({
+                onSelectionChanged: () => {
+                    this.onSelectionChanged();
+                }
+            });
             
             // Initialize native Power Apps selection (like ComboBox.SelectedItems)
             this.initializeNativeSelection();
@@ -449,6 +460,15 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
 
     public updateView(context: ComponentFramework.Context<IInputs>): React.ReactElement {
         try {
+            // Safety check: if we're stuck in loading state for too long, force recovery
+            if (this.isLoading && this.loadingStartTime > 0) {
+                const loadingDuration = Date.now() - this.loadingStartTime;
+                if (loadingDuration > this.maxForceRecoveryTime) {
+                    console.log(`🚨 Loading state stuck for ${loadingDuration}ms - forcing recovery`);
+                    this.forceRecovery();
+                }
+            }
+            
             // Store context for use in other methods
             this.context = context;
             
@@ -508,9 +528,14 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         }
 
         // Set column limit to 150 for the selected columns dataset
-        if (columns.paging.pageSize !== FilteredDetailsListV2.COLUMN_LIMIT) {
-            columns.paging.setPageSize(FilteredDetailsListV2.COLUMN_LIMIT);
-            columns.refresh();
+        try {
+            if (columns?.paging && columns.paging.pageSize !== FilteredDetailsListV2.COLUMN_LIMIT) {
+                columns.paging.setPageSize(FilteredDetailsListV2.COLUMN_LIMIT);
+                columns.refresh();
+            }
+        } catch (columnError) {
+            console.warn('⚠️ Error setting column page size:', columnError);
+            // Continue processing - this is not a critical error
         }
 
         // Clear error state if we reach this point successfully
@@ -777,8 +802,19 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             }
 
             // When the dataset is changed, the selected records are reset and so we must re-set them here
-            if (dataset.getSelectedRecordIds().length === 0 && this.selection.count > 0) {
-                this.onSelectionChanged();
+            // Use the modern selectionManager instead of legacy this.selection object
+            try {
+                const datasetSelectedCount = dataset?.getSelectedRecordIds?.()?.length || 0;
+                const currentSelectionCount = this.isSelectionMode ? 
+                    this.selectionManager.getSelectionState().selectedItems.size : 
+                    this.nativeSelectionState.selectedCount;
+                
+                if (datasetSelectedCount === 0 && currentSelectionCount > 0) {
+                    this.onSelectionChanged();
+                }
+            } catch (selectionError) {
+                console.warn('⚠️ Error checking selection state during dataset change:', selectionError);
+                // Continue processing - this is not a critical error
             }
 
             this.pagingEventPending = false;
@@ -1226,9 +1262,21 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         return grid;
         } catch (error) {
             console.error('❌ Error in updateView:', error);
+            console.error('❌ Error details:', {
+                message: (error as Error)?.message || 'Unknown error',
+                stack: (error as Error)?.stack || 'No stack trace',
+                contextParams: Object.keys(context.parameters || {}),
+                updatedProperties: context.updatedProperties || [],
+                isDatasetLoading: context.parameters?.records?.loading,
+                isColumnsLoading: context.parameters?.columns?.loading
+            });
             
             // Set error state and start recovery mechanism
             this.isInErrorState = true;
+            
+            // CRITICAL: Always stop loading before starting recovery
+            this.stopLoading();
+            
             this.startErrorRecovery();
             
             // If we're in recovery mode, show loading state instead of error
@@ -1459,6 +1507,9 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
 
         console.log(`🔄 Starting error recovery, attempt ${this.errorRecoveryAttempts + 1}/${this.maxRecoveryAttempts}`);
         
+        // Start force recovery timer to prevent infinite loading
+        this.startForceRecoveryTimer();
+        
         this.errorRecoveryTimer = window.setTimeout(() => {
             this.errorRecoveryAttempts++;
             this.attemptRecovery();
@@ -1482,6 +1533,9 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 this.errorRecoveryAttempts = 0;
                 this.clearErrorRecoveryTimer();
                 
+                // CRITICAL: Stop loading state before triggering re-render
+                this.stopLoading();
+                
                 // Force a re-render by notifying of output changes
                 this.notifyOutputChanged();
             } else {
@@ -1493,11 +1547,15 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 } else {
                     console.log('❌ Max recovery attempts reached, giving up auto-recovery');
                     this.clearErrorRecoveryTimer();
+                    // CRITICAL: Stop loading state when recovery fails
+                    this.stopLoading();
                 }
             }
         } catch (error) {
             console.error('❌ Error during recovery attempt:', error);
             this.clearErrorRecoveryTimer();
+            // CRITICAL: Stop loading state on recovery failure
+            this.stopLoading();
         }
     }
 
@@ -1509,12 +1567,73 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             window.clearTimeout(this.errorRecoveryTimer);
             this.errorRecoveryTimer = null;
         }
+        this.clearForceRecoveryTimer();
+    }
+
+    /**
+     * Start force recovery timer to prevent infinite loading
+     */
+    private startForceRecoveryTimer(): void {
+        if (this.forceRecoveryTimer) {
+            return; // Already running
+        }
+
+        console.log(`⏰ Starting force recovery timer (${this.maxForceRecoveryTime}ms)`);
+        this.forceRecoveryTimer = window.setTimeout(() => {
+            console.log('🚨 Force recovery timeout reached - clearing error state');
+            this.forceRecovery();
+        }, this.maxForceRecoveryTime);
+    }
+
+    /**
+     * Clear the force recovery timer
+     */
+    private clearForceRecoveryTimer(): void {
+        if (this.forceRecoveryTimer) {
+            window.clearTimeout(this.forceRecoveryTimer);
+            this.forceRecoveryTimer = null;
+        }
+    }
+
+    /**
+     * Force recovery from stuck states
+     */
+    private forceRecovery(): void {
+        console.log('🚨 Forcing recovery from stuck state');
+        
+        // Clear all timers and state
+        this.clearErrorRecoveryTimer();
+        this.clearForceRecoveryTimer();
+        
+        // Reset all error and loading states
+        this.isInErrorState = false;
+        this.errorRecoveryAttempts = 0;
+        this.stopLoading();
+        
+        // Force a clean re-render
+        try {
+            this.notifyOutputChanged();
+        } catch (error) {
+            console.error('❌ Error during force recovery:', error);
+        }
     }
 
     /**
      * Start loading state with optional message
      */
     private startLoading(message: string = 'Loading...'): void {
+        // Safety check: if we're calling startLoading too many times consecutively, force recovery
+        if (this.isLoading) {
+            this.consecutiveLoadingCalls++;
+            if (this.consecutiveLoadingCalls >= this.maxConsecutiveLoading) {
+                console.log('🚨 Too many consecutive loading calls detected - forcing recovery');
+                this.forceRecovery();
+                return;
+            }
+        } else {
+            this.consecutiveLoadingCalls = 0;
+        }
+        
         this.isLoading = true;
         this.loadingMessage = message;
         this.loadingStartTime = Date.now();
@@ -1532,6 +1651,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         this.isLoading = false;
         this.loadingMessage = 'Loading...';
         this.loadingStartTime = 0;
+        this.consecutiveLoadingCalls = 0; // Reset consecutive loading counter
     }
 
     /**
