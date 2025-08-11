@@ -41,6 +41,7 @@ export interface EnhancedInlineEditorProps {
     onTriggerAutoFillConfirmation?: (itemId: string) => void; // New: For triggering auto-fill confirmation
     allColumns?: Record<string, any>; // New: All column values for conditional logic
     columnEditorMapping?: ColumnEditorMapping; // New: All editor configurations for conditional logic
+    columnTextSize?: number; // Font size for inline editor text in px
     style?: React.CSSProperties;
     className?: string;
 }
@@ -57,6 +58,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
     onTriggerAutoFillConfirmation,
     allColumns,
     columnEditorMapping,
+    columnTextSize = 13, // Default font size to match column text
     style,
     className = ''
 }) => {
@@ -446,7 +448,12 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
     }
 
     const commonProps = {
-        style: { border: 'none', background: 'transparent', ...style },
+        style: { 
+            border: 'none', 
+            background: 'transparent', 
+            fontSize: `${columnTextSize}px`, // Apply dynamic column text size
+            ...style 
+        },
         onKeyDown: handleKeyDown,
         onFocus: handleFocus,
         onBlur: handleBlur,
@@ -853,7 +860,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                             field: { 
                                 border: 'none', 
                                 background: 'transparent',
-                                fontSize: '13px'
+                                fontSize: `${columnTextSize}px` // Use dynamic column text size
                             }
                         }}
                     />
@@ -882,7 +889,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                                     border: '1px solid #d1d1d1',
                                     borderRadius: '4px',
                                     boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
-                                    fontSize: isNarrowColumn ? '12px' : '14px'
+                                    fontSize: isNarrowColumn ? `${Math.max(columnTextSize - 1, 10)}px` : `${columnTextSize}px` // Use dynamic font size, slightly smaller for narrow columns
                                 }
                             }}
                         >
@@ -892,7 +899,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                                         key={option.key}
                                         className={`enhanced-dropdown-item ${isNarrowColumn ? 'narrow-column-item' : ''}`}
                                         style={{
-                                            fontSize: isNarrowColumn ? '12px' : '14px',
+                                            fontSize: isNarrowColumn ? `${Math.max(columnTextSize - 1, 10)}px` : `${columnTextSize}px`, // Use dynamic font size
                                             whiteSpace: isNarrowColumn ? 'normal' : 'nowrap',
                                             wordWrap: isNarrowColumn ? 'break-word' : 'normal',
                                             lineHeight: isNarrowColumn ? '1.3' : '1.5'

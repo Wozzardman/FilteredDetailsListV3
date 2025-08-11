@@ -1402,6 +1402,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                         onTriggerAutoFillConfirmation={triggerAutoFillConfirmation}
                                         allColumns={getCurrentColumnValues(item)}
                                         columnEditorMapping={columnEditorMapping}
+                                        columnTextSize={columnTextSize}
                                         style={{ width: '100%', border: 'none', background: 'transparent' }}
                                     />
                                 ) : (
@@ -1419,6 +1420,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                         onCommit={commitEdit}
                                         onCancel={cancelEdit}
                                         onTriggerAutoFillConfirmation={triggerAutoFillConfirmation}
+                                        columnTextSize={columnTextSize}
                                         style={{ width: '100%', border: 'none', background: 'transparent' }}
                                     />
                                 )}
@@ -1766,8 +1768,8 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                         fontSize: '14px',
                                         color: hasFilter ? '#0078d4' : '#8a8886',
                                         userSelect: 'none',
-                                        padding: '6px',
-                                        borderRadius: '6px',
+                                        padding: '2px', // Reduced padding to make button more compact
+                                        borderRadius: '4px', // Slightly smaller border radius to match reduced padding
                                         backgroundColor: hasFilter ? 'rgba(0, 120, 212, 0.1)' : 'transparent',
                                         border: hasFilter ? '1px solid rgba(0, 120, 212, 0.3)' : '1px solid transparent',
                                         transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -1775,8 +1777,8 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        width: '24px',
-                                        height: '24px',
+                                        width: '18px', // Reduced width to be more compact
+                                        height: '18px', // Reduced height to be more compact
                                         position: 'relative',
                                         zIndex: 20,
                                         boxShadow: hasFilter ? '0 2px 4px rgba(0, 120, 212, 0.2)' : 'none'

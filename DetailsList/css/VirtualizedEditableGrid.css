@@ -693,8 +693,8 @@
     margin-left: auto;
     opacity: 0;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    border-radius: 6px;
-    padding: 4px;
+    border-radius: 4px; /* Reduced to match inline styles */
+    padding: 2px; /* Reduced padding to make button more compact */
     background: transparent;
 }
 
