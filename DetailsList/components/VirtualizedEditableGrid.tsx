@@ -282,7 +282,18 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                     if (filterValue instanceof Date) {
                         normalizedFilter = filterValue.toDateString();
                     }
-                    return normalizedField === normalizedFilter || String(normalizedField) === String(normalizedFilter);
+                    
+                    // Enhanced comparison for text-like numbers (e.g., "01", "02", "03")
+                    // Compare both original string values and normalized values
+                    const fieldStr = String(normalizedField);
+                    const filterStr = String(normalizedFilter);
+                    const originalFieldStr = String(fieldValue);
+                    
+                    return normalizedField === normalizedFilter || 
+                           fieldStr === filterStr ||
+                           originalFieldStr === filterStr ||
+                           fieldStr === String(filterValue) ||
+                           originalFieldStr === String(filterValue);
                 });
             default:
                 return true;

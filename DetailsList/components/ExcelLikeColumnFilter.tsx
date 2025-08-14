@@ -436,6 +436,11 @@ function normalizeValue(value: any, dataType: string): any {
     
     switch (dataType) {
         case 'number':
+            // Special handling for text-like numbers with leading zeros
+            // If it's a string that looks like a number but has leading zeros, preserve as string
+            if (typeof value === 'string' && /^0+\d+$/.test(value)) {
+                return value; // Keep original string format for values like "01", "02", "03"
+            }
             return Number(value);
         case 'date':
             return new Date(value);
@@ -471,6 +476,15 @@ function sortByDataType(a: any, b: any, dataType: string): number {
     
     switch (dataType) {
         case 'number':
+            // Smart sorting for text-like numbers with leading zeros
+            // If both values are strings that look like numbers, use numeric comparison
+            // but preserve the original string format
+            const aIsTextNum = typeof a === 'string' && /^\d+$/.test(a);
+            const bIsTextNum = typeof b === 'string' && /^\d+$/.test(b);
+            
+            if (aIsTextNum && bIsTextNum) {
+                return Number(a) - Number(b); // Sort numerically but keep original string format
+            }
             return Number(a) - Number(b);
         case 'date':
             return new Date(a).getTime() - new Date(b).getTime();
