@@ -817,12 +817,28 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                     handleFocus();
                 },
                 // Custom onBlur that respects calendar interactions
-                onBlur: () => {
-                    // Delay the blur handling to allow calendar selection to complete
+                onBlur: (event: React.FocusEvent) => {
+                    // Check if the focus is moving to a calendar-related element
+                    const relatedTarget = event.relatedTarget as HTMLElement;
+                    const isCalendarNavigation = relatedTarget && (
+                        relatedTarget.closest('.ms-DatePicker-monthAndYear') ||
+                        relatedTarget.closest('.ms-DatePicker-yearPicker') ||
+                        relatedTarget.closest('.ms-DatePicker-monthPicker') ||
+                        relatedTarget.closest('[role="grid"]') ||
+                        relatedTarget.classList.contains('ms-Button') ||
+                        relatedTarget.closest('.ms-DatePicker-wrap')
+                    );
+                    
+                    if (isCalendarNavigation) {
+                        // Focus is moving within the calendar, don't close yet
+                        return;
+                    }
+                    
+                    // Focus is leaving the calendar entirely, safe to close
                     setTimeout(() => {
                         setIsDatePickerActive(false);
                         handleBlur();
-                    }, 200);
+                    }, 50);
                 },
                 className: `enhanced-editor ${className} ${hasError ? 'has-error' : ''}`,
                 autoFocus: true,
