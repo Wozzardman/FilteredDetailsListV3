@@ -53,6 +53,8 @@ export const enum InputProperties {
     AlternateRowColor = 'AlternateRowColor',
     EnableJumpTo = 'EnableJumpTo',
     JumpToValue = 'JumpToValue',
+    FilterRecordsWidth = 'FilterRecordsWidth',
+    JumpToWidth = 'JumpToWidth',
 }
 
 export const enum OutputProperties {

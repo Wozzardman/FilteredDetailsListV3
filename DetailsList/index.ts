@@ -1233,6 +1233,10 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             jumpToValue: context.parameters.JumpToValue?.raw || '',
             onJumpToResult: this.handleJumpToResult,
             
+            // Width configuration props
+            filterRecordsWidth: context.parameters.FilterRecordsWidth?.raw || 200,
+            jumpToWidth: context.parameters.JumpToWidth?.raw || 200,
+            
             getColumnDataType: (columnKey: string) => {
                 const column = gridColumns.find(col => col.key === columnKey);
                 const dataType = column?.dataType || 'string';

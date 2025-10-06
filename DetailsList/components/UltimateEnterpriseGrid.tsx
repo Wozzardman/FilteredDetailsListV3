@@ -77,6 +77,10 @@ export interface IUltimateEnterpriseGridProps {
     jumpToValue?: string;
     onJumpToResult?: (result: string, rowIndex: number) => void;
     
+    // Width configuration properties
+    filterRecordsWidth?: number;
+    jumpToWidth?: number;
+    
     className?: string;
     theme?: 'light' | 'dark' | 'high-contrast';
     locale?: string;
@@ -129,6 +133,10 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     jumpToColumnDisplayName = '',
     jumpToValue = '',
     onJumpToResult,
+    
+    // Width configuration props
+    filterRecordsWidth = 200,
+    jumpToWidth = 200,
     
     className = '',
     theme = 'light',
@@ -569,7 +577,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                         value={globalFilter}
                         onChange={(_, value) => setGlobalFilter(value || '')}
                         styles={{
-                            root: { minWidth: 200 },
+                            root: { width: filterRecordsWidth, minWidth: 'unset', maxWidth: 'unset' },
                             field: { fontSize: 14 }
                         }}
                     />
@@ -582,7 +590,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                         onChange={handleJumpToSearch}
                         onKeyPress={handleJumpToKeyPress}
                         styles={{
-                            root: { minWidth: 200 },
+                            root: { width: jumpToWidth, minWidth: 'unset', maxWidth: 'unset' },
                             field: { fontSize: 14 }
                         }}
                         iconProps={{ iconName: 'Search' }}

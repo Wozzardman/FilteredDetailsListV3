@@ -344,6 +344,10 @@
     <value>Applied filters</value>
     <comment/>
   </data>
+  <data name="FilterRecordsWidth" xml:space="preserve">
+    <value>Filter Records Width</value>
+    <comment/>
+  </data>
   <data name="FilterEventName" xml:space="preserve">
     <value>Filter event name</value>
     <comment/>
@@ -395,6 +399,10 @@
   <data name="EditedRecordKeys" xml:space="preserve">
     <value>Edited record keys</value>
     <comment>Comma-separated list of edited record IDs</comment>
+  </data>
+  <data name="JumpToWidth" xml:space="preserve">
+    <value>Jump To Width</value>
+    <comment/>
   </data>
   
 </root>

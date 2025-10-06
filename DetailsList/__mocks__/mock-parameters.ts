@@ -58,6 +58,10 @@ export function getMockParameters(): IInputs {
         // JumpToColumn: new MockStringProperty(), // Removed - now using JumptoColumn in columns dataset
         JumpToValue: new MockStringProperty(),
         
+        // Width Configuration Properties
+        FilterRecordsWidth: new MockWholeNumberProperty(200),
+        JumpToWidth: new MockWholeNumberProperty(200),
+        
         records: new MockDataSet([]),
         columns: new MockDataSet([]),
     };
