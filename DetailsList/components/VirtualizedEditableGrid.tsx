@@ -729,10 +729,10 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         estimateSize: () => rowHeight,
         overscan: overscan,
         // Ultimate performance features for enterprise competition
-        measureElement: enableMemoryPooling ? undefined : (element) => {
+        measureElement: enableMemoryPooling ? undefined : (element: any) => {
             return element?.getBoundingClientRect().height || rowHeight;
         },
-        scrollToFn: (offset, canSmooth, instance) => {
+        scrollToFn: (offset: any, canSmooth: any, instance: any) => {
             const duration = canSmooth && enablePrefetching ? 100 : 0;
             const scrollElement = instance.scrollElement;
             if (scrollElement) {
@@ -766,23 +766,6 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         };
     }, [getAvailableValues]);
 
-    // Create a wrapper for ExcelLikeColumnFilter that always returns the object format
-    const getAvailableValuesForFilter = React.useCallback((columnKey: string) => {
-        const availableValuesData = getAvailableValues?.(columnKey) || [];
-        
-        // Always return object format for ExcelLikeColumnFilter
-        if (availableValuesData.length > 0 && typeof availableValuesData[0] === 'object') {
-            return availableValuesData as Array<{value: any, displayValue: string, count: number}>;
-        } else {
-            // Convert string array to object format
-            return (availableValuesData as string[]).map(value => ({
-                value,
-                displayValue: value,
-                count: 1
-            }));
-        }
-    }, [getAvailableValues]);
-
     // Convert complex IColumnFilter format to simple format expected by ExcelLikeColumnFilter
     const convertFiltersToSimpleFormat = React.useCallback((filters: IFilterState): Record<string, any[]> => {
         const simpleFilters: Record<string, any[]> = {};
@@ -812,6 +795,143 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         
         return simpleFilters;
     }, []);
+
+    // Create a wrapper for ExcelLikeColumnFilter that returns cascaded filtered values
+    const getAvailableValuesForFilter = React.useCallback((columnKey: string) => {
+        // Get the original available values
+        const availableValuesData = getAvailableValues?.(columnKey) || [];
+        
+        // Get current filters excluding the column we're calculating for (cascading)
+        const otherFilters = convertFiltersToSimpleFormat(columnFilters);
+        delete otherFilters[columnKey]; // Remove current column filter to prevent self-filtering
+        
+        // If there are no other active filters, return original data
+        if (Object.keys(otherFilters).length === 0) {
+            if (availableValuesData.length > 0 && typeof availableValuesData[0] === 'object') {
+                return availableValuesData as Array<{value: any, displayValue: string, count: number}>;
+            } else {
+                // Convert string array to object format
+                return (availableValuesData as string[]).map(value => ({
+                    value,
+                    displayValue: value,
+                    count: 1
+                }));
+            }
+        }
+        
+        // Apply cascading filter: filter the original items by other column filters
+        const cascadedData = items.filter(item => {
+            return Object.entries(otherFilters).every(([filterColumnKey, filterValues]) => {
+                if (!filterValues || filterValues.length === 0) return true;
+                
+                const itemValue = getPCFValue(item, filterColumnKey);
+                
+                // Handle blank values
+                if (filterValues.includes('(Blanks)')) {
+                    const isBlank = itemValue == null || itemValue === '' || itemValue === undefined ||
+                                   (typeof itemValue === 'string' && itemValue.trim() === '');
+                    if (isBlank) return true;
+                }
+                
+                // Handle regular values (excluding blanks)
+                const nonBlankValues = filterValues.filter(v => v !== '(Blanks)');
+                if (nonBlankValues.length > 0) {
+                    // Normalize values for comparison (same logic as in ExcelLikeColumnFilter)
+                    const column = columns.find(col => (col.fieldName || col.key) === filterColumnKey);
+                    const dataType = column?.dataType || getColumnDataType?.(filterColumnKey) || 'text';
+                    
+                    let normalizedItemValue = itemValue;
+                    if (dataType === 'date' && itemValue instanceof Date) {
+                        normalizedItemValue = itemValue.toDateString();
+                    } else if (dataType === 'date' && typeof itemValue === 'string' && !isNaN(Date.parse(itemValue))) {
+                        const dateValue = new Date(itemValue);
+                        if (!isNaN(dateValue.getTime())) {
+                            normalizedItemValue = dateValue.toDateString();
+                        }
+                    }
+                    
+                    return nonBlankValues.includes(normalizedItemValue) || nonBlankValues.includes(itemValue);
+                }
+                
+                return false;
+            });
+        });
+        
+        // Calculate distinct values and counts from cascaded data
+        const valueCountMap = new Map<any, number>();
+        let blankCount = 0;
+        
+        // Find the column configuration to determine data type
+        const column = columns.find(col => (col.fieldName || col.key) === columnKey);
+        const dataType = column?.dataType || getColumnDataType?.(columnKey) || 'text';
+        const isDateColumn = dataType === 'date';
+        
+        cascadedData.forEach(item => {
+            const value = getPCFValue(item, columnKey);
+            
+            // Count blank values
+            if (value == null || value === undefined || value === '' || 
+                (typeof value === 'string' && value.trim() === '')) {
+                blankCount++;
+            } else {
+                // Normalize values for proper grouping
+                let normalizedValue = value;
+                if (isDateColumn && value instanceof Date) {
+                    normalizedValue = value.toDateString();
+                } else if (isDateColumn && typeof value === 'string') {
+                    const parsedDate = new Date(value);
+                    if (!isNaN(parsedDate.getTime())) {
+                        normalizedValue = parsedDate.toDateString();
+                    }
+                }
+                
+                const currentCount = valueCountMap.get(normalizedValue) || 0;
+                valueCountMap.set(normalizedValue, currentCount + 1);
+            }
+        });
+        
+        // Convert to required format
+        const result: Array<{value: any, displayValue: string, count: number}> = [];
+        
+        // Add blank entry if there are blank values
+        if (blankCount > 0) {
+            result.push({
+                value: '(Blanks)',
+                displayValue: '(Blanks)',
+                count: blankCount
+            });
+        }
+        
+        // Add non-blank values
+        Array.from(valueCountMap.entries()).forEach(([value, count]) => {
+            let displayValue: string;
+            
+            if (isDateColumn && value) {
+                if (value instanceof Date) {
+                    displayValue = value.toLocaleDateString();
+                } else if (typeof value === 'string') {
+                    const parsedDate = new Date(value);
+                    if (!isNaN(parsedDate.getTime())) {
+                        displayValue = parsedDate.toLocaleDateString();
+                    } else {
+                        displayValue = String(value);
+                    }
+                } else {
+                    displayValue = String(value);
+                }
+            } else {
+                displayValue = String(value);
+            }
+            
+            result.push({
+                value,
+                displayValue,
+                count
+            });
+        });
+        
+        return result;
+    }, [getAvailableValues, columnFilters, items, columns, getColumnDataType]);
 
     // Create effective columns array including selection column if needed
     const effectiveColumns = React.useMemo(() => {
@@ -1426,7 +1546,20 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                                   dataType === 'number' ? 'number' : 
                                                   dataType === 'boolean' ? 'boolean' : 'text',
                                             isReadOnly: isReadOnly,
-                                            dropdownOptions: availableValues?.map(val => ({ key: val, text: val, value: val }))
+                                            dropdownOptions: availableValues?.map(val => {
+                                                // Handle both string arrays and key-value object arrays
+                                                if (typeof val === 'string') {
+                                                    return { key: val, text: val, value: val };
+                                                } else if (
+                                                    val &&
+                                                    typeof val === 'object' &&
+                                                    'key' in val &&
+                                                    'value' in val
+                                                ) {
+                                                    return { key: (val as any).key, text: (val as any).key, value: (val as any).value };
+                                                }
+                                                return { key: val, text: val, value: val };
+                                            })
                                         }}
                                         onCommit={commitEdit}
                                         onCancel={cancelEdit}

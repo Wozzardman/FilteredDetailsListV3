@@ -51,7 +51,7 @@ export interface IExcelLikeColumnFilterProps {
     target: HTMLElement | null;
     onDismiss: () => void;
     isOpen: boolean;
-    getAvailableValues?: (columnKey: string) => Array<{value: any, displayValue: string, count: number}>;
+    getAvailableValues: (columnKey: string) => Array<{value: any, displayValue: string, count: number}>;
 }
 
 export const ExcelLikeColumnFilter: React.FC<IExcelLikeColumnFilterProps> = ({
@@ -75,101 +75,37 @@ export const ExcelLikeColumnFilter: React.FC<IExcelLikeColumnFilterProps> = ({
     // Refs for virtualization
     const listRef = React.useRef<HTMLDivElement>(null);
 
-    // Calculate distinct values with counts - OPTIMIZED with getAvailableValues
+    // Calculate distinct values with counts - Using cascaded getAvailableValues
     React.useEffect(() => {
         if (!isOpen) return;
 
         let values: IDistinctValue[];
         
-        if (getAvailableValues) {
-            // Use the optimized getAvailableValues function for better performance
-            const availableValues = getAvailableValues(columnKey);
-            const currentColumnFilter = currentFilters[columnKey];
-            
-            values = availableValues.map(item => ({
-                value: item.value,
-                displayValue: item.displayValue,
-                count: item.count, // Use the actual count from the optimized function
-                selected: currentColumnFilter 
-                    ? Array.isArray(currentColumnFilter) 
-                        ? currentColumnFilter.includes(item.value)
-                        : currentColumnFilter === item.value
-                    : false  // CHANGED: Default to UNselected when no filter exists - user must explicitly choose what to show
-            }));
-            
-            // Sort based on data type
-            values.sort((a, b) => sortByDataType(a.value, b.value, dataType));
-        } else {
-            // Fallback to original calculation if getAvailableValues not provided
-            const otherFilters = { ...currentFilters };
-            delete otherFilters[columnKey];
-            
-            const cascadedData = filterDataByOtherColumns(allData, otherFilters);
-            const currentColumnFilter = currentFilters[columnKey];
-
-            // Calculate distinct values from cascaded data
-            const valueMap = new Map<any, { count: number; selected: boolean }>();
-            let blankCount = 0;
-            
-            cascadedData.forEach(item => {
-                const value = getPCFValue(item, columnKey);
-                
-                // Check if value is blank/empty
-                if (value == null || value === '' || value === undefined) {
-                    blankCount++;
-                    return;
-                }
-                
-                const normalizedValue = normalizeValue(value, dataType);
-                
-                if (valueMap.has(normalizedValue)) {
-                    valueMap.get(normalizedValue)!.count++;
-                } else {
-                    const isSelected = currentColumnFilter 
-                        ? Array.isArray(currentColumnFilter) 
-                            ? currentColumnFilter.includes(normalizedValue)
-                            : currentColumnFilter === normalizedValue
-                        : false; // CHANGED: Default to UNselected when no filter exists
-                    
-                    valueMap.set(normalizedValue, { count: 1, selected: isSelected });
-                }
-            });
-
-            // Convert to array and sort by data type
-            values = Array.from(valueMap.entries()).map(([value, info]) => ({
-                value,
-                displayValue: formatDisplayValue(value, dataType),
-                count: info.count,
-                selected: info.selected
-            }));
-            
-            // Add "(Blanks)" option if there are blank values
-            if (blankCount > 0) {
-                const isBlankSelected = currentColumnFilter 
-                    ? Array.isArray(currentColumnFilter) 
-                        ? currentColumnFilter.includes('(Blanks)')
-                        : currentColumnFilter === '(Blanks)'
-                    : false; // CHANGED: Default to UNselected when no filter exists
-                    
-                values.unshift({
-                    value: '(Blanks)',
-                    displayValue: '(Blanks)',
-                    count: blankCount,
-                    selected: isBlankSelected
-                });
-            }
-
-            // Sort based on data type (but keep blanks at the top)
-            const blanksEntry = values.find(v => v.value === '(Blanks)');
-            const nonBlanksEntries = values.filter(v => v.value !== '(Blanks)');
-            nonBlanksEntries.sort((a, b) => sortByDataType(a.value, b.value, dataType));
-            
-            values = blanksEntry ? [blanksEntry, ...nonBlanksEntries] : nonBlanksEntries;
-        }
+        // Always use getAvailableValues since it now handles cascading internally
+        const availableValues = getAvailableValues ? getAvailableValues(columnKey) : [];
+        const currentColumnFilter = currentFilters[columnKey];
+        
+        values = availableValues.map(item => ({
+            value: item.value,
+            displayValue: item.displayValue,
+            count: item.count, // Use the actual count from the cascaded function
+            selected: currentColumnFilter 
+                ? Array.isArray(currentColumnFilter) 
+                    ? currentColumnFilter.includes(item.value)
+                    : currentColumnFilter === item.value
+                : false  // Default to UNselected when no filter exists - user must explicitly choose what to show
+        }));
+        
+        // Sort based on data type (but keep blanks at the top)
+        const blanksEntry = values.find(v => v.value === '(Blanks)');
+        const nonBlanksEntries = values.filter(v => v.value !== '(Blanks)');
+        nonBlanksEntries.sort((a, b) => sortByDataType(a.value, b.value, dataType));
+        
+        values = blanksEntry ? [blanksEntry, ...nonBlanksEntries] : nonBlanksEntries;
 
         setDistinctValues(values);
         setSelectAll(values.every(v => v.selected));
-    }, [allData, currentFilters, columnKey, dataType, isOpen, getAvailableValues]);
+    }, [currentFilters, columnKey, dataType, isOpen, getAvailableValues]);
 
     // Filter distinct values by search term
     React.useEffect(() => {
@@ -344,7 +280,7 @@ export const ExcelLikeColumnFilter: React.FC<IExcelLikeColumnFilterProps> = ({
                             position: 'relative'
                         }}
                     >
-                        {virtualizer.getVirtualItems().map(virtualItem => {
+                        {virtualizer.getVirtualItems().map((virtualItem: any) => {
                             const item = filteredDistinctValues[virtualItem.index];
                             return (
                                 <div
@@ -495,21 +431,6 @@ function sortByDataType(a: any, b: any, dataType: string): number {
         default:
             return String(a).localeCompare(String(b));
     }
-}
-
-function filterDataByOtherColumns(data: any[], filters: Record<string, any>): any[] {
-    return data.filter(item => {
-        return Object.entries(filters).every(([column, filterValues]) => {
-            if (!filterValues || (Array.isArray(filterValues) && filterValues.length === 0)) {
-                return true;
-            }
-            
-            const value = getPCFValue(item, column);
-            return Array.isArray(filterValues) 
-                ? filterValues.includes(value)
-                : filterValues === value;
-        });
-    });
 }
 
 export default ExcelLikeColumnFilter;

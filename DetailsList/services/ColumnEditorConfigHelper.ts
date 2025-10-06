@@ -110,6 +110,57 @@ export class ColumnEditorConfigHelper {
     }
 
     /**
+     * Create a text editor configuration that can handle date values
+     */
+    static textWithDateSupport(options: {
+        placeholder?: string;
+        isRequired?: boolean;
+        isReadOnly?: boolean;
+        maxLength?: number;
+    } = {}): ColumnEditorConfig {
+        return {
+            type: 'text',
+            isRequired: options.isRequired || false,
+            isReadOnly: options.isReadOnly || false,
+            placeholder: options.placeholder || 'MM/DD/YYYY',
+            textConfig: {
+                maxLength: options.maxLength
+            },
+            // Custom display formatter to show dates nicely
+            displayFormatter: (value: any) => {
+                if (value instanceof Date) {
+                    return value.toLocaleDateString();
+                } else if (typeof value === 'string' && !isNaN(Date.parse(value))) {
+                    const parsedDate = new Date(value);
+                    if (!isNaN(parsedDate.getTime())) {
+                        return parsedDate.toLocaleDateString();
+                    }
+                }
+                return String(value || '');
+            },
+            // Custom value formatter to parse date strings
+            valueFormatter: (value: any) => {
+                if (typeof value === 'string') {
+                    // Check if it looks like a date string
+                    const datePatterns = [
+                        /^\d{1,2}\/\d{1,2}\/\d{4}$/,
+                        /^\d{1,2}-\d{1,2}-\d{4}$/,
+                        /^\d{4}-\d{1,2}-\d{1,2}$/
+                    ];
+                    
+                    if (datePatterns.some(pattern => pattern.test(value.trim()))) {
+                        const parsedDate = new Date(value);
+                        if (!isNaN(parsedDate.getTime())) {
+                            return parsedDate;
+                        }
+                    }
+                }
+                return value;
+            }
+        };
+    }
+
+    /**
      * Create a date editor configuration
      */
     static date(options: {

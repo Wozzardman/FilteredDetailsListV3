@@ -29,6 +29,110 @@ import {
 import { conditionalEngine, ConditionalEngineContext } from '../services/ConditionalLogicEngine';
 import { PowerAppsConditionalProcessor, PowerAppsConditionalConfig } from '../services/PowerAppsConditionalProcessor';
 
+/**
+ * Helper function to detect if a string looks like a date input
+ * @exported for testing and reuse
+ */
+export function isDateLikeString(str: string): boolean {
+    if (!str || typeof str !== 'string') return false;
+    
+    // Common date patterns: MM/DD/YYYY, M/D/YYYY, MM-DD-YYYY, MM.DD.YYYY, etc.
+    const datePatterns = [
+        /^\d{1,2}\/\d{1,2}\/\d{4}$/,           // MM/DD/YYYY or M/D/YYYY
+        /^\d{1,2}-\d{1,2}-\d{4}$/,            // MM-DD-YYYY or M-D-YYYY
+        /^\d{1,2}\.\d{1,2}\.\d{4}$/,          // MM.DD.YYYY or M.D.YYYY
+        /^\d{4}-\d{1,2}-\d{1,2}$/,            // YYYY-MM-DD or YYYY-M-D
+        /^\d{4}\/\d{1,2}\/\d{1,2}$/,          // YYYY/MM/DD or YYYY/M/D
+        /^\d{1,2}\/\d{1,2}\/\d{2}$/,          // MM/DD/YY or M/D/YY
+        /^\d{1,2}-\d{1,2}-\d{2}$/,            // MM-DD-YY or M-D-YY
+    ];
+    
+    return datePatterns.some(pattern => pattern.test(str.trim()));
+}
+
+/**
+ * Helper function to parse user date input into a Date object
+ * @exported for testing and reuse
+ */
+export function tryParseUserDateInput(input: string): Date | null {
+    if (!input || typeof input !== 'string') return null;
+    
+    const trimmedInput = input.trim();
+    if (!trimmedInput) return null;
+    
+    // Try direct Date parsing first (handles many formats automatically)
+    let parsedDate = new Date(trimmedInput);
+    if (!isNaN(parsedDate.getTime())) {
+        return parsedDate;
+    }
+    
+    // Handle common formats that Date constructor might not parse correctly
+    const formats = [
+        // MM/DD/YYYY, M/D/YYYY
+        /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/,
+        // MM-DD-YYYY, M-D-YYYY  
+        /^(\d{1,2})-(\d{1,2})-(\d{4})$/,
+        // MM.DD.YYYY, M.D.YYYY
+        /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/,
+        // MM/DD/YY, M/D/YY (assume 20XX for years 00-30, 19XX for 31-99)
+        /^(\d{1,2})\/(\d{1,2})\/(\d{2})$/,
+        // MM-DD-YY, M-D-YY
+        /^(\d{1,2})-(\d{1,2})-(\d{2})$/,
+    ];
+    
+    for (const format of formats) {
+        const match = trimmedInput.match(format);
+        if (match) {
+            let month = parseInt(match[1], 10);
+            let day = parseInt(match[2], 10);
+            let year = parseInt(match[3], 10);
+            
+            // Handle 2-digit years
+            if (year < 100) {
+                year += year <= 30 ? 2000 : 1900;
+            }
+            
+            // Validate ranges
+            if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year >= 1900 && year <= 2100) {
+                parsedDate = new Date(year, month - 1, day); // month is 0-indexed
+                if (!isNaN(parsedDate.getTime()) && 
+                    parsedDate.getFullYear() === year && 
+                    parsedDate.getMonth() === month - 1 && 
+                    parsedDate.getDate() === day) {
+                    return parsedDate;
+                }
+            }
+        }
+    }
+    
+    // Try YYYY-MM-DD, YYYY/MM/DD formats
+    const isoFormats = [
+        /^(\d{4})-(\d{1,2})-(\d{1,2})$/,
+        /^(\d{4})\/(\d{1,2})\/(\d{1,2})$/,
+    ];
+    
+    for (const format of isoFormats) {
+        const match = trimmedInput.match(format);
+        if (match) {
+            const year = parseInt(match[1], 10);
+            const month = parseInt(match[2], 10);
+            const day = parseInt(match[3], 10);
+            
+            if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year >= 1900 && year <= 2100) {
+                parsedDate = new Date(year, month - 1, day);
+                if (!isNaN(parsedDate.getTime()) && 
+                    parsedDate.getFullYear() === year && 
+                    parsedDate.getMonth() === month - 1 && 
+                    parsedDate.getDate() === day) {
+                    return parsedDate;
+                }
+            }
+        }
+    }
+    
+    return null;
+}
+
 export interface EnhancedInlineEditorProps {
     value: any;
     column: IColumn;
@@ -323,6 +427,33 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
 
         // Type-specific validation
         switch (config.type) {
+            case 'text':
+                // Pattern validation
+                if (val && config.textConfig?.pattern) {
+                    const regex = new RegExp(config.textConfig.pattern);
+                    if (!regex.test(val)) {
+                        setHasError(true);
+                        setErrorMessage(config.textConfig.patternErrorMessage || 'Invalid format');
+                        return false;
+                    }
+                }
+                // Length validation
+                if (val && config.textConfig?.maxLength && val.length > config.textConfig.maxLength) {
+                    setHasError(true);
+                    setErrorMessage(`Maximum ${config.textConfig.maxLength} characters allowed`);
+                    return false;
+                }
+                // Special validation for date-like values in text fields
+                if (val && (value instanceof Date || (typeof value === 'string' && !isNaN(Date.parse(value))))) {
+                    // If original value was a date, validate that text input can be parsed as a date
+                    if (isDateLikeString(val) && !tryParseUserDateInput(val)) {
+                        setHasError(true);
+                        setErrorMessage('Please enter a valid date (e.g., MM/DD/YYYY)');
+                        return false;
+                    }
+                }
+                break;
+
             case 'number':
                 if (val !== '' && val !== null && isNaN(Number(val))) {
                     setHasError(true);
@@ -465,11 +596,38 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
     // Render appropriate editor based on type
     switch (config.type) {
         case 'text':
+            // Special handling for date values in text editors
+            const displayValue = (() => {
+                if (currentValue instanceof Date) {
+                    // Format date for editing (MM/DD/YYYY format)
+                    return currentValue.toLocaleDateString();
+                } else if (typeof currentValue === 'string' && currentValue.includes('GMT')) {
+                    // Handle cases where date was converted to string representation
+                    const parsedDate = new Date(currentValue);
+                    if (!isNaN(parsedDate.getTime())) {
+                        return parsedDate.toLocaleDateString();
+                    }
+                }
+                return String(currentValue || '');
+            })();
+
             return (
                 <TextField
                     {...commonProps}
-                    value={String(currentValue || '')}
-                    onChange={(_, newValue) => handleValueChange(newValue)}
+                    value={displayValue}
+                    onChange={(_, newValue) => {
+                        // Check if this looks like a date input and the original value was a date
+                        if ((value instanceof Date || (typeof value === 'string' && !isNaN(Date.parse(value)))) && 
+                            newValue && isDateLikeString(newValue)) {
+                            // Try to parse as date
+                            const parsedDate = tryParseUserDateInput(newValue);
+                            if (parsedDate) {
+                                handleValueChange(parsedDate);
+                                return;
+                            }
+                        }
+                        handleValueChange(newValue);
+                    }}
                     errorMessage={errorMessage}
                     multiline={config.textConfig?.multiline}
                     rows={config.textConfig?.rows}
@@ -617,6 +775,39 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
             );
 
         case 'date':
+            // If allowDirectTextInput is enabled, use a text field instead of date picker
+            if (config.allowDirectTextInput) {
+                const dateDisplayValue = (() => {
+                    if (currentValue instanceof Date) {
+                        return currentValue.toLocaleDateString();
+                    } else if (typeof currentValue === 'string' && !isNaN(Date.parse(currentValue))) {
+                        const parsedDate = new Date(currentValue);
+                        return parsedDate.toLocaleDateString();
+                    }
+                    return String(currentValue || '');
+                })();
+
+                return (
+                    <TextField
+                        {...commonProps}
+                        value={dateDisplayValue}
+                        onChange={(_, newValue) => {
+                            if (newValue && isDateLikeString(newValue)) {
+                                const parsedDate = tryParseUserDateInput(newValue);
+                                if (parsedDate) {
+                                    handleValueChange(parsedDate);
+                                    return;
+                                }
+                            }
+                            handleValueChange(newValue);
+                        }}
+                        onBlur={handleBlur}
+                        errorMessage={errorMessage}
+                        placeholder={config.placeholder || 'MM/DD/YYYY'}
+                    />
+                );
+            }
+
             // Create special props for DatePicker without the onBlur handler that interferes with date selection
             const datePickerProps = {
                 style: { border: 'none', background: 'transparent', ...style },
