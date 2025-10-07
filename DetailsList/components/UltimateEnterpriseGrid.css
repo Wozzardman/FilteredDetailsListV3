@@ -2,8 +2,9 @@
 /* Simplified styling for the cleaned up component */
 
 .ultimate-enterprise-grid {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    grid-gap: 0 !important;
     height: 100%;
     width: 100%;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -11,6 +12,59 @@
     border: 1px solid #e1e1e1;
     border-radius: 4px;
     overflow: hidden;
+    margin: 0;
+    padding: 0;
+}
+
+/* When control bar is hidden, use single row layout */
+.ultimate-enterprise-grid.no-control-bar {
+    grid-template-rows: 1fr;
+}
+
+.ultimate-enterprise-grid > * {
+    margin: 0 !important;
+}
+
+/* Control Bar Styles */
+.control-bar {
+    padding: 2px 12px 2px 12px !important;
+    margin: 0 !important;
+    margin-bottom: 0 !important;
+    background-color: #faf9f8;
+    border-bottom: 1px solid #e1e1e1;
+    min-height: 28px;
+    flex-wrap: wrap;
+    line-height: 1;
+}
+
+/* Override FluentUI Stack spacing */
+.control-bar.ms-Stack {
+    margin: 0 !important;
+    margin-bottom: 0 !important;
+}
+
+.control-bar .ms-Stack-inner {
+    margin: 0 !important;
+    margin-bottom: 0 !important;
+}
+
+/* Target the Stack component directly */
+.ultimate-enterprise-grid .ms-Stack {
+    margin: 0 !important;
+}
+
+.ultimate-enterprise-grid .ms-Stack + * {
+    margin-top: 0 !important;
+}
+
+.ultimate-enterprise-grid.theme-dark .control-bar {
+    background-color: #2d2c2b;
+    border-bottom-color: #484644;
+}
+
+/* Ensure FluentUI Stack doesn't add extra spacing */
+.control-bar > div {
+    margin: 0 !important;
 }
 
 .ultimate-enterprise-grid.theme-dark {
@@ -113,6 +167,245 @@
     flex: 1;
     overflow: hidden;
     position: relative;
+    margin: 0;
+    padding: 0;
+}
+
+/* Ensure virtualized grid has no spacing */
+.grid-container > div {
+    margin: 0 !important;
+    padding-top: 0 !important;
+}
+
+.grid-container .ms-DetailsList {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+/* Override VirtualizedEditableGrid spacing */
+.ultimate-enterprise-grid .virtualized-editable-grid-container {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.ultimate-enterprise-grid .ms-CommandBar {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.ultimate-enterprise-grid .ms-MessageBar {
+    margin: 0 !important;
+}
+
+.ultimate-enterprise-grid .virtualized-header-container {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.ultimate-enterprise-grid .virtualized-header {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Ensure header row has no top spacing */
+.ultimate-enterprise-grid .ms-DetailsHeader {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+.ultimate-enterprise-grid .ms-DetailsList-headerWrapper {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+/* Target all possible grid spacing elements */
+.ultimate-enterprise-grid .ms-DetailsList,
+.ultimate-enterprise-grid .ms-DetailsList-contentWrapper,
+.ultimate-enterprise-grid .ms-ScrollablePane,
+.ultimate-enterprise-grid .ms-ScrollablePane--contentContainer {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+/* Aggressive targeting of any element after control bar */
+.control-bar + * {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+.control-bar + * > * {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+.control-bar + * > * > * {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+/* Make headers super compact */
+.ultimate-enterprise-grid .virtualized-header {
+    height: 28px !important;
+    min-height: 28px !important;
+}
+
+.ultimate-enterprise-grid .virtualized-header-cell {
+    padding: 0px 12px !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    font-size: 13px !important;
+}
+
+/* Eliminate any possible spacing sources */
+.ultimate-enterprise-grid .virtualized-header-container {
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 28px !important;
+}
+
+/* Ensure zero spacing between control bar and grid */
+.ultimate-enterprise-grid .grid-container {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    border-top: none !important;
+}
+
+/* Target any potential FluentUI spacing between elements */
+.ultimate-enterprise-grid > * + * {
+    margin-top: 0 !important;
+}
+
+.ultimate-enterprise-grid [data-is-focusable="true"] {
+    margin: 0 !important;
+}
+
+/* Make sure TextField components are compact */
+.ultimate-enterprise-grid .control-bar .ms-TextField {
+    margin: 0 !important;
+}
+
+.ultimate-enterprise-grid .control-bar .ms-TextField-wrapper {
+    margin: 0 !important;
+}
+
+/* TARGET THE ROOT PCF CONTAINER - This is critical! */
+.JvtFilteredDetailsListV2 {
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: 0 !important;
+}
+
+.JvtFilteredDetailsListV2 > * {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.JvtFilteredDetailsListV2 .ultimate-enterprise-grid {
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: 0 !important;
+}
+
+/* Target FluentUI Stack component spacing aggressively */
+.JvtFilteredDetailsListV2 .ms-Stack,
+.ultimate-enterprise-grid .ms-Stack {
+    margin: 0 !important;
+    gap: 0 !important;
+}
+
+.JvtFilteredDetailsListV2 .ms-Stack.control-bar,
+.ultimate-enterprise-grid .ms-Stack.control-bar {
+    padding: 2px 12px !important;
+    margin: 0 !important;
+    gap: 8px !important; /* Keep internal gap for controls */
+}
+
+/* Override any default FluentUI component margins */
+.JvtFilteredDetailsListV2 .ms-TextField,
+.JvtFilteredDetailsListV2 .ms-Button,
+.ultimate-enterprise-grid .ms-TextField,
+.ultimate-enterprise-grid .ms-Button {
+    margin: 0 !important;
+}
+
+/* Target the grid-container and virtualized grid specifically */
+.ultimate-enterprise-grid .grid-container {
+    margin: 0 !important;
+    padding: 0 !important;
+    border-top: none !important;
+}
+
+.ultimate-enterprise-grid .virtualized-editable-grid-container {
+    margin: 0 !important;
+    padding: 0 !important;
+    border-top: none !important;
+}
+
+/* Ensure no spacing between adjacent flex items */
+.ultimate-enterprise-grid > .control-bar + .grid-container {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+/* MORE TARGETED: Focus on the specific elements causing spacing */
+
+.ultimate-enterprise-grid .control-bar {
+    margin-bottom: 0 !important;
+    border-bottom: none !important;
+}
+
+.ultimate-enterprise-grid .grid-container {
+    margin-top: 0 !important;
+    border-top: none !important;
+}
+
+.ultimate-enterprise-grid .virtualized-editable-grid-container {
+    margin-top: 0 !important;
+    border-top: none !important;
+}
+
+/* Target any div that might be adding spacing */
+.ultimate-enterprise-grid > div {
+    margin: 0 !important;
+}
+
+.ultimate-enterprise-grid div + div {
+    margin-top: 0 !important;
+}
+
+/* MAXIMUM SPECIFICITY: Force zero spacing between control bar and grid */
+.JvtFilteredDetailsListV2 .ultimate-enterprise-grid .control-bar {
+    margin: 0 !important;
+    margin-bottom: 0 !important;
+    padding: 2px 12px !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #faf9f8 !important;
+    backdrop-filter: none !important;
+}
+
+.JvtFilteredDetailsListV2 .ultimate-enterprise-grid .control-bar:hover {
+    margin: 0 !important;
+    margin-bottom: 0 !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+.JvtFilteredDetailsListV2 .ultimate-enterprise-grid .grid-container {
+    margin: 0 !important;
+    margin-top: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    position: relative;
+    top: 0;
+}
+
+.JvtFilteredDetailsListV2 .ultimate-enterprise-grid .virtualized-editable-grid-container {
+    margin: 0 !important;
+    margin-top: 0 !important;
+    padding: 0 !important;
+    border: none !important;
 }
 
 /* Loading States */
@@ -164,6 +457,12 @@
     
     .export-buttons {
         justify-content: center;
+    }
+    
+    .control-bar {
+        flex-wrap: wrap;
+        padding: 4px 8px !important;
+        gap: 6px;
     }
 }
 

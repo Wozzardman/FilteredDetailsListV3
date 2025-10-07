@@ -2,10 +2,11 @@ import * as React from 'react';
 import { useEffect, useState, useCallback } from 'react';
 import { IColumn, SelectionMode, DetailsListLayoutMode, ConstrainMode } from '@fluentui/react';
 import { TextField } from '@fluentui/react/lib/TextField';
-import { DefaultButton, PrimaryButton } from '@fluentui/react/lib/Button';
+import { DefaultButton, PrimaryButton, IconButton } from '@fluentui/react/lib/Button';
 import { Dialog, DialogType, DialogFooter } from '@fluentui/react/lib/Dialog';
 import { Stack } from '@fluentui/react/lib/Stack';
 import { Text } from '@fluentui/react/lib/Text';
+import { ContextualMenu, IContextualMenuItem } from '@fluentui/react/lib/ContextualMenu';
 import { DetailsList } from '@fluentui/react/lib/DetailsList';
 import { UltraVirtualizedGrid, useUltraVirtualization } from '../virtualization/UltraVirtualizationEngine';
 import { EnterpriseChangeManager } from '../services/EnterpriseChangeManager';
@@ -81,6 +82,9 @@ export interface IUltimateEnterpriseGridProps {
     filterRecordsWidth?: number;
     jumpToWidth?: number;
     
+    // Control Bar Visibility
+    showControlBar?: boolean;
+    
     className?: string;
     theme?: 'light' | 'dark' | 'high-contrast';
     locale?: string;
@@ -138,6 +142,9 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     filterRecordsWidth = 200,
     jumpToWidth = 200,
     
+    // Control Bar Visibility
+    showControlBar = true,
+    
     className = '',
     theme = 'light',
     locale = 'en-US',
@@ -155,6 +162,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     // State management
     const [filteredItems, setFilteredItems] = useState<any[]>(items);
     const [globalFilter, setGlobalFilter] = useState<string>('');
+    const [columnFilters, setColumnFilters] = useState<Record<string, any[]>>({});
     const [pendingChangesCount, setPendingChangesCount] = useState<number>(0);
     const [changeManager] = useState(() => new EnterpriseChangeManager());
     const [exportService] = useState(() => DataExportService.getInstance());
@@ -166,6 +174,10 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     // Jump To navigation state
     const [jumpToSearchValue, setJumpToSearchValue] = useState<string>('');
     const [lastJumpResult, setLastJumpResult] = useState<{ result: string; rowIndex: number } | null>(null);
+    
+    // Export dropdown state
+    const [showExportMenu, setShowExportMenu] = useState<boolean>(false);
+    const exportButtonRef = React.useRef<HTMLDivElement>(null);
     
     // Ultra virtualization hook
     const {
@@ -207,8 +219,54 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
             );
         }
         
-        setFilteredItems(result);
-    }, [items, globalFilter, columns]);
+        // Apply column filters
+                Object.entries(columnFilters).forEach(([columnKey, selectedValues]) => {
+            if (selectedValues && selectedValues.length > 0) {
+                result = result.filter(item => {
+                    let value: any;
+                    if (item && typeof item.getValue === 'function') {
+                        try {
+                            value = item.getValue(columnKey);
+                        } catch (e) {
+                            value = null;
+                        }
+                    } else {
+                        value = item[columnKey];
+                    }
+                    
+                    // Handle blanks
+                    if (selectedValues.includes('(Blanks)') && (value == null || value === undefined || value === '')) {
+                        return true;
+                    }
+                    
+                    // Normalize dates for comparison to match VirtualizedEditableGrid logic
+                    let normalizedValue: any = value;
+                    if (value instanceof Date) {
+                        normalizedValue = value.toDateString();
+                    } else if (typeof value === 'string' && !isNaN(Date.parse(value))) {
+                        const dateValue = new Date(value);
+                        if (!isNaN(dateValue.getTime())) {
+                            normalizedValue = dateValue.toDateString();
+                        }
+                    }
+                    
+                    return selectedValues.some((filterValue: any) => {
+                        if (filterValue === '(Blanks)') return false; // Already handled above
+                        
+                        // Normalize filter values for comparison
+                        let normalizedFilter: any = filterValue;
+                        if (filterValue instanceof Date) {
+                            normalizedFilter = filterValue.toDateString();
+                        }
+                        
+                        return normalizedValue === normalizedFilter || 
+                               normalizedValue === filterValue ||
+                               value === filterValue;
+                    });
+                });
+            }
+        });        setFilteredItems(result);
+    }, [items, globalFilter, columnFilters, columns]);
 
     // Handle cell edit
     const handleCellEdit = useCallback((item: any, column: IUltimateEnterpriseGridColumn, newValue: any) => {
@@ -479,6 +537,28 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
         }
     }, [jumpToValue, handleJumpTo]);
 
+    // Export menu items
+    const exportMenuItems: IContextualMenuItem[] = [
+        {
+            key: 'csv',
+            text: 'Export CSV',
+            iconProps: { iconName: 'Table' },
+            onClick: () => {
+                handleExport('CSV');
+                setShowExportMenu(false);
+            }
+        },
+        {
+            key: 'excel',
+            text: 'Export Excel',
+            iconProps: { iconName: 'ExcelLogo' },
+            onClick: () => {
+                handleExport('Excel');
+                setShowExportMenu(false);
+            }
+        }
+    ];
+
     // Add New Row dialog handlers
     const handleShowAddRowDialog = useCallback(() => {
         setShowAddRowDialog(true);
@@ -502,11 +582,28 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
         setNewRowCount(newValue || '1');
     }, []);
 
+    // Handle column filter changes
+    const handleColumnFilterChange = useCallback((columnKey: string, selectedValues: any[]) => {
+        setColumnFilters(prev => {
+            if (selectedValues.length === 0) {
+                // Remove filter if no values selected
+                const { [columnKey]: removed, ...rest } = prev;
+                return rest;
+            } else {
+                // Update filter
+                return {
+                    ...prev,
+                    [columnKey]: selectedValues
+                };
+            }
+        });
+    }, []);
+
     // Determine if virtualization should be used
     const shouldUseVirtualization = enableVirtualization && 
         (filteredItems.length >= virtualizationThreshold || shouldVirtualize);
 
-    // Performance metrics display - simplified to show only total items
+    // Performance metrics display - shows filtered item count
     const performanceDisplay = (
         <div className="performance-metrics" data-theme={theme}>
             <span>Total Items: {filteredItems.length}</span>
@@ -544,14 +641,17 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
         return vars;
     }, [alternateRowColor]);
 
-    // Dynamic class name for alternating rows
+    // Dynamic class name for alternating rows and control bar visibility
     const gridClassName = React.useMemo(() => {
         const classes = [`ultimate-enterprise-grid`, className];
         if (alternateRowColor) {
             classes.push('alternating-rows');
         }
+        if (!showControlBar) {
+            classes.push('no-control-bar');
+        }
         return classes.join(' ');
-    }, [className, alternateRowColor]);
+    }, [className, alternateRowColor, showControlBar]);
 
     return (
         <div 
@@ -566,68 +666,85 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                 overflow: 'hidden',
                 boxSizing: 'border-box',
                 display: 'flex',
-                flexDirection: 'column'
+                flexDirection: 'column',
+                margin: 0,
+                padding: 0
             }}
         >
-            {/* Control Bar */}
-            <Stack horizontal tokens={{ childrenGap: 16 }} className="control-bar" verticalAlign="center">
-                {enableFiltering && (
-                    <TextField
-                        placeholder="Filter records..."
-                        value={globalFilter}
-                        onChange={(_, value) => setGlobalFilter(value || '')}
-                        styles={{
-                            root: { width: filterRecordsWidth, minWidth: 'unset', maxWidth: 'unset' },
-                            field: { fontSize: 14 }
-                        }}
-                    />
-                )}
-                
-                {enableJumpTo && jumpToColumn && (
-                    <TextField
-                        placeholder={`Jump to ${jumpToColumnDisplayName || jumpToColumn}...`}
-                        value={jumpToSearchValue}
-                        onChange={handleJumpToSearch}
-                        onKeyPress={handleJumpToKeyPress}
-                        styles={{
-                            root: { width: jumpToWidth, minWidth: 'unset', maxWidth: 'unset' },
-                            field: { fontSize: 14 }
-                        }}
-                        iconProps={{ iconName: 'Search' }}
-                    />
-                )}
-                
-                {enableExport && (
-                    <Stack horizontal tokens={{ childrenGap: 8 }}>
-                        <DefaultButton 
-                            text="Export CSV" 
-                            onClick={() => handleExport('CSV')}
+            {/* Control Bar - Conditionally rendered */}
+            {showControlBar && (
+                <Stack horizontal tokens={{ childrenGap: 8, padding: 0 }} className="control-bar" verticalAlign="center" wrap>
+                    {enableFiltering && (
+                        <TextField
+                            placeholder="Filter records"
+                            value={globalFilter}
+                            onChange={(_, value) => setGlobalFilter(value || '')}
+                            styles={{
+                                root: { width: filterRecordsWidth, minWidth: 'unset', maxWidth: 'unset' },
+                                field: { fontSize: 12 }
+                            }}
                         />
-                        <DefaultButton 
-                            text="Export Excel" 
-                            onClick={() => handleExport('Excel')}
+                    )}
+                    
+                    {enableJumpTo && jumpToColumn && (
+                        <TextField
+                            placeholder={`Jump to ${jumpToColumnDisplayName || jumpToColumn}`}
+                            value={jumpToSearchValue}
+                            onChange={handleJumpToSearch}
+                            onKeyPress={handleJumpToKeyPress}
+                            styles={{
+                                root: { width: jumpToWidth, minWidth: 'unset', maxWidth: 'unset' },
+                                field: { fontSize: 12 }
+                            }}
+                            iconProps={{ iconName: 'Search' }}
                         />
+                    )}
+                    
+                    {enableExport && (
+                        <div ref={exportButtonRef}>
+                            <IconButton
+                                iconProps={{ iconName: 'Download' }}
+                                title="Export Data"
+                                ariaLabel="Export Data"
+                                onClick={() => setShowExportMenu(!showExportMenu)}
+                                styles={{
+                                    root: {
+                                        width: 16,
+                                        height: 32,
+                                        backgroundColor: showExportMenu ? '#f3f2f1' : 'transparent'
+                                    }
+                                }}
+                            />
+                            {showExportMenu && (
+                                <ContextualMenu
+                                    items={exportMenuItems}
+                                    target={exportButtonRef.current}
+                                    onDismiss={() => setShowExportMenu(false)}
+                                    directionalHint={6} // DirectionalHint.bottomLeftEdge
+                                />
+                            )}
+                        </div>
+                    )}
+                    
+                    {enableAddNewRow && (
+                        <DefaultButton 
+                            text="Add New Row" 
+                            onClick={handleShowAddRowDialog}
+                            primary
+                            styles={{
+                                root: { minHeight: 32, fontSize: 13 },
+                                label: { fontWeight: 600 }
+                            }}
+                        />
+                    )}
+                    
+                    {/* Combined status display */}
+                    <Stack horizontal tokens={{ childrenGap: 12 }}>
+                        {performanceDisplay}
+                        {changeTrackingDisplay}
                     </Stack>
-                )}
-                
-                {enableAddNewRow && (
-                    <DefaultButton 
-                        text="Add New Row" 
-                        onClick={handleShowAddRowDialog}
-                        primary
-                        styles={{
-                            root: { minHeight: 32, fontSize: 13 },
-                            label: { fontWeight: 600 }
-                        }}
-                    />
-                )}
-                
-                {/* Combined status display */}
-                <Stack horizontal tokens={{ childrenGap: 12 }}>
-                    {performanceDisplay}
-                    {changeTrackingDisplay}
                 </Stack>
-            </Stack>
+            )}
 
             {/* Main Grid - ALWAYS VIRTUALIZED for META/Google Competition */}
             <div 
@@ -637,7 +754,9 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                     flex: 1, // Take remaining height
                     minHeight: 0, // Allow flex shrinking
                     overflow: 'hidden',
-                    boxSizing: 'border-box'
+                    boxSizing: 'border-box',
+                    margin: 0,
+                    padding: 0
                 }}
             >
                 <VirtualizedEditableGrid
@@ -651,6 +770,9 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                     useEnhancedEditors={useEnhancedEditors}
                     columnEditorMapping={columnEditorMapping}
                     getAvailableValues={getAvailableValues}
+                    
+                    // Column filter props
+                    onColumnFilter={handleColumnFilterChange}
                     
                     // Selection mode props
                     enableSelectionMode={enableSelectionMode}

@@ -521,6 +521,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 enableFiltering: false,
                 enableExport: false,
                 enableSelectionMode: false,
+                showControlBar: context.parameters.ShowControlBar?.raw ?? true,
                 onCancelChanges: this.handleCancelOperation,
                 headerTextSize: context.parameters.HeaderTextSize?.raw || 14,
                 columnTextSize: context.parameters.ColumnTextSize?.raw || 13
@@ -1237,6 +1238,9 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             filterRecordsWidth: context.parameters.FilterRecordsWidth?.raw || 200,
             jumpToWidth: context.parameters.JumpToWidth?.raw || 200,
             
+            // Control Bar Visibility
+            showControlBar: context.parameters.ShowControlBar?.raw ?? true,
+            
             getColumnDataType: (columnKey: string) => {
                 const column = gridColumns.find(col => col.key === columnKey);
                 const dataType = column?.dataType || 'string';
@@ -1334,6 +1338,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 enableFiltering: false,
                 enableExport: false,
                 enableSelectionMode: false,
+                showControlBar: context.parameters.ShowControlBar?.raw ?? true,
                 onCancelChanges: this.handleCancelOperation,
                 headerTextSize: 14,
                 columnTextSize: 13

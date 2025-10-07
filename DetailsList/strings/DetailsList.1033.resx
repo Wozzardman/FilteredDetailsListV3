@@ -404,5 +404,9 @@
     <value>Jump To Width</value>
     <comment/>
   </data>
+  <data name="ShowControlBar" xml:space="preserve">
+    <value>Show Control Bar</value>
+    <comment>Controls visibility of the command bar with filters, export, and navigation controls</comment>
+  </data>
   
 </root>

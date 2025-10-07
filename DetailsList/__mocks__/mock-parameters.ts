@@ -62,6 +62,9 @@ export function getMockParameters(): IInputs {
         FilterRecordsWidth: new MockWholeNumberProperty(200),
         JumpToWidth: new MockWholeNumberProperty(200),
         
+        // Control Bar Visibility
+        ShowControlBar: new MockTwoOptionsProperty(true),
+        
         records: new MockDataSet([]),
         columns: new MockDataSet([]),
     };

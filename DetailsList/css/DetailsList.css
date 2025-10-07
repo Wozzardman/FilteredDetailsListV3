@@ -11,6 +11,10 @@
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  /* CRITICAL: Remove all spacing at PCF root level */
+  margin: 0 !important;
+  padding: 0 !important;
+  gap: 0 !important;
 }
 
 /* Ensure PowerApps container compatibility */

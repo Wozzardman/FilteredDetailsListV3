@@ -330,6 +330,9 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 delete newFilters[columnKey];
                 return newFilters;
             });
+            
+            // Notify parent component of filter removal
+            onColumnFilter?.(columnKey, []);
         } else {
             // Create proper filter condition
             const columnDisplayName = columns.find(c => c.key === columnKey)?.name || columnKey;
@@ -388,7 +391,10 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 }
             }));
         }
-    }, [columns, getColumnDataType]);
+        
+        // Notify parent component of filter change
+        onColumnFilter?.(columnKey, selectedValues);
+    }, [columns, getColumnDataType, onColumnFilter]);
 
     const handleFilterButtonClick = React.useCallback((columnKey: string, target: HTMLElement) => {
         setActiveFilterColumn(activeFilterColumn === columnKey ? null : columnKey);
