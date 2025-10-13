@@ -74,6 +74,7 @@ export function getMockParameters(): IInputs {
         ShowFormulaField: new MockTwoOptionsProperty(false),
         FormulaFieldText: new MockStringProperty('Formula Result:'),
         FormulaFieldExpression: new MockStringProperty(''),
+        FormulaFieldValue: new MockStringProperty(''),
         
         records: new MockDataSet([]),
         columns: new MockDataSet([]),

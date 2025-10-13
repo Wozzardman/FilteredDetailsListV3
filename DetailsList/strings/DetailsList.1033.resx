@@ -432,5 +432,9 @@
     <value>Formula Expression</value>
     <comment>Formula to calculate values from records (e.g. "SUM(amount)", "COUNT(status='Active')", "AVG(score)")</comment>
   </data>
+  <data name="FormulaFieldValue" xml:space="preserve">
+    <value>Formula Field Value</value>
+    <comment>Calculated result value from Power Apps to pass to PCF control</comment>
+  </data>
   
 </root>
