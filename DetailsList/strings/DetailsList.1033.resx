@@ -408,5 +408,29 @@
     <value>Show Control Bar</value>
     <comment>Controls visibility of the command bar with filters, export, and navigation controls</comment>
   </data>
+  <data name="AddNewRowText" xml:space="preserve">
+    <value>Add New Row Text</value>
+    <comment>Custom text for the Add New Row button</comment>
+  </data>
+  <data name="TotalItemsText" xml:space="preserve">
+    <value>Total Items Label</value>
+    <comment>Custom text for the Total Items label (e.g. "Total Records:", "Items Found:")</comment>
+  </data>
+  <data name="FilterRecordsText" xml:space="preserve">
+    <value>Filter Records Text</value>
+    <comment>Custom placeholder text for the search/filter input (e.g. "Search records", "Filter data")</comment>
+  </data>
+  <data name="ShowFormulaField" xml:space="preserve">
+    <value>Show Formula Field</value>
+    <comment>Controls visibility of the custom formula calculation field</comment>
+  </data>
+  <data name="FormulaFieldText" xml:space="preserve">
+    <value>Formula Field Label</value>
+    <comment>Display text for the formula field (e.g. "Total Amount:", "Average Score:")</comment>
+  </data>
+  <data name="FormulaFieldExpression" xml:space="preserve">
+    <value>Formula Expression</value>
+    <comment>Formula to calculate values from records (e.g. "SUM(amount)", "COUNT(status='Active')", "AVG(score)")</comment>
+  </data>
   
 </root>

@@ -85,6 +85,16 @@ export interface IUltimateEnterpriseGridProps {
     // Control Bar Visibility
     showControlBar?: boolean;
     
+    // Control Bar Text Customization
+    addNewRowText?: string;
+    totalItemsText?: string;
+    filterRecordsText?: string;
+    
+    // Custom Formula Field Configuration
+    showFormulaField?: boolean;
+    formulaFieldText?: string;
+    formulaFieldExpression?: string;
+    
     className?: string;
     theme?: 'light' | 'dark' | 'high-contrast';
     locale?: string;
@@ -144,6 +154,16 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     
     // Control Bar Visibility
     showControlBar = true,
+    
+    // Control Bar Text Customization
+    addNewRowText = 'Add New Row',
+    totalItemsText = 'Total Items:',
+    filterRecordsText = 'Search records',
+    
+    // Custom Formula Field Configuration
+    showFormulaField = false,
+    formulaFieldText = 'Formula Result:',
+    formulaFieldExpression = '',
     
     className = '',
     theme = 'light',
@@ -603,10 +623,96 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     const shouldUseVirtualization = enableVirtualization && 
         (filteredItems.length >= virtualizationThreshold || shouldVirtualize);
 
+    // Formula evaluation function
+    const evaluateFormula = useCallback((expression: string, items: any[]): string => {
+        if (!expression || items.length === 0) return '0';
+        
+        try {
+            // Parse common formula patterns
+            const upperExpression = expression.toUpperCase().trim();
+            
+            // Handle SUM(fieldName) - e.g., "SUM(amount)"
+            const sumMatch = upperExpression.match(/^SUM\(([^)]+)\)$/);
+            if (sumMatch) {
+                const fieldName = sumMatch[1].trim();
+                const sum = items.reduce((acc, item) => {
+                    const value = parseFloat(item[fieldName]) || 0;
+                    return acc + value;
+                }, 0);
+                return sum.toLocaleString();
+            }
+            
+            // Handle COUNT() or COUNT(condition) - e.g., "COUNT()", "COUNT(status='Active')"
+            const countMatch = upperExpression.match(/^COUNT\(([^)]*)\)$/);
+            if (countMatch) {
+                const condition = countMatch[1].trim();
+                if (!condition) {
+                    return items.length.toString();
+                } else {
+                    // Simple condition parsing like "status='Active'"
+                    const condMatch = condition.match(/^([^=<>!]+)(=|!=|<|>|<=|>=)(.+)$/);
+                    if (condMatch) {
+                        const field = condMatch[1].trim();
+                        const operator = condMatch[2];
+                        const value = condMatch[3].replace(/['"]/g, '').trim();
+                        
+                        const count = items.filter(item => {
+                            const itemValue = item[field]?.toString() || '';
+                            switch (operator) {
+                                case '=': return itemValue === value;
+                                case '!=': return itemValue !== value;
+                                case '<': return parseFloat(itemValue) < parseFloat(value);
+                                case '>': return parseFloat(itemValue) > parseFloat(value);
+                                case '<=': return parseFloat(itemValue) <= parseFloat(value);
+                                case '>=': return parseFloat(itemValue) >= parseFloat(value);
+                                default: return false;
+                            }
+                        }).length;
+                        return count.toString();
+                    }
+                }
+            }
+            
+            // Handle AVG(fieldName) - e.g., "AVG(score)"
+            const avgMatch = upperExpression.match(/^AVG\(([^)]+)\)$/);
+            if (avgMatch) {
+                const fieldName = avgMatch[1].trim();
+                const values = items.map(item => parseFloat(item[fieldName]) || 0).filter(v => !isNaN(v));
+                if (values.length === 0) return '0';
+                const average = values.reduce((acc, val) => acc + val, 0) / values.length;
+                return average.toFixed(2);
+            }
+            
+            // Handle MIN(fieldName) and MAX(fieldName)
+            const minMatch = upperExpression.match(/^MIN\(([^)]+)\)$/);
+            if (minMatch) {
+                const fieldName = minMatch[1].trim();
+                const values = items.map(item => parseFloat(item[fieldName]) || 0).filter(v => !isNaN(v));
+                return values.length > 0 ? Math.min(...values).toString() : '0';
+            }
+            
+            const maxMatch = upperExpression.match(/^MAX\(([^)]+)\)$/);
+            if (maxMatch) {
+                const fieldName = maxMatch[1].trim();
+                const values = items.map(item => parseFloat(item[fieldName]) || 0).filter(v => !isNaN(v));
+                return values.length > 0 ? Math.max(...values).toString() : '0';
+            }
+            
+            return '0';
+        } catch (error) {
+            console.warn('Formula evaluation error:', error);
+            return 'Error';
+        }
+    }, []);
+
+    // Calculate formula result if formula field is enabled
+    const formulaResult = showFormulaField && formulaFieldExpression ? 
+        evaluateFormula(formulaFieldExpression, filteredItems) : '';
+
     // Performance metrics display - shows filtered item count
     const performanceDisplay = (
         <div className="performance-metrics" data-theme={theme}>
-            <span>Total Items: {filteredItems.length}</span>
+            <span>{totalItemsText} {filteredItems.length}</span>
         </div>
     );
 
@@ -676,7 +782,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                 <Stack horizontal tokens={{ childrenGap: 8, padding: 0 }} className="control-bar" verticalAlign="center" wrap>
                     {enableFiltering && (
                         <TextField
-                            placeholder="Filter records"
+                            placeholder={filterRecordsText}
                             value={globalFilter}
                             onChange={(_, value) => setGlobalFilter(value || '')}
                             styles={{
@@ -728,7 +834,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                     
                     {enableAddNewRow && (
                         <DefaultButton 
-                            text="Add New Row" 
+                            text={addNewRowText} 
                             onClick={handleShowAddRowDialog}
                             primary
                             styles={{
@@ -741,6 +847,11 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                     {/* Combined status display */}
                     <Stack horizontal tokens={{ childrenGap: 12 }}>
                         {performanceDisplay}
+                        {showFormulaField && formulaFieldExpression && (
+                            <div className="formula-field-display" data-theme={theme}>
+                                <span>{formulaFieldText} {formulaResult}</span>
+                            </div>
+                        )}
                         {changeTrackingDisplay}
                     </Stack>
                 </Stack>

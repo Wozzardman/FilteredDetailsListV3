@@ -904,7 +904,8 @@
 }
 
 /* Enhanced Performance Metrics */
-.performance-metrics {
+.performance-metrics,
+.formula-field-display {
     font-size: 13px;
     font-weight: 500;
     color: #656d76;

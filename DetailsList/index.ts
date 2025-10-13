@@ -522,6 +522,12 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 enableExport: false,
                 enableSelectionMode: false,
                 showControlBar: context.parameters.ShowControlBar?.raw ?? true,
+                addNewRowText: context.parameters.AddNewRowText?.raw || 'Add New Row',
+                totalItemsText: context.parameters.TotalItemsText?.raw || 'Total Items:',
+                filterRecordsText: context.parameters.FilterRecordsText?.raw || 'Search records',
+                showFormulaField: context.parameters.ShowFormulaField?.raw ?? false,
+                formulaFieldText: context.parameters.FormulaFieldText?.raw || 'Formula Result:',
+                formulaFieldExpression: context.parameters.FormulaFieldExpression?.raw || '',
                 onCancelChanges: this.handleCancelOperation,
                 headerTextSize: context.parameters.HeaderTextSize?.raw || 14,
                 columnTextSize: context.parameters.ColumnTextSize?.raw || 13
@@ -1240,6 +1246,12 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             
             // Control Bar Visibility
             showControlBar: context.parameters.ShowControlBar?.raw ?? true,
+            addNewRowText: context.parameters.AddNewRowText?.raw || 'Add New Row',
+            totalItemsText: context.parameters.TotalItemsText?.raw || 'Total Items:',
+            filterRecordsText: context.parameters.FilterRecordsText?.raw || 'Search records',
+            showFormulaField: context.parameters.ShowFormulaField?.raw ?? false,
+            formulaFieldText: context.parameters.FormulaFieldText?.raw || 'Formula Result:',
+            formulaFieldExpression: context.parameters.FormulaFieldExpression?.raw || '',
             
             getColumnDataType: (columnKey: string) => {
                 const column = gridColumns.find(col => col.key === columnKey);
@@ -1339,6 +1351,12 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 enableExport: false,
                 enableSelectionMode: false,
                 showControlBar: context.parameters.ShowControlBar?.raw ?? true,
+                addNewRowText: context.parameters.AddNewRowText?.raw || 'Add New Row',
+                totalItemsText: context.parameters.TotalItemsText?.raw || 'Total Items:',
+                filterRecordsText: context.parameters.FilterRecordsText?.raw || 'Search records',
+                showFormulaField: context.parameters.ShowFormulaField?.raw ?? false,
+                formulaFieldText: context.parameters.FormulaFieldText?.raw || 'Formula Result:',
+                formulaFieldExpression: context.parameters.FormulaFieldExpression?.raw || '',
                 onCancelChanges: this.handleCancelOperation,
                 headerTextSize: 14,
                 columnTextSize: 13

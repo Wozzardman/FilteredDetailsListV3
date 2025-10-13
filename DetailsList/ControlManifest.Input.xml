@@ -217,6 +217,16 @@
     <!-- Control Bar Visibility -->
     <property name="ShowControlBar" display-name-key="ShowControlBar" of-type="TwoOptions" usage="input" required="false" default-value="true" />
     
+    <!-- Control Bar Text Customization -->
+    <property name="AddNewRowText" display-name-key="AddNewRowText" of-type="SingleLine.Text" usage="input" required="false" />
+    <property name="TotalItemsText" display-name-key="TotalItemsText" of-type="SingleLine.Text" usage="input" required="false" />
+    <property name="FilterRecordsText" display-name-key="FilterRecordsText" of-type="SingleLine.Text" usage="input" required="false" />
+    
+    <!-- Custom Formula Field Configuration -->
+    <property name="ShowFormulaField" display-name-key="ShowFormulaField" of-type="TwoOptions" usage="input" required="false" default-value="false" />
+    <property name="FormulaFieldText" display-name-key="FormulaFieldText" of-type="SingleLine.Text" usage="input" required="false" />
+    <property name="FormulaFieldExpression" display-name-key="FormulaFieldExpression" of-type="Multiple" usage="input" required="false" />
+    
     <resources>
       <code path="index.ts" order="1" />
       <resx path="strings/DetailsList.1033.resx" version="1.0.0" />

@@ -1682,7 +1682,8 @@ body .PowerAppsPortal .JvtFilteredDetailsListV2,
 }
 
 .performance-metrics,
-.change-tracking {
+.change-tracking,
+.formula-field-display {
   font-size: 13px;
   color: var(--neutralSecondary, #605e5c);
   font-weight: 500;
@@ -1693,6 +1694,8 @@ body .PowerAppsPortal .JvtFilteredDetailsListV2,
   color: var(--themePrimary, #0078d4);
   font-weight: 600;
 }
+
+/* Formula field inherits same styling as performance-metrics */
 
 /* Dark theme support */
 [data-theme="dark"] .control-bar {
@@ -1707,6 +1710,8 @@ body .PowerAppsPortal .JvtFilteredDetailsListV2,
 [data-theme="dark"] .change-tracking {
   color: var(--themeDarkAlt, #106ebe);
 }
+
+/* Formula field inherits dark theme styling from performance-metrics */
 
 /* Responsive adjustments */
 @media (max-width: 768px) {

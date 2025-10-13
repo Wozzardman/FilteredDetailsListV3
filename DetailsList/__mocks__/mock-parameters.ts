@@ -65,6 +65,16 @@ export function getMockParameters(): IInputs {
         // Control Bar Visibility
         ShowControlBar: new MockTwoOptionsProperty(true),
         
+        // Control Bar Text Customization
+        AddNewRowText: new MockStringProperty('Add New Row'),
+        TotalItemsText: new MockStringProperty('Total Items:'),
+        FilterRecordsText: new MockStringProperty('Search records'),
+        
+        // Custom Formula Field Configuration
+        ShowFormulaField: new MockTwoOptionsProperty(false),
+        FormulaFieldText: new MockStringProperty('Formula Result:'),
+        FormulaFieldExpression: new MockStringProperty(''),
+        
         records: new MockDataSet([]),
         columns: new MockDataSet([]),
     };
