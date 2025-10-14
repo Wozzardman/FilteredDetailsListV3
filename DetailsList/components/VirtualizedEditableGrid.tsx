@@ -1761,13 +1761,23 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         // Calculate height needed for each column individually
         effectiveColumns.forEach((col, index) => {
             const headerText = col.name || '';
-            const columnWidth = memoizedColumnWidths[index] || 150;
             
-            // Account for horizontal padding (20px total: 8px left + 12px right) and filter icon space (~20px)
-            const availableTextWidth = Math.max(80, columnWidth - 30);
+            // Get the actual column width - use the memoized width which handles custom ColWidth properly
+            const actualColumnWidth = memoizedColumnWidths[index];
+            if (!actualColumnWidth) return; // Skip if no width available
             
-            // Conservative estimate: 7px per character to avoid false wrapping detection
-            const charsPerLine = Math.floor(availableTextWidth / 7);
+            // Check text alignment - center/right aligned text is less likely to wrap naturally
+            const headerAlignment = col.headerHorizontalAligned || 'start';
+            const isNonLeftAligned = headerAlignment === 'center' || headerAlignment === 'end' || headerAlignment === 'right';
+            
+            // Account for horizontal padding (20px: 8px left + 12px right) and filter icon space (~20px)
+            // For center/right aligned text, be more conservative as wrapping looks worse
+            const paddingAndIconSpace = isNonLeftAligned ? 35 : 30;
+            const availableTextWidth = Math.max(60, actualColumnWidth - paddingAndIconSpace);
+            
+            // Conservative character width estimate - use 7px for left-aligned, 8px for center/right
+            const charWidth = isNonLeftAligned ? 8 : 7;
+            const charsPerLine = Math.floor(availableTextWidth / charWidth);
             const estimatedLines = Math.max(1, Math.ceil(headerText.length / charsPerLine));
             
             // Only add extra height if we're actually wrapping (more than 1 line)
@@ -1776,8 +1786,8 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 // Multiple lines: minimal padding + lines * tight line height
                 columnHeight = 4 + (estimatedLines * 16);
             } else {
-                // Single line: use minimum height (just enough for one line + minimal padding)
-                columnHeight = 20; // Minimum for single line
+                // Single line: use minimum height
+                columnHeight = 20;
             }
             
             // Update max height if this column needs more space
