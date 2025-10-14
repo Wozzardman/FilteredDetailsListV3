@@ -1766,7 +1766,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 top: 0,
                 zIndex: 5,
                 flexShrink: 0, // Prevent header from shrinking
-                minHeight: enableHeaderTextWrapping ? '64px' : '48px', // Taller height for wrapped headers
+                minHeight: enableHeaderTextWrapping ? '20px' : '48px', // Minimal height for wrapped headers, let content determine actual height
                 height: enableHeaderTextWrapping ? 'auto' : '48px' // Auto height when wrapping
             }}
         >
