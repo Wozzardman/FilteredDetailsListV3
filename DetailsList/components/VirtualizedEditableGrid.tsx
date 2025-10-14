@@ -1752,6 +1752,28 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         return renderRowContent(virtualRow);
     }, [renderRowContent]);
 
+    // Calculate uniform header height based on the tallest wrapped column
+    const calculateHeaderHeight = React.useMemo(() => {
+        if (!enableHeaderTextWrapping) return '48px';
+        
+        // Estimate height based on longest column name
+        const longestHeaderLength = Math.max(...effectiveColumns.map(col => (col.name || '').length));
+        const estimatedLineHeight = 20; // Approximate line height in pixels
+        const padding = 16; // Top + bottom padding (8px each)
+        
+        // Rough calculation: if header text is longer than ~25 characters per line for average column width
+        const avgColumnWidth = memoizedColumnWidths.length > 0 ? 
+            memoizedColumnWidths.reduce((sum, width) => sum + width, 0) / memoizedColumnWidths.length : 150;
+        const charactersPerLine = Math.max(1, Math.floor(avgColumnWidth / 8)); // Rough estimate: 8px per character
+        const estimatedLines = Math.max(1, Math.ceil(longestHeaderLength / charactersPerLine));
+        
+        // Calculate total height needed
+        const calculatedHeight = (estimatedLines * estimatedLineHeight) + padding;
+        
+        // Ensure minimum height of 20px and maximum reasonable height of 120px
+        return `${Math.max(20, Math.min(120, calculatedHeight))}px`;
+    }, [enableHeaderTextWrapping, effectiveColumns, memoizedColumnWidths]);
+
     // Render header with Excel-like filter buttons and column resizing
     const renderHeader = () => (
         <div 
@@ -1766,8 +1788,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 top: 0,
                 zIndex: 5,
                 flexShrink: 0, // Prevent header from shrinking
-                minHeight: enableHeaderTextWrapping ? '20px' : '48px', // Minimal height for wrapped headers, let content determine actual height
-                height: enableHeaderTextWrapping ? 'auto' : '48px' // Auto height when wrapping
+                height: calculateHeaderHeight // Use calculated uniform height for all headers
             }}
         >
             {effectiveColumns.map((column, index) => {
@@ -1783,6 +1804,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                 width: memoizedColumnWidths[index], // Use the same width calculation as data cells
                                 minWidth: memoizedColumnWidths[index],
                                 maxWidth: memoizedColumnWidths[index],
+                                height: '100%', // Fill the full height of the header container
                                 position: 'relative',
                                 display: 'flex',
                                 alignItems: 'center',
@@ -1885,6 +1907,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                             width: memoizedColumnWidths[index],
                             minWidth: memoizedColumnWidths[index],
                             maxWidth: memoizedColumnWidths[index],
+                            height: '100%', // Fill the full height of the header container
                             position: 'relative',
                             display: 'flex',
                             alignItems: enableHeaderTextWrapping ? 'flex-start' : 'center', // Top align when wrapping

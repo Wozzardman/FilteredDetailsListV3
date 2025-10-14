@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest>
-  <control namespace="JVT" constructor="FilteredDetailsListV2" version="17.4.0" display-name-key="FilteredDetailsListV2" description-key="FilteredDetailsListV2_Desc" control-type="virtual">
+  <control namespace="JVT" constructor="FilteredDetailsListV2" version="17.4.2" display-name-key="FilteredDetailsListV2" description-key="FilteredDetailsListV2_Desc" control-type="virtual">
     <external-service-usage enabled="false">
       <!-- Explicitly declare no external services to avoid CORS issues -->
     </external-service-usage>
@@ -131,7 +131,7 @@
     <property name="ColumnTextSize" display-name-key="ColumnTextSize" of-type="Whole.None" usage="input" required="false" default-value="13" />
     
     <!-- Header text wrapping -->
-    <property name="EnableHeaderTextWrapping" display-name-key="EnableHeaderTextWrapping" of-type="TwoOptions" usage="input" required="false" default-value="false" />
+    <property name="EnableHeaderTextWrapping" display-name-key="EnableHeaderTextWrapping" of-type="TwoOptions" usage="input" required="false" default-value="true" />
     
     <!-- Row styling properties -->
     <property name="AlternateRowColor" display-name-key="AlternateRowColor" of-type="SingleLine.Text" usage="input" required="false" />
