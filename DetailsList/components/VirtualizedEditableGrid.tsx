@@ -1752,33 +1752,41 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         return renderRowContent(virtualRow);
     }, [renderRowContent]);
 
-    // Calculate header height based on content when wrapping is enabled
-    const getHeaderHeight = () => {
+    // Calculate the maximum header height needed across all columns
+    const uniformHeaderHeight = React.useMemo(() => {
         if (!enableHeaderTextWrapping) return '48px';
         
-        // Find the longest header text among visible columns
-        const longestHeader = effectiveColumns.reduce((longest, col) => {
+        let maxHeight = 20; // Start with minimum height of 20px
+        
+        // Calculate height needed for each column individually
+        effectiveColumns.forEach((col, index) => {
             const headerText = col.name || '';
-            return headerText.length > longest.length ? headerText : longest;
-        }, '');
+            const columnWidth = memoizedColumnWidths[index] || 150;
+            
+            // Account for horizontal padding (20px total: 8px left + 12px right) and filter icon space (~20px)
+            const availableTextWidth = Math.max(80, columnWidth - 30);
+            
+            // Conservative estimate: 7px per character to avoid false wrapping detection
+            const charsPerLine = Math.floor(availableTextWidth / 7);
+            const estimatedLines = Math.max(1, Math.ceil(headerText.length / charsPerLine));
+            
+            // Only add extra height if we're actually wrapping (more than 1 line)
+            let columnHeight;
+            if (estimatedLines > 1) {
+                // Multiple lines: minimal padding + lines * tight line height
+                columnHeight = 4 + (estimatedLines * 16);
+            } else {
+                // Single line: use minimum height (just enough for one line + minimal padding)
+                columnHeight = 20; // Minimum for single line
+            }
+            
+            // Update max height if this column needs more space
+            maxHeight = Math.max(maxHeight, columnHeight);
+        });
         
-        // Calculate approximate lines needed based on average column width
-        const avgWidth = memoizedColumnWidths.length > 0 ? 
-            memoizedColumnWidths.reduce((sum, w) => sum + w, 0) / memoizedColumnWidths.length : 150;
-        
-        // Account for padding and filter icon space (subtract ~40px for icons and padding)
-        const availableTextWidth = Math.max(50, avgWidth - 40);
-        
-        // Rough estimate: 8px per character
-        const charsPerLine = Math.floor(availableTextWidth / 8);
-        const estimatedLines = Math.max(1, Math.ceil(longestHeader.length / charsPerLine));
-        
-        // Calculate height: padding (6px top/bottom) + lines * line height (18px)
-        const calculatedHeight = 12 + (estimatedLines * 18);
-        
-        // Ensure reasonable bounds: minimum 32px, maximum 80px
-        return `${Math.max(32, Math.min(80, calculatedHeight))}px`;
-    };
+        // Ensure reasonable bounds: minimum 20px, maximum 120px
+        return `${Math.max(20, Math.min(120, maxHeight))}px`;
+    }, [enableHeaderTextWrapping, effectiveColumns, memoizedColumnWidths]);
 
     // Render header with Excel-like filter buttons and column resizing
     const renderHeader = () => (
@@ -1794,7 +1802,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 top: 0,
                 zIndex: 5,
                 flexShrink: 0, // Prevent header from shrinking
-                height: getHeaderHeight() // Use calculated height for both wrapped and non-wrapped states
+                height: uniformHeaderHeight // Use calculated height for both wrapped and non-wrapped states
             }}
         >
             {effectiveColumns.map((column, index) => {
@@ -1919,7 +1927,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                             alignItems: enableHeaderTextWrapping ? 'flex-start' : 'center', // Top align when wrapping
                             justifyContent: 'space-between', // Keep space-between for filter icon positioning
                             background: '#faf9f8',
-                            padding: enableHeaderTextWrapping ? '6px 12px 6px 8px' : '0 12px 0 8px', // Balanced vertical padding when wrapping
+                            padding: enableHeaderTextWrapping ? '2px 12px 2px 8px' : '0 12px 0 8px', // Minimal vertical padding when wrapping
                             boxSizing: 'border-box', // Ensure consistent box model
                             overflow: 'hidden'
                         }}
@@ -1934,7 +1942,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                 textOverflow: enableHeaderTextWrapping ? 'initial' : 'ellipsis',
                                 whiteSpace: enableHeaderTextWrapping ? 'normal' : 'nowrap',
                                 wordWrap: enableHeaderTextWrapping ? 'break-word' : 'normal',
-                                lineHeight: enableHeaderTextWrapping ? '1.2' : 'normal', // Balanced line height for wrapped text
+                                lineHeight: enableHeaderTextWrapping ? '1.0' : 'normal', // Tight line height for wrapped text
                                 textAlign: column.headerHorizontalAligned === 'center' ? 'center' : 
                                           column.headerHorizontalAligned === 'end' ? 'right' : 'left' // Apply text alignment
                             }}

@@ -40,7 +40,7 @@
 /* Header Styles */
 .virtualized-header {
     display: flex;
-    height: 32px;
+    /* No fixed or minimum height - let inline styles control this completely */
     background: linear-gradient(180deg, #fafafa 0%, #f5f5f5 100%);
     border-bottom: 2px solid #e1dfdd;
     position: relative;
@@ -53,6 +53,7 @@
 
 .virtualized-header-cell {
     height: 100%;
+    /* Padding controlled by inline styles when text wrapping enabled */
     padding: 2px 12px;
     display: flex;
     align-items: center;
