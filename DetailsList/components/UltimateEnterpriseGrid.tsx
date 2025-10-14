@@ -61,6 +61,9 @@ export interface IUltimateEnterpriseGridProps {
     headerTextSize?: number;
     columnTextSize?: number;
     
+    // Header text wrapping configuration
+    enableHeaderTextWrapping?: boolean;
+    
     // Row styling configuration
     alternateRowColor?: string;
     onItemSelection?: (itemId: string) => void;
@@ -172,6 +175,9 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     // Text sizing props with defaults
     headerTextSize = 14, // Default 14px for headers
     columnTextSize = 13, // Default 13px for column data
+    
+    // Header text wrapping
+    enableHeaderTextWrapping = false, // Default to no wrapping for backward compatibility
     
     // Row styling props
     alternateRowColor
@@ -973,6 +979,9 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                     // Text sizing props
                     headerTextSize={headerTextSize}
                     columnTextSize={columnTextSize}
+                    
+                    // Header text wrapping
+                    enableHeaderTextWrapping={enableHeaderTextWrapping}
                     
                     // Row styling props
                     alternateRowColor={alternateRowColor}

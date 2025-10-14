@@ -30,6 +30,7 @@ export function getMockParameters(): IInputs {
         EnableColumnResizing: new MockTwoOptionsProperty(true),
         HeaderTextSize: new MockWholeNumberProperty(14),
         ColumnTextSize: new MockWholeNumberProperty(13),
+        EnableHeaderTextWrapping: new MockTwoOptionsProperty(false),
         EnableFiltering: new MockTwoOptionsProperty(),
         FilterConfiguration: new MockStringProperty(),
         AppliedFilters: new MockStringProperty(),

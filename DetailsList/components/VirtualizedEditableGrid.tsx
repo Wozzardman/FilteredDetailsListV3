@@ -141,6 +141,9 @@ export interface VirtualizedEditableGridProps {
     headerTextSize?: number; // Font size for column headers in px
     columnTextSize?: number; // Font size for column data in px
     
+    // Header text wrapping
+    enableHeaderTextWrapping?: boolean; // Whether to wrap header text when it doesn't fit
+    
     // Row styling properties
     alternateRowColor?: string; // Color for alternating rows
     
@@ -201,6 +204,9 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     // Text sizing props with defaults
     headerTextSize = 14, // Default 14px for headers
     columnTextSize = 13, // Default 13px for column data
+    
+    // Header text wrapping
+    enableHeaderTextWrapping = false, // Default to no wrapping for backward compatibility
     
     // Row styling props
     alternateRowColor,
@@ -1760,7 +1766,8 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 top: 0,
                 zIndex: 5,
                 flexShrink: 0, // Prevent header from shrinking
-                height: '48px'
+                minHeight: enableHeaderTextWrapping ? '64px' : '48px', // Taller height for wrapped headers
+                height: enableHeaderTextWrapping ? 'auto' : '48px' // Auto height when wrapping
             }}
         >
             {effectiveColumns.map((column, index) => {
@@ -1880,10 +1887,10 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                             maxWidth: memoizedColumnWidths[index],
                             position: 'relative',
                             display: 'flex',
-                            alignItems: 'center', // Keep center alignment for header container
+                            alignItems: enableHeaderTextWrapping ? 'flex-start' : 'center', // Top align when wrapping
                             justifyContent: 'space-between', // Keep space-between for filter icon positioning
                             background: '#faf9f8',
-                            padding: '0 12px 0 8px', // More padding on right for filter icon, match data cell left padding
+                            padding: enableHeaderTextWrapping ? '8px 12px 8px 8px' : '0 12px 0 8px', // More vertical padding when wrapping
                             boxSizing: 'border-box', // Ensure consistent box model
                             overflow: 'hidden'
                         }}
@@ -1895,8 +1902,10 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                 fontWeight: 600,
                                 fontSize: `${headerTextSize}px`, // Apply custom header text size
                                 overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
+                                textOverflow: enableHeaderTextWrapping ? 'initial' : 'ellipsis',
+                                whiteSpace: enableHeaderTextWrapping ? 'normal' : 'nowrap',
+                                wordWrap: enableHeaderTextWrapping ? 'break-word' : 'normal',
+                                lineHeight: enableHeaderTextWrapping ? '1.2' : 'normal', // Tighter line height for wrapped text
                                 textAlign: column.headerHorizontalAligned === 'center' ? 'center' : 
                                           column.headerHorizontalAligned === 'end' ? 'right' : 'left' // Apply text alignment
                             }}

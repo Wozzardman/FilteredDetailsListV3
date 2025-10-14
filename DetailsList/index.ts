@@ -530,7 +530,8 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 formulaFieldExpression: context.parameters.FormulaFieldExpression?.raw || '',
                 onCancelChanges: this.handleCancelOperation,
                 headerTextSize: context.parameters.HeaderTextSize?.raw || 14,
-                columnTextSize: context.parameters.ColumnTextSize?.raw || 13
+                columnTextSize: context.parameters.ColumnTextSize?.raw || 13,
+                enableHeaderTextWrapping: context.parameters.EnableHeaderTextWrapping?.raw ?? false
             });
         }
 
@@ -1211,6 +1212,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             // Text size configuration from Power Apps properties
             headerTextSize: context.parameters.HeaderTextSize?.raw || 14,
             columnTextSize: context.parameters.ColumnTextSize?.raw || 13,
+            enableHeaderTextWrapping: context.parameters.EnableHeaderTextWrapping?.raw ?? false,
             
             // Row styling configuration
             alternateRowColor: context.parameters.AlternateRowColor?.raw || undefined,

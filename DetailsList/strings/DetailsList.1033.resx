@@ -380,6 +380,10 @@
     <value>Column text size</value>
     <comment>Controls the font size of column data</comment>
   </data>
+  <data name="EnableHeaderTextWrapping" xml:space="preserve">
+    <value>Enable header text wrapping</value>
+    <comment>When enabled, column header text will wrap when it doesn't fit in the column width</comment>
+  </data>
   <data name="EditedRecords" xml:space="preserve">
     <value>Edited records</value>
     <comment>JSON array of all edited records with changes</comment>
