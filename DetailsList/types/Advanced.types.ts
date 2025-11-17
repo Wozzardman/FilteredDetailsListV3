@@ -113,6 +113,7 @@ export interface IExportOptions {
     includeFilters: boolean;
     includeHeaders: boolean;
     customColumns?: string[];
+    customHeaders?: string[]; // Display names for headers
     maxRows?: number;
     fileName?: string;
     metadata?: {

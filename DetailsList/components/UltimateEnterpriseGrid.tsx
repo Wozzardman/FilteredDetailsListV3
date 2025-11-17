@@ -434,6 +434,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                 includeFilters: true,
                 includeHeaders: true,
                 customColumns: columns.map(col => col.fieldName || col.key),
+                customHeaders: columns.map(col => col.name || col.fieldName || col.key), // Use display names for headers
                 maxRows: filteredItems.length, // Export all filtered data
                 fileName: `enterprise-grid-export-${new Date().toISOString().slice(0, 10)}`,
                 metadata: {

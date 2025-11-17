@@ -180,6 +180,17 @@ export class DataExportService {
             skipHeader: options.includeHeaders === false,
         });
 
+        // Replace field names with display names in headers if provided
+        if (options.customHeaders && options.customHeaders.length > 0) {
+            const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+            options.customHeaders.forEach((displayName, index) => {
+                const cellAddress = XLSX.utils.encode_cell({ r: 0, c: index });
+                if (worksheet[cellAddress]) {
+                    worksheet[cellAddress].v = displayName;
+                }
+            });
+        }
+
         // Add data worksheet
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Data');
 
@@ -386,17 +397,41 @@ export class DataExportService {
         // Add auto-filter
         worksheet['!autofilter'] = { ref: range };
 
-        // Set column widths
-        const headers = getPCFKeys(data[0] || {}, options.customColumns);
-        worksheet['!cols'] = headers.map((header) => {
-            const maxLength = Math.max(
-                header.length,
+        // Get headers - use display names if available, otherwise use field names
+        const headers = options.customHeaders || options.customColumns || getPCFKeys(data[0] || {});
+        
+        // Style header row with background color and bold text
+        const decodedRange = XLSX.utils.decode_range(range);
+        for (let col = decodedRange.s.c; col <= decodedRange.e.c; col++) {
+            const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+            if (worksheet[cellAddress]) {
+                worksheet[cellAddress].s = {
+                    font: { bold: true, color: { rgb: "FFFFFF" } },
+                    fill: { fgColor: { rgb: "0078D4" } }, // Microsoft blue
+                    alignment: { horizontal: "center", vertical: "center" },
+                    border: {
+                        top: { style: "thin", color: { rgb: "000000" } },
+                        bottom: { style: "thin", color: { rgb: "000000" } },
+                        left: { style: "thin", color: { rgb: "000000" } },
+                        right: { style: "thin", color: { rgb: "000000" } }
+                    }
+                };
+            }
+        }
+
+        // Set column widths - calculate based on display names and content, then add extra space
+        worksheet['!cols'] = headers.map((header, index) => {
+            const fieldName = options.customColumns ? options.customColumns[index] : header;
+            const maxContentLength = Math.max(
+                header.length, // Use display name length
                 ...data.slice(0, 100).map((row) => {
-                    const value = getPCFValue(row, header);
+                    const value = getPCFValue(row, fieldName);
                     return value ? value.toString().length : 0;
                 }),
             );
-            return { width: Math.min(Math.max(maxLength + 2, 10), 50) };
+            // Add 20% extra width for padding, with min of 12 and max of 60
+            const calculatedWidth = maxContentLength * 1.2 + 2;
+            return { width: Math.min(Math.max(calculatedWidth, 12), 60) };
         });
     }
 
