@@ -1,6 +1,7 @@
 import { IExportOptions } from '../types/Advanced.types';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
+import * as ExcelJS from 'exceljs';
 const jsPDF = require('jspdf');
 const autoTable = require('jspdf-autotable');
 
@@ -158,67 +159,110 @@ export class DataExportService {
     }
 
     /**
-     * Export to Excel format
+     * Export to Excel format using ExcelJS for proper table support
      */
     private async exportToExcel(data: any[], filename: string, options: IExportOptions): Promise<void> {
-        // Convert PCF EntityRecords to plain objects for Excel compatibility
-        const plainData = data.map(row => {
-            const plainRow: any = {};
-            const headers = options.customColumns || getPCFKeys(row);
-            headers.forEach(header => {
-                plainRow[header] = getPCFValue(row, header);
+        const fieldNames = options.customColumns || getPCFKeys(data[0] || {});
+        const displayNames = options.customHeaders || fieldNames;
+        
+        // Create workbook and worksheet
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Data');
+
+        // Detect date columns
+        const dateColumns = new Set<number>();
+        fieldNames.forEach((fieldName, colIndex) => {
+            const sampleValues = data.slice(0, 10).map(row => getPCFValue(row, fieldName));
+            const isDateColumn = sampleValues.some(val => {
+                if (!val) return false;
+                if (val instanceof Date) return true;
+                const datePattern = /^\d{1,2}\/\d{1,2}\/\d{4}$/;
+                return typeof val === 'string' && datePattern.test(val);
             });
-            return plainRow;
+            if (isDateColumn) dateColumns.add(colIndex);
         });
 
-        // Create workbook
-        const workbook = XLSX.utils.book_new();
+        // Add header row
+        worksheet.addRow(displayNames);
 
-        // Create main data worksheet
-        const worksheet = XLSX.utils.json_to_sheet(plainData, {
-            header: options.customColumns || undefined,
-            skipHeader: options.includeHeaders === false,
+        // Add data rows
+        data.forEach(row => {
+            const rowData = fieldNames.map(fieldName => getPCFValue(row, fieldName));
+            worksheet.addRow(rowData);
         });
 
-        // Replace field names with display names in headers if provided
-        if (options.customHeaders && options.customHeaders.length > 0) {
-            const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
-            options.customHeaders.forEach((displayName, index) => {
-                const cellAddress = XLSX.utils.encode_cell({ r: 0, c: index });
-                if (worksheet[cellAddress]) {
-                    worksheet[cellAddress].v = displayName;
-                }
-            });
-        }
+        // Create Excel Table
+        worksheet.addTable({
+            name: 'DataTable',
+            ref: `A1:${this.getColumnLetter(displayNames.length)}${data.length + 1}`,
+            headerRow: true,
+            totalsRow: false,
+            style: {
+                theme: 'TableStyleLight9',
+                showRowStripes: true,
+            },
+            columns: displayNames.map(name => ({ name, filterButton: true })),
+            rows: data.map(row => fieldNames.map(fieldName => getPCFValue(row, fieldName)))
+        });
 
-        // Add data worksheet
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Data');
+        // Style header row
+        const headerRow = worksheet.getRow(1);
+        headerRow.font = { bold: true, color: { argb: 'FF000000' } }; // Black text
+        headerRow.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFE2EFDA' } // Light green
+        };
+        headerRow.alignment = { vertical: 'middle', horizontal: 'left' };
+        headerRow.border = {
+            top: { style: 'thin', color: { argb: 'FF000000' } },
+            bottom: { style: 'thin', color: { argb: 'FF000000' } },
+            left: { style: 'thin', color: { argb: 'FF000000' } },
+            right: { style: 'thin', color: { argb: 'FF000000' } }
+        };
 
-        // Add metadata worksheet if specified
-        if (options.metadata) {
-            const metadataSheet = this.createMetadataWorksheet(XLSX, options.metadata, plainData.length);
-            XLSX.utils.book_append_sheet(workbook, metadataSheet, 'Metadata');
-        }
-
-        // Add summary worksheet with statistics
-        const summarySheet = this.createSummaryWorksheet(XLSX, plainData, options);
-        XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
-
-        // Style the worksheets
-        this.styleExcelWorksheet(worksheet, plainData, options);
+        // Set column widths
+        worksheet.columns = displayNames.map((header, index) => {
+            const fieldName = fieldNames[index];
+            
+            // Date columns get fixed width
+            if (dateColumns.has(index)) {
+                return { width: 14 };
+            }
+            
+            // Calculate width for other columns
+            const maxContentLength = Math.max(
+                header.length,
+                ...data.slice(0, 100).map(row => {
+                    const value = getPCFValue(row, fieldName);
+                    return value ? value.toString().length : 0;
+                })
+            );
+            const calculatedWidth = maxContentLength * 1.2 + 2;
+            return { width: Math.min(Math.max(calculatedWidth, 12), 50) };
+        });
 
         // Generate and save file
-        const excelBuffer = XLSX.write(workbook, {
-            bookType: 'xlsx',
-            type: 'array',
-            cellStyles: true,
-        });
-
-        const blob = new Blob([excelBuffer], {
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], {
             type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         });
 
         saveAs(blob, this.ensureFileExtension(filename, 'xlsx'));
+    }
+
+    /**
+     * Get Excel column letter from index (0=A, 1=B, etc.)
+     */
+    private getColumnLetter(columnIndex: number): string {
+        let temp: number;
+        let letter = '';
+        while (columnIndex > 0) {
+            temp = (columnIndex - 1) % 26;
+            letter = String.fromCharCode(temp + 65) + letter;
+            columnIndex = (columnIndex - temp - 1) / 26;
+        }
+        return letter;
     }
 
     /**
@@ -394,21 +438,32 @@ export class DataExportService {
         const range = worksheet['!ref'];
         if (!range) return;
 
-        // Add auto-filter
-        worksheet['!autofilter'] = { ref: range };
-
-        // Get headers - use display names if available, otherwise use field names
-        const headers = options.customHeaders || options.customColumns || getPCFKeys(data[0] || {});
-        
-        // Style header row with background color and bold text
         const decodedRange = XLSX.utils.decode_range(range);
+        const fieldNames = options.customColumns || getPCFKeys(data[0] || {});
+        const displayNames = options.customHeaders || fieldNames;
+        
+        // Detect date columns by checking first few rows
+        const dateColumns = new Set<number>();
+        fieldNames.forEach((fieldName, colIndex) => {
+            const sampleValues = data.slice(0, 10).map(row => getPCFValue(row, fieldName));
+            const isDateColumn = sampleValues.some(val => {
+                if (!val) return false;
+                // Check if it's a date string or Date object
+                if (val instanceof Date) return true;
+                const datePattern = /^\d{1,2}\/\d{1,2}\/\d{4}$/; // MM/DD/YYYY format
+                return typeof val === 'string' && datePattern.test(val);
+            });
+            if (isDateColumn) dateColumns.add(colIndex);
+        });
+
+        // Style header row with light green background and bold black text
         for (let col = decodedRange.s.c; col <= decodedRange.e.c; col++) {
             const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
             if (worksheet[cellAddress]) {
                 worksheet[cellAddress].s = {
-                    font: { bold: true, color: { rgb: "FFFFFF" } },
-                    fill: { fgColor: { rgb: "0078D4" } }, // Microsoft blue
-                    alignment: { horizontal: "center", vertical: "center" },
+                    font: { bold: true, color: { rgb: "000000" } }, // Black text
+                    fill: { fgColor: { rgb: "E2EFDA" } }, // Light green like Excel example
+                    alignment: { horizontal: "left", vertical: "center" },
                     border: {
                         top: { style: "thin", color: { rgb: "000000" } },
                         bottom: { style: "thin", color: { rgb: "000000" } },
@@ -419,19 +474,44 @@ export class DataExportService {
             }
         }
 
-        // Set column widths - calculate based on display names and content, then add extra space
-        worksheet['!cols'] = headers.map((header, index) => {
-            const fieldName = options.customColumns ? options.customColumns[index] : header;
+        // Create Excel Table
+        const tableRef = `A1:${XLSX.utils.encode_col(decodedRange.e.c)}${decodedRange.e.r + 1}`;
+        worksheet['!autofilter'] = { ref: tableRef };
+        
+        // Add table definition for proper Excel table
+        if (!worksheet['!tables']) worksheet['!tables'] = [];
+        worksheet['!tables'].push({
+            ref: tableRef,
+            name: 'DataTable',
+            displayName: 'DataTable',
+            headerRowCount: 1,
+            totalsRowCount: 0,
+            style: {
+                theme: 'TableStyleLight9',
+                showRowStripes: true
+            }
+        });
+
+        // Set column widths - special handling for date columns
+        worksheet['!cols'] = displayNames.map((header, index) => {
+            const fieldName = fieldNames[index];
+            
+            // Date columns get fixed width of 14
+            if (dateColumns.has(index)) {
+                return { width: 14 };
+            }
+            
+            // Regular columns - calculate based on content
             const maxContentLength = Math.max(
-                header.length, // Use display name length
+                header.length,
                 ...data.slice(0, 100).map((row) => {
                     const value = getPCFValue(row, fieldName);
                     return value ? value.toString().length : 0;
                 }),
             );
-            // Add 20% extra width for padding, with min of 12 and max of 60
+            // Add 20% extra width for padding, with min of 12 and max of 50
             const calculatedWidth = maxContentLength * 1.2 + 2;
-            return { width: Math.min(Math.max(calculatedWidth, 12), 60) };
+            return { width: Math.min(Math.max(calculatedWidth, 12), 50) };
         });
     }
 

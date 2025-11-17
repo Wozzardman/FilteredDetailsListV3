@@ -1,6 +1,6 @@
 {
   "name": "powerapps-filtered-detailslist",
-  "version": "17.4.6",
+  "version": "17.4.9",
   "description": "Enterprise-grade PowerApps Component Framework (PCF) control with advanced filtering, virtualization, and industry-leading performance.",
   "author": "Josh VanTimmeren",
   "keywords": [
@@ -46,6 +46,7 @@
     "@tanstack/react-virtual": "^3.13.12",
     "comlink": "^4.4.2",
     "date-fns": "^2.30.0",
+    "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
     "immer": "^10.1.1",
     "jspdf": "^2.5.2",
@@ -68,6 +69,7 @@
     "@types/conventional-commits-parser": "^5.0.1",
     "@types/enzyme": "^3.10.11",
     "@types/enzyme-adapter-react-16": "^1.0.6",
+    "@types/exceljs": "^0.5.3",
     "@types/file-saver": "^2.0.7",
     "@types/geojson": "^7946.0.16",
     "@types/jest": "^27.4.0",
