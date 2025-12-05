@@ -73,6 +73,8 @@ export const enum InputEvents {
     SetFocusOnRowSetSelection = 'SetFocusOnRowSetSelection',
     ClearSelection = 'ClearSelection',
     SetSelection = 'SetSelection',
+    SelectRowById = 'SelectRowById',
+    SelectRows = 'SelectRows',
     SetFocusOnHeader = 'SetFocusOnHeader',
     LoadNextPage = 'LoadNextPage',
     LoadPreviousPage = 'LoadPreviousPage',

@@ -1702,23 +1702,83 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     }
 
     private handleInputEvents(context: ComponentFramework.Context<IInputs>) {
-        // Input events removed - no longer supported
-        return;
+        // Get the input event value
+        const inputEvent = context.parameters.InputEvent?.raw;
+        
+        // Only process if there's an actual input event
+        if (!inputEvent || inputEvent === this.inputEvent) {
+            return;
+        }
+        
+        // Store the current event to prevent re-processing
+        this.inputEvent = inputEvent;
+        
+        // Handle different event types
+        this.handleSelectionEvents(inputEvent);
+        this.handleFocusEvents(inputEvent);
+        this.handlePagingEvents(inputEvent);
     }
 
     private handleSelectionEvents(inputEvent: string) {
         // Clear the selection if required, before setting the focus
         if (inputEvent.indexOf(InputEvents.ClearSelection) > -1) {
             this.asyncOperations(() => {
+                // Clear both legacy selection and modern SelectionManager
                 this.selection.setAllSelected(false);
+                if (this.isSelectionMode) {
+                    this.selectionManager.clearAll();
+                }
                 this.ref && this.ref.forceUpdate();
+                console.log('✅ Selection cleared via InputEvent');
             });
         } else if (inputEvent.indexOf(InputEvents.SetSelection) > -1) {
             this.asyncOperations(() => {
                 // set the default selection
                 this.setSelected();
                 this.ref && this.ref.forceUpdate();
+                console.log('✅ Selection set from dataset via InputEvent');
             });
+        } else if (inputEvent.indexOf(InputEvents.SelectRowById) > -1) {
+            // Format: SelectRowById:<recordId>[:<additive>]
+            // Example: SelectRowById:guid123 or SelectRowById:guid123:true
+            const parts = inputEvent.split(':');
+            if (parts.length >= 2) {
+                const recordId = parts[1];
+                const additive = parts.length > 2 && parts[2] === 'true';
+                
+                this.asyncOperations(() => {
+                    if (this.isSelectionMode && recordId) {
+                        if (!additive) {
+                            // Clear existing selection unless additive mode
+                            this.selectionManager.clearAll();
+                        }
+                        // Select the specified row
+                        this.selectionManager.setItemSelection(recordId, true);
+                        console.log(`✅ Row selected via InputEvent: ${recordId} (additive: ${additive})`);
+                    }
+                    this.ref && this.ref.forceUpdate();
+                });
+            }
+        } else if (inputEvent.indexOf(InputEvents.SelectRows) > -1) {
+            // Format: SelectRows:<recordId1>,<recordId2>,<recordId3>
+            // Example: SelectRows:guid1,guid2,guid3
+            const parts = inputEvent.split(':');
+            if (parts.length >= 2) {
+                const recordIds = parts[1].split(',').filter(id => id.trim());
+                
+                this.asyncOperations(() => {
+                    if (this.isSelectionMode && recordIds.length > 0) {
+                        // Clear existing selection
+                        this.selectionManager.clearAll();
+                        // Select all specified rows
+                        recordIds.forEach(recordId => {
+                            this.selectionManager.setItemSelection(recordId.trim(), true);
+                        });
+                        console.log(`✅ Rows selected via InputEvent: ${recordIds.length} rows`);
+                    }
+                    this.ref && this.ref.forceUpdate();
+                });
+            }
         }
     }
 
