@@ -117,7 +117,16 @@ export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.React
 
     private shouldUseVirtualization(): boolean {
         // Enable virtualization for datasets > 1000 items or mobile devices
-        const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        // iOS WebView Safety: Safely access navigator.userAgent
+        let isMobile = false;
+        try {
+            if (typeof navigator !== 'undefined' && navigator !== null && navigator.userAgent) {
+                isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            }
+        } catch (e) {
+            // Default to false if navigator is not accessible
+        }
+        
         const hasLargeDataset = this.context.parameters.records.paging.totalResultCount > 1000;
 
         return hasLargeDataset || isMobile;

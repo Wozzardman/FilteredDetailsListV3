@@ -54,7 +54,8 @@ export class EnterpriseChangeManager {
     private committedChanges: IChangeRecord[] = [];
     private config: Required<IChangeManagerConfig>;
     private callbacks: IChangeManagerCallbacks;
-    private autoCommitTimer?: NodeJS.Timeout;
+    // iOS WebView Safety: Use ReturnType instead of NodeJS.Timeout which is not valid in browser
+    private autoCommitTimer?: ReturnType<typeof setTimeout>;
 
     constructor(config: IChangeManagerConfig = {}, callbacks: IChangeManagerCallbacks = {}) {
         this.config = {

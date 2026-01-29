@@ -54,21 +54,77 @@ export class PerformanceMonitor {
     }
 
     private initializeWebVitals() {
-        if (typeof PerformanceObserver !== 'undefined') {
+        // iOS WebView safety: PerformanceObserver may not support all entry types
+        // and can crash on iOS Power Apps mobile app if not handled properly
+        if (typeof PerformanceObserver === 'undefined') {
+            return;
+        }
+
+        try {
             this.observer = new PerformanceObserver((list) => {
-                const entries = list.getEntries();
-                entries.forEach((entry) => {
-                    this.processPerformanceEntry(entry);
-                });
+                try {
+                    const entries = list.getEntries();
+                    entries.forEach((entry) => {
+                        this.processPerformanceEntry(entry);
+                    });
+                } catch (e) {
+                    // Silently ignore processing errors on mobile
+                }
             });
 
-            this.observer.observe({
-                entryTypes: ['paint', 'largest-contentful-paint', 'first-input', 'layout-shift', 'measure'],
-            });
+            // Use only the most universally supported entry types
+            // 'paint' and 'measure' are widely supported
+            // Avoid 'largest-contentful-paint', 'first-input', 'layout-shift' which can crash iOS WebView
+            const supportedEntryTypes = this.getSafeEntryTypes();
+            
+            if (supportedEntryTypes.length > 0) {
+                this.observer.observe({
+                    entryTypes: supportedEntryTypes,
+                });
+            }
+        } catch (error) {
+            // PerformanceObserver may fail on iOS Power Apps WebView - fail silently
+            console.warn('PerformanceObserver initialization failed (likely iOS WebView):', error);
+            this.observer = null;
         }
     }
 
+    /**
+     * Get safe entry types that work on iOS WebView/Power Apps mobile
+     * iOS Safari/WebView has limited PerformanceObserver support
+     */
+    private getSafeEntryTypes(): string[] {
+        const safeTypes: string[] = [];
+        
+        // Only use entry types that are definitely supported
+        // 'measure' is widely supported across all platforms
+        try {
+            if (typeof PerformanceObserver !== 'undefined' && PerformanceObserver.supportedEntryTypes) {
+                const supported = PerformanceObserver.supportedEntryTypes;
+                // Only include universally safe types
+                if (supported.includes('measure')) safeTypes.push('measure');
+                if (supported.includes('mark')) safeTypes.push('mark');
+                // 'paint' is generally safe but check anyway
+                if (supported.includes('paint')) safeTypes.push('paint');
+            } else {
+                // Fallback: only use 'measure' which is universally supported
+                safeTypes.push('measure');
+            }
+        } catch (e) {
+            // If checking supported types fails, use minimal safe set
+            safeTypes.push('measure');
+        }
+        
+        return safeTypes;
+    }
+
     private initializeFrameRateMonitor() {
+        // Mobile-safe: Check if performance.now is available
+        if (typeof performance === 'undefined' || typeof performance.now !== 'function') {
+            console.warn('Performance API not available, skipping frame rate monitoring');
+            return;
+        }
+        
         let lastTime = performance.now();
         let frameCount = 0;
 
@@ -91,20 +147,45 @@ export class PerformanceMonitor {
     }
 
     private initializeMemoryMonitor() {
+        // Mobile-safe: performance.memory is NOT available on iOS Safari/WebView
+        // Only available in Chrome/Edge desktop
+        if (typeof performance === 'undefined') {
+            return;
+        }
+        
         this.memoryMonitor = window.setInterval(() => {
-            if ('memory' in performance) {
-                const memory = (performance as any).memory;
-                const memoryUsage = memory.usedJSHeapSize / memory.totalJSHeapSize;
-                this.recordMetric('memoryUsage', memoryUsage);
+            try {
+                if ('memory' in performance && (performance as any).memory) {
+                    const memory = (performance as any).memory;
+                    if (memory.usedJSHeapSize && memory.totalJSHeapSize) {
+                        const memoryUsage = memory.usedJSHeapSize / memory.totalJSHeapSize;
+                        this.recordMetric('memoryUsage', memoryUsage);
+                    }
+                }
+            } catch (error) {
+                // Silently fail on unsupported platforms (iOS)
+                console.warn('Memory monitoring not supported on this platform');
+                if (this.memoryMonitor) {
+                    clearInterval(this.memoryMonitor);
+                    this.memoryMonitor = null;
+                }
             }
         }, 5000) as any; // Every 5 seconds
     }
 
     private initializeCustomMarks() {
         // Custom performance marks for component lifecycle
-        window.addEventListener('beforeunload', () => {
-            this.generatePerformanceReport();
-        });
+        // Use 'pagehide' instead of 'beforeunload' - beforeunload is blocked by Permissions Policy
+        // in modern browsers and iOS WebView (causes crash)
+        try {
+            if (typeof window !== 'undefined' && window.addEventListener) {
+                window.addEventListener('pagehide', () => {
+                    this.generatePerformanceReport();
+                });
+            }
+        } catch (e) {
+            // Silently fail if event listener cannot be added
+        }
     }
 
     public startMeasure(name: string): () => void {

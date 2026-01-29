@@ -135,8 +135,10 @@ export const EnterpriseGridIntegration: React.FC<EnterpriseGridIntegrationProps>
     // Initialize performance monitoring
     useEffect(() => {
         if (enablePerformanceMonitoring) {
+            // Mobile-safe performance helper
+            const safeNow = () => typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
             // Simplified performance monitoring without constructor issues
-            const startTime = performance.now();
+            const startTime = safeNow();
 
             // Set up alert listeners (simplified for compatibility)
             const alertListener = (alert: PerformanceAlert) => {
@@ -146,7 +148,7 @@ export const EnterpriseGridIntegration: React.FC<EnterpriseGridIntegrationProps>
 
             // Basic performance checking
             const checkPerformance = () => {
-                const currentTime = performance.now();
+                const currentTime = safeNow();
                 const renderTime = currentTime - startTime;
 
                 // Check render time (simplified)
@@ -176,7 +178,8 @@ export const EnterpriseGridIntegration: React.FC<EnterpriseGridIntegrationProps>
         console.log('🧪 Enterprise Test Mode Enabled - Generating test data...');
         setIsLoading(true);
 
-        const startTime = performance.now();
+        const safeNow = () => typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
+        const startTime = safeNow();
 
         try {
             if (!testDataGenerator.current) {
@@ -202,7 +205,7 @@ export const EnterpriseGridIntegration: React.FC<EnterpriseGridIntegrationProps>
                 testColumns = createTestColumns(columnCounts[testDataSize]);
             }
 
-            const loadTime = performance.now() - startTime;
+            const loadTime = safeNow() - startTime;
             const memoryEstimate = testDataGenerator.current.estimateMemoryUsage(testItems.length, testColumns.length);
 
             const metrics: DataLoadMetrics = {

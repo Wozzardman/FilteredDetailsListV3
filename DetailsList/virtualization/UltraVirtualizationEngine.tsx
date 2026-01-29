@@ -370,10 +370,11 @@ export const UltraVirtualizedGrid: React.FC<UltraVirtualizedGridProps> = ({
     React.useEffect(() => {
         if (!enablePerformanceMonitoring) return;
 
-        const startTime = performance.now();
+        const safeNow = () => typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
+        const startTime = safeNow();
         
         const updatePerformance = () => {
-            const now = performance.now();
+            const now = safeNow();
             const renderTime = now - startTime;
             
             performanceRef.current = {

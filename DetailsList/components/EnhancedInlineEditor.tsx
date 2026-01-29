@@ -270,10 +270,20 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
             console.log(`📋 Dependencies found for ${column.key}:`, dependentFields);
 
             if (dependentFields && dependentFields.length > 0) {
+                // iOS WebView Safety: Safely access global data sources
+                let globalDataSources = {};
+                try {
+                    if (typeof window !== 'undefined' && window !== null) {
+                        globalDataSources = (window as any).PowerAppsDataSources || {};
+                    }
+                } catch (e) {
+                    // Ignore window access errors on restricted iOS WebView
+                }
+                
                 const context = {
                     currentValues: { ...allColumns, [column.key]: valueToUse },
                     isNewRecord: !item || Object.keys(item).every(key => !item[key]),
-                    globalDataSources: (window as any).PowerAppsDataSources || {}
+                    globalDataSources: globalDataSources
                 };
 
                 console.log(`🔍 Processing conditional logic for ${column.key} = ${valueToUse}`);

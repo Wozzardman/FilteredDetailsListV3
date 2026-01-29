@@ -20,7 +20,8 @@ export class SelectionManager {
     private selectedItems: Set<string> = new Set();
     private totalItems: string[] = [];
     private listeners: ((state: SelectionState) => void)[] = [];
-    private debounceTimer: NodeJS.Timeout | null = null;
+    // iOS WebView Safety: Use ReturnType instead of NodeJS.Timeout which is not valid in browser
+    private debounceTimer: ReturnType<typeof setTimeout> | null = null;
     private pendingNotification = false;
     private performanceThreshold = 500; // Debounce threshold for large datasets
     

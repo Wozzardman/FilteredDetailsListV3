@@ -13,12 +13,22 @@ import { PowerAppsFxColumnEditorParser } from './services/PowerAppsFxColumnEdito
 import { SelectionManager, SelectionState } from './services/SelectionManager';
 
 // Initialize global data source registry for conditional lookups
-if (typeof window !== 'undefined') {
-    (window as any).PowerAppsDataSources = (window as any).PowerAppsDataSources || {};
-    (window as any).registerPowerAppsDataSource = (name: string, data: any) => {
-        (window as any).PowerAppsDataSources[name] = data;
-        console.log(`📊 Registered data source: ${name}`, data);
-    };
+// iOS WebView Safety: Wrap in try-catch to prevent crashes on restricted iOS environments
+try {
+    if (typeof window !== 'undefined' && window !== null) {
+        (window as any).PowerAppsDataSources = (window as any).PowerAppsDataSources || {};
+        (window as any).registerPowerAppsDataSource = (name: string, data: any) => {
+            try {
+                (window as any).PowerAppsDataSources[name] = data;
+                console.log(`📊 Registered data source: ${name}`, data);
+            } catch (e) {
+                // Silently fail on restricted iOS WebView environments
+            }
+        };
+    }
+} catch (e) {
+    // Global window initialization failed (possibly restricted iOS WebView)
+    // This is non-critical - conditional lookups will use fallback behavior
 }
 
 type DataSet = ComponentFramework.PropertyHelper.DataSetApi.EntityRecord & IObjectWithKey;
@@ -3160,7 +3170,8 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             }
 
             // Performance optimization: Use SelectionManager's optimized batch operations
-            const performanceStart = performance.now();
+            const safeNow = () => typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
+            const performanceStart = safeNow();
             
             const stats = this.selectionManager.getSelectionStats();
             console.log(`🚀 Select All using performance-optimized SelectionManager - Current stats:`, stats);
@@ -3168,7 +3179,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             // Use SelectionManager's built-in performance optimization for large datasets
             this.selectionManager.toggleSelectAll();
             
-            const performanceEnd = performance.now();
+            const performanceEnd = safeNow();
             console.log(`🔄 Select all completed in ${(performanceEnd - performanceStart).toFixed(2)}ms using SelectionManager`);
         } catch (error) {
             console.error('❌ Error in handleSelectAll:', error);

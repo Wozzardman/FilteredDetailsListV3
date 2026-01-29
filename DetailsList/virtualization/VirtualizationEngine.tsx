@@ -14,10 +14,15 @@ export class PerformanceMetrics {
     private memoryUsage: number[] = [];
 
     startMeasurement(): { end: () => number } {
-        const start = performance.now();
+        // Mobile-safe: Check if performance.now is available
+        const safeNow = () => (typeof performance !== 'undefined' && typeof performance.now === 'function')
+            ? performance.now()
+            : Date.now();
+        
+        const start = safeNow();
         return {
             end: () => {
-                const duration = performance.now() - start;
+                const duration = safeNow() - start;
                 this.renderTimes.push(duration);
                 if (this.renderTimes.length > 100) {
                     this.renderTimes = this.renderTimes.slice(-50);

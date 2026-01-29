@@ -11,6 +11,13 @@ import {
     IAggregationConfig,
 } from '../types/Advanced.types';
 
+// Mobile-safe performance.now() helper
+const safeNow = (): number => {
+    return typeof performance !== 'undefined' && typeof performance.now === 'function'
+        ? performance.now()
+        : Date.now();
+};
+
 // Main Grid Store Interface
 interface IGridStore {
     // Data State
@@ -135,7 +142,7 @@ export const useGridStore = create<IGridStore>()(
 
         // Data Actions
         setData: (data: any[]) => {
-            const startTime = performance.now();
+            const startTime = safeNow();
 
             set((state) => ({
                 originalData: data,
@@ -150,7 +157,7 @@ export const useGridStore = create<IGridStore>()(
                 performance: {
                     ...state.performance,
                     dataSize: data.length,
-                    renderTime: performance.now() - startTime,
+                    renderTime: safeNow() - startTime,
                     timestamp: new Date(),
                 },
             }));
@@ -161,7 +168,7 @@ export const useGridStore = create<IGridStore>()(
 
         // Filter Actions
         applyFilter: (columnName: string, filter: any) => {
-            const startTime = performance.now();
+            const startTime = safeNow();
 
             set((state) => {
                 const newFilters = { ...state.filters, [columnName]: filter };
@@ -180,7 +187,7 @@ export const useGridStore = create<IGridStore>()(
                     },
                     performance: {
                         ...state.performance,
-                        filterTime: performance.now() - startTime,
+                        filterTime: safeNow() - startTime,
                         timestamp: new Date(),
                     },
                 };
@@ -190,7 +197,7 @@ export const useGridStore = create<IGridStore>()(
         },
 
         applyAdvancedFilter: (filter: IAdvancedFilter) => {
-            const startTime = performance.now();
+            const startTime = safeNow();
 
             set((state) => {
                 const newAdvancedFilters = [...state.advancedFilters, filter];
@@ -209,7 +216,7 @@ export const useGridStore = create<IGridStore>()(
                     },
                     performance: {
                         ...state.performance,
-                        filterTime: performance.now() - startTime,
+                        filterTime: safeNow() - startTime,
                         timestamp: new Date(),
                     },
                 };

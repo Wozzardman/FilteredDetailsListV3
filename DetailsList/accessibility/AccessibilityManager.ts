@@ -57,9 +57,17 @@ export class AccessibilityManager {
             ...config,
         };
 
-        this.initializeAccessibility();
-        this.setupMediaQueries();
-        this.registerDefaultShortcuts();
+        // iOS WebView Safety: Wrap all DOM/window operations in try-catch
+        try {
+            if (typeof document !== 'undefined' && typeof window !== 'undefined') {
+                this.initializeAccessibility();
+                this.setupMediaQueries();
+                this.registerDefaultShortcuts();
+            }
+        } catch (e) {
+            // Silently fail on restricted environments (iOS Power Apps WebView)
+            console.warn('Accessibility features limited in this environment');
+        }
     }
 
     private initializeAccessibility() {

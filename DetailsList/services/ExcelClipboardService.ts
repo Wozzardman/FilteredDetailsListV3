@@ -39,33 +39,44 @@ export class ExcelClipboardService {
 
     /**
      * Copy data to clipboard in Excel-compatible format
-     * Power Apps-compatible implementation
+     * Power Apps-compatible implementation with iOS WebView safety
      */
     public async copyToClipboard(data: any[], columns: any[], includeHeaders: boolean = true): Promise<boolean> {
         try {
-            // Check if modern clipboard API is available and not blocked
-            if (navigator.clipboard && navigator.clipboard.write && this.isClipboardAPIAllowed()) {
+            // iOS WebView Safety: ClipboardItem is NOT supported on iOS Safari/WebView
+            // This can cause crashes on iOS Power Apps mobile app
+            // Check for ClipboardItem constructor availability before using it
+            const hasClipboardItem = typeof ClipboardItem !== 'undefined';
+            
+            // Check if modern clipboard API is available, not blocked, and ClipboardItem is supported
+            if (hasClipboardItem && navigator.clipboard && navigator.clipboard.write && this.isClipboardAPIAllowed()) {
                 const clipboardData = this.prepareClipboardData(data, columns, includeHeaders);
                 
-                const clipboardItems = [];
-                
-                // Add HTML format (for Excel rich formatting)
-                if (clipboardData.html) {
-                    clipboardItems.push(new ClipboardItem({
-                        'text/html': new Blob([clipboardData.html], { type: 'text/html' })
-                    }));
-                }
-                
-                // Add plain text (TSV format for Excel compatibility)
-                if (clipboardData.text) {
-                    clipboardItems.push(new ClipboardItem({
-                        'text/plain': new Blob([clipboardData.text], { type: 'text/plain' })
-                    }));
-                }
+                try {
+                    const clipboardItems = [];
+                    
+                    // Add HTML format (for Excel rich formatting)
+                    if (clipboardData.html) {
+                        clipboardItems.push(new ClipboardItem({
+                            'text/html': new Blob([clipboardData.html], { type: 'text/html' })
+                        }));
+                    }
+                    
+                    // Add plain text (TSV format for Excel compatibility)
+                    if (clipboardData.text) {
+                        clipboardItems.push(new ClipboardItem({
+                            'text/plain': new Blob([clipboardData.text], { type: 'text/plain' })
+                        }));
+                    }
 
-                await navigator.clipboard.write(clipboardItems);
-                console.log('📋 Data copied to clipboard with Excel formatting');
-                return true;
+                    await navigator.clipboard.write(clipboardItems);
+                    console.log('📋 Data copied to clipboard with Excel formatting');
+                    return true;
+                } catch (clipboardError) {
+                    // ClipboardItem may fail on iOS even if it exists - fallback to legacy
+                    console.warn('ClipboardItem failed (likely iOS WebView), using fallback:', clipboardError);
+                    return this.copyToClipboardLegacy(data, columns, includeHeaders);
+                }
             } else {
                 console.warn('Modern Clipboard API not available in Power Apps context, using fallback');
                 return this.copyToClipboardLegacy(data, columns, includeHeaders);
@@ -94,19 +105,45 @@ export class ExcelClipboardService {
 
     /**
      * Detect if running in Power Apps context where some APIs are restricted
+     * iOS WebView Safety: All checks are wrapped in try-catch
      */
     private isPowerAppsContext(): boolean {
         try {
+            // iOS WebView Safety: Check for window and document availability
+            if (typeof window === 'undefined' || window === null) {
+                return true; // Assume restricted context if window is not available
+            }
+            
+            if (typeof document === 'undefined' || document === null) {
+                return true; // Assume restricted context if document is not available
+            }
+            
             // Check for Power Apps specific indicators
-            return !!(
+            const hasPowerAppsWindow = !!(
                 (window as any).PowerApps ||
-                (window as any).PowerAppsPortal ||
-                document.querySelector('.PowerAppsPortal') ||
-                document.querySelector('[data-control-name]') ||
-                navigator.userAgent.includes('PowerApps')
+                (window as any).PowerAppsPortal
             );
+            
+            // Safely check for DOM elements
+            let hasPowerAppsDom = false;
+            try {
+                hasPowerAppsDom = !!(
+                    document.querySelector('.PowerAppsPortal') ||
+                    document.querySelector('[data-control-name]')
+                );
+            } catch (e) {
+                // DOM query failed - assume Power Apps context
+                hasPowerAppsDom = true;
+            }
+            
+            // Check user agent
+            const isPowerAppsUserAgent = typeof navigator !== 'undefined' && 
+                                          typeof navigator.userAgent === 'string' && 
+                                          navigator.userAgent.includes('PowerApps');
+            
+            return hasPowerAppsWindow || hasPowerAppsDom || isPowerAppsUserAgent;
         } catch {
-            return false;
+            return true; // Assume restricted context on any error
         }
     }
 

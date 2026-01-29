@@ -424,20 +424,45 @@ export const DataQualityPlugin = PluginBuilder.create('data-quality', '1.0.0')
 export const PerformanceMonitorPlugin = PluginBuilder.create('performance-monitor', '1.0.0')
     .description('Monitors and displays performance metrics')
     .hook('beforeRender', (props: any) => {
-        (window as any).__gridRenderStart = performance.now();
+        const safeNow = () => typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
+        // iOS WebView Safety: Wrap window access in try-catch
+        try {
+            if (typeof window !== 'undefined' && window !== null) {
+                (window as any).__gridRenderStart = safeNow();
+            }
+        } catch (e) {
+            // Ignore window access errors on restricted iOS WebView
+        }
         return props;
     })
     .hook('afterRender', (element: HTMLElement) => {
-        const renderTime = performance.now() - (window as any).__gridRenderStart;
-        console.log(`Render time: ${renderTime.toFixed(2)}ms`);
+        const safeNow = () => typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
+        // iOS WebView Safety: Wrap window access in try-catch
+        try {
+            if (typeof window !== 'undefined' && window !== null) {
+                const renderTime = safeNow() - ((window as any).__gridRenderStart || safeNow());
+                console.log(`Render time: ${renderTime.toFixed(2)}ms`);
+            }
+        } catch (e) {
+            // Ignore window access errors on restricted iOS WebView
+        }
     })
-    .component('toolbar', ({ context }: { context: any }) =>
-        React.createElement(
+    .component('toolbar', ({ context }: { context: any }) => {
+        // iOS WebView Safety: Safely access render time from window
+        let renderTime = 0;
+        try {
+            if (typeof window !== 'undefined' && window !== null) {
+                renderTime = (window as any).__lastRenderTime || 0;
+            }
+        } catch (e) {
+            // Ignore window access errors on restricted iOS WebView
+        }
+        return React.createElement(
             'div',
             { className: 'performance-badge' },
-            React.createElement('span', {}, `⚡ ${(window as any).__lastRenderTime || 0}ms`),
-        ),
-    )
+            React.createElement('span', {}, `⚡ ${renderTime}ms`),
+        );
+    })
     .build();
 
 /**
@@ -471,38 +496,52 @@ export const ExportEnhancementPlugin = PluginBuilder.create('export-enhancement'
 export const KeyboardShortcutsPlugin = PluginBuilder.create('keyboard-shortcuts', '1.0.0')
     .description('Provides keyboard shortcuts and navigation')
     .init((context: IGridContext) => {
-        const handleKeyDown = (event: KeyboardEvent) => {
-            switch (event.key) {
-                case 'f':
-                    if (event.ctrlKey) {
-                        event.preventDefault();
-                        // Open filter dialog
-                        console.log('Open filter dialog');
-                    }
-                    break;
-                case 'e':
-                    if (event.ctrlKey) {
-                        event.preventDefault();
-                        // Open export dialog
-                        console.log('Open export dialog');
-                    }
-                    break;
-                case 'a':
-                    if (event.ctrlKey) {
-                        event.preventDefault();
-                        // Select all rows
-                        console.log('Select all rows');
-                    }
-                    break;
+        // iOS WebView Safety: Wrap document access in try-catch
+        try {
+            if (typeof document === 'undefined' || document === null) {
+                return;
             }
-        };
+            
+            const handleKeyDown = (event: KeyboardEvent) => {
+                switch (event.key) {
+                    case 'f':
+                        if (event.ctrlKey) {
+                            event.preventDefault();
+                            // Open filter dialog
+                            console.log('Open filter dialog');
+                        }
+                        break;
+                    case 'e':
+                        if (event.ctrlKey) {
+                            event.preventDefault();
+                            // Open export dialog
+                            console.log('Open export dialog');
+                        }
+                        break;
+                    case 'a':
+                        if (event.ctrlKey) {
+                            event.preventDefault();
+                            // Select all rows
+                            console.log('Select all rows');
+                        }
+                        break;
+                }
+            };
 
-        document.addEventListener('keydown', handleKeyDown);
-        (context as any).__keyboardHandler = handleKeyDown;
+            document.addEventListener('keydown', handleKeyDown);
+            (context as any).__keyboardHandler = handleKeyDown;
+        } catch (e) {
+            // Ignore document access errors on restricted iOS WebView
+        }
     })
     .destroy(() => {
-        if ((window as any).__keyboardHandler) {
-            document.removeEventListener('keydown', (window as any).__keyboardHandler);
+        // iOS WebView Safety: Wrap window/document access in try-catch
+        try {
+            if (typeof window !== 'undefined' && window !== null && (window as any).__keyboardHandler) {
+                document.removeEventListener('keydown', (window as any).__keyboardHandler);
+            }
+        } catch (e) {
+            // Ignore window access errors on restricted iOS WebView
         }
     })
     .build();

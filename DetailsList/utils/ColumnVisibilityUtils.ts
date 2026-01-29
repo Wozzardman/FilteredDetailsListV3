@@ -3,6 +3,13 @@
  * Optimized for enterprise-grade performance with 0ms overhead
  */
 
+// Mobile-safe performance.now() helper
+const safeNow = (): number => {
+    return typeof performance !== 'undefined' && typeof performance.now === 'function'
+        ? performance.now()
+        : Date.now();
+};
+
 export interface ColumnVisibilityState {
     [columnKey: string]: boolean;
 }
@@ -27,7 +34,7 @@ export class ColumnVisibilityManager {
     public filterVisibleColumns<T extends { key?: string; fieldName?: string; isVisible?: boolean }>(
         columns: T[]
     ): T[] {
-        const now = performance.now();
+        const now = safeNow();
         
         // Lightning-fast filtering using direct isVisible property check
         const result: T[] = [];
@@ -52,7 +59,7 @@ export class ColumnVisibilityManager {
         Object.entries(visibilityUpdates).forEach(([columnKey, isVisible]) => {
             this.visibilityCache.set(columnKey, isVisible);
         });
-        this.lastCacheUpdate = performance.now();
+        this.lastCacheUpdate = safeNow();
     }
 
     /**
@@ -99,7 +106,7 @@ export class ColumnVisibilityManager {
         return {
             cacheSize: this.visibilityCache.size,
             lastUpdate: this.lastCacheUpdate,
-            cacheAge: performance.now() - this.lastCacheUpdate
+            cacheAge: safeNow() - this.lastCacheUpdate
         };
     }
 }

@@ -1,10 +1,43 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useGridStore } from '../store/GridStore';
-// Import export libraries with proper module resolution
+// LAZY LOADING: Export libraries use eval/Function which violates CSP on iOS Power Apps
+// saveAs can be loaded at top level as it's CSP-safe
 const saveAs = require('file-saver').saveAs;
-const XLSX = require('xlsx');
-const jsPDF = require('jspdf').default || require('jspdf');
-const autoTable = require('jspdf-autotable').default || require('jspdf-autotable');
+
+// Lazy-loaded library references
+let XLSX: any = null;
+let jsPDF: any = null;
+let autoTable: any = null;
+
+// Lazy loader functions to avoid CSP violations on iOS
+// These use require() which is synchronous but deferred until first call
+const loadXLSX = (): any => {
+    if (!XLSX) {
+        try {
+            XLSX = require('xlsx');
+        } catch (e) {
+            console.warn('XLSX library could not be loaded:', e);
+            throw new Error('Excel export is not available in this environment');
+        }
+    }
+    return XLSX;
+};
+
+const loadJsPDF = (): { jsPDF: any; autoTable: any } => {
+    if (!jsPDF) {
+        try {
+            const jsPDFModule = require('jspdf');
+            jsPDF = jsPDFModule.default || jsPDFModule;
+            const autoTableModule = require('jspdf-autotable');
+            autoTable = autoTableModule.default || autoTableModule;
+        } catch (e) {
+            console.warn('jsPDF library could not be loaded:', e);
+            throw new Error('PDF export is not available in this environment');
+        }
+    }
+    return { jsPDF, autoTable };
+};
+
 import {
     IAdvancedFilter,
     IFilterPreset,
@@ -156,9 +189,10 @@ export const usePerformanceMonitoring = () => {
     });
 
     const startMeasurement = useCallback((operation: string) => {
-        const startTime = performance.now();
+        const safeNow = () => typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
+        const startTime = safeNow();
         return () => {
-            const endTime = performance.now();
+            const endTime = safeNow();
             const duration = endTime - startTime;
 
             setMetrics((prev) => ({
@@ -241,11 +275,14 @@ export const useDataExport = () => {
     const exportToExcel = useCallback(async (data: any[], filename: string = 'export.xlsx') => {
         setExportInProgress(true);
         try {
-            const worksheet = XLSX.utils.json_to_sheet(data);
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, 'Data');
+            // Lazy load XLSX to avoid CSP issues on iOS
+            const XLSXLib = loadXLSX();
+            
+            const worksheet = XLSXLib.utils.json_to_sheet(data);
+            const workbook = XLSXLib.utils.book_new();
+            XLSXLib.utils.book_append_sheet(workbook, worksheet, 'Data');
 
-            const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+            const excelBuffer = XLSXLib.write(workbook, { bookType: 'xlsx', type: 'array' });
             const blob = new Blob([excelBuffer], {
                 type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             });
@@ -257,6 +294,9 @@ export const useDataExport = () => {
                 recordCount: data.length,
                 filename,
             });
+        } catch (e) {
+            console.error('Excel export failed:', e);
+            throw e;
         } finally {
             setExportInProgress(false);
         }
@@ -265,8 +305,11 @@ export const useDataExport = () => {
     const exportToPDF = useCallback(async (data: any[], filename: string = 'export.pdf') => {
         setExportInProgress(true);
         try {
+            // Lazy load jsPDF to avoid CSP issues on iOS
+            const { jsPDF: jsPDFLib, autoTable: autoTableLib } = loadJsPDF();
+            
             // Create jsPDF instance with proper constructor
-            const doc = new (jsPDF as any)();
+            const doc = new (jsPDFLib as any)();
 
             if (data.length === 0) return;
 
@@ -274,7 +317,7 @@ export const useDataExport = () => {
             const rows = data.map((row) => headers.map((header) => row[header]));
 
             // Use autoTable with proper call
-            (autoTable as any)(doc, {
+            (autoTableLib as any)(doc, {
                 head: [headers],
                 body: rows,
                 startY: 20,

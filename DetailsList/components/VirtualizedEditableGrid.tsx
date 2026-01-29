@@ -446,10 +446,20 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                     const triggerValue = getPCFValue(item, triggerField);
                     
                     if (triggerValue) {
+                    // iOS WebView Safety: Safely access global data sources
+                    let globalDataSources = {};
+                    try {
+                        if (typeof window !== 'undefined' && window !== null) {
+                            globalDataSources = (window as any).PowerAppsDataSources || {};
+                        }
+                    } catch (e) {
+                        // Ignore window access errors on restricted iOS WebView
+                    }
+                    
                     const context = {
                         currentValues: { ...Object.fromEntries(Object.keys(columnEditorMapping).map(key => [key, getPCFValue(item, key)])), [triggerField]: triggerValue },
                         isNewRecord: false,
-                        globalDataSources: (window as any).PowerAppsDataSources || {}
+                        globalDataSources: globalDataSources
                     };
 
                     for (const dependentField of dependentFields) {
@@ -745,13 +755,28 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
             return element?.getBoundingClientRect().height || rowHeight;
         },
         scrollToFn: (offset: any, canSmooth: any, instance: any) => {
-            const duration = canSmooth && enablePrefetching ? 100 : 0;
-            const scrollElement = instance.scrollElement;
-            if (scrollElement) {
-                scrollElement.scrollTo({ 
-                    top: Math.max(0, offset), 
-                    behavior: duration ? 'smooth' : 'auto' 
-                });
+            // iOS WebView Safety: scrollTo with smooth behavior can cause issues on iOS
+            // Use fallback behavior on iOS or when smooth scrolling fails
+            try {
+                const scrollElement = instance.scrollElement;
+                if (scrollElement) {
+                    // iOS Safari/WebView may not support smooth scrolling properly
+                    // Check if we're on iOS and use instant scroll instead
+                    const isIOS = /iPad|iPhone|iPod/.test(navigator?.userAgent || '') || 
+                                  (navigator?.platform === 'MacIntel' && navigator?.maxTouchPoints > 1);
+                    const duration = canSmooth && enablePrefetching && !isIOS ? 100 : 0;
+                    
+                    scrollElement.scrollTo({ 
+                        top: Math.max(0, offset), 
+                        behavior: duration ? 'smooth' : 'auto' 
+                    });
+                }
+            } catch (e) {
+                // Fallback for iOS WebView - use direct property assignment
+                const scrollElement = instance.scrollElement;
+                if (scrollElement) {
+                    scrollElement.scrollTop = Math.max(0, offset);
+                }
             }
         },
     });
@@ -1949,10 +1974,10 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                 fontWeight: 600,
                                 fontSize: `${headerTextSize}px`, // Apply custom header text size
                                 overflow: 'hidden',
-                                textOverflow: enableHeaderTextWrapping ? 'initial' : 'ellipsis',
+                                textOverflow: enableHeaderTextWrapping ? 'clip' : 'ellipsis',
                                 whiteSpace: enableHeaderTextWrapping ? 'normal' : 'nowrap',
                                 wordWrap: enableHeaderTextWrapping ? 'break-word' : 'normal',
-                                lineHeight: enableHeaderTextWrapping ? '1.0' : 'normal', // Tight line height for wrapped text
+                                lineHeight: enableHeaderTextWrapping ? 1 : 'normal', // Tight line height for wrapped text
                                 textAlign: column.headerHorizontalAligned === 'center' ? 'center' : 
                                           column.headerHorizontalAligned === 'end' ? 'right' : 'left' // Apply text alignment
                             }}

@@ -1,9 +1,53 @@
 import { IExportOptions } from '../types/Advanced.types';
 import { saveAs } from 'file-saver';
-import * as XLSX from 'xlsx';
-import * as ExcelJS from 'exceljs';
-const jsPDF = require('jspdf');
-const autoTable = require('jspdf-autotable');
+
+// LAZY LOADING: These libraries use eval/Function which violates CSP on iOS Power Apps
+// They are now loaded dynamically only when export functions are called
+// This prevents the app from crashing on initialization
+let XLSX: any = null;
+let ExcelJS: any = null;
+let jsPDF: any = null;
+let autoTable: any = null;
+
+// Lazy loader functions - use require() for compatibility with es2015 module format
+const loadXLSX = (): any => {
+    if (!XLSX) {
+        try {
+            XLSX = require('xlsx');
+        } catch (e) {
+            console.warn('XLSX library could not be loaded:', e);
+            throw new Error('Excel export is not available in this environment');
+        }
+    }
+    return XLSX;
+};
+
+const loadExcelJS = (): any => {
+    if (!ExcelJS) {
+        try {
+            ExcelJS = require('exceljs');
+        } catch (e) {
+            console.warn('ExcelJS library could not be loaded:', e);
+            throw new Error('Excel export is not available in this environment');
+        }
+    }
+    return ExcelJS;
+};
+
+const loadJsPDF = (): any => {
+    if (!jsPDF) {
+        try {
+            const jsPDFModule = require('jspdf');
+            jsPDF = jsPDFModule.default || jsPDFModule;
+            const autoTableModule = require('jspdf-autotable');
+            autoTable = autoTableModule.default || autoTableModule;
+        } catch (e) {
+            console.warn('jsPDF library could not be loaded:', e);
+            throw new Error('PDF export is not available in this environment');
+        }
+    }
+    return { jsPDF, autoTable };
+};
 
 // Helper function for PCF EntityRecord compatibility
 const getPCFValue = (item: any, columnKey: string): any => {
@@ -162,11 +206,14 @@ export class DataExportService {
      * Export to Excel format using ExcelJS for proper table support
      */
     private async exportToExcel(data: any[], filename: string, options: IExportOptions): Promise<void> {
+        // Lazy load ExcelJS to avoid CSP issues on iOS
+        const ExcelJSLib = loadExcelJS();
+        
         const fieldNames = options.customColumns || getPCFKeys(data[0] || {});
         const displayNames = options.customHeaders || fieldNames;
         
         // Create workbook and worksheet
-        const workbook = new ExcelJS.Workbook();
+        const workbook = new ExcelJSLib.Workbook();
         const worksheet = workbook.addWorksheet('Data');
 
         // Detect date columns
@@ -269,7 +316,9 @@ export class DataExportService {
      * Export to PDF format
      */
     private async exportToPDF(data: any[], filename: string, options: IExportOptions): Promise<void> {
-        const doc = new jsPDF('l', 'mm', 'a4'); // Landscape orientation for better table display
+        // Lazy load jsPDF to avoid CSP issues on iOS
+        const { jsPDF: jsPDFLib, autoTable: autoTableLib } = loadJsPDF();
+        const doc = new jsPDFLib('l', 'mm', 'a4'); // Landscape orientation for better table display
 
         // Add title and metadata
         this.addPDFHeader(doc, options);
@@ -314,7 +363,7 @@ export class DataExportService {
             showHead: options.includeHeaders !== false,
         };
 
-        autoTable(doc, tableConfig);
+        autoTableLib(doc, tableConfig);
 
         // Add footer with export info
         this.addPDFFooter(doc, data.length);
@@ -432,13 +481,14 @@ export class DataExportService {
     }
 
     /**
-     * Style Excel worksheet
+     * Style Excel worksheet (Legacy method - uses XLSX library)
+     * Note: XLSX must be passed in to avoid top-level import that breaks iOS
      */
-    private styleExcelWorksheet(worksheet: any, data: any[], options: IExportOptions): void {
+    private styleExcelWorksheet(XLSXLib: any, worksheet: any, data: any[], options: IExportOptions): void {
         const range = worksheet['!ref'];
-        if (!range) return;
+        if (!range || !XLSXLib) return;
 
-        const decodedRange = XLSX.utils.decode_range(range);
+        const decodedRange = XLSXLib.utils.decode_range(range);
         const fieldNames = options.customColumns || getPCFKeys(data[0] || {});
         const displayNames = options.customHeaders || fieldNames;
         
@@ -458,7 +508,7 @@ export class DataExportService {
 
         // Style header row with light green background and bold black text
         for (let col = decodedRange.s.c; col <= decodedRange.e.c; col++) {
-            const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+            const cellAddress = XLSXLib.utils.encode_cell({ r: 0, c: col });
             if (worksheet[cellAddress]) {
                 worksheet[cellAddress].s = {
                     font: { bold: true, color: { rgb: "000000" } }, // Black text
@@ -475,7 +525,7 @@ export class DataExportService {
         }
 
         // Create Excel Table
-        const tableRef = `A1:${XLSX.utils.encode_col(decodedRange.e.c)}${decodedRange.e.r + 1}`;
+        const tableRef = `A1:${XLSXLib.utils.encode_col(decodedRange.e.c)}${decodedRange.e.r + 1}`;
         worksheet['!autofilter'] = { ref: tableRef };
         
         // Add table definition for proper Excel table
