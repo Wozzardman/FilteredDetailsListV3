@@ -131,6 +131,7 @@ export interface VirtualizedEditableGridProps {
     
     // Selection mode props
     enableSelectionMode?: boolean;
+    selectionType?: '0' | '1' | '2'; // 0=None, 1=Single, 2=Multiple
     selectedItems?: Set<string>;
     selectAllState?: 'none' | 'some' | 'all';
     onItemSelection?: (itemId: string) => void;
@@ -195,6 +196,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     
     // Selection mode props
     enableSelectionMode = false,
+    selectionType = '2', // Default to Multiple for backward compatibility
     selectedItems = new Set(),
     selectAllState = 'none',
     onItemSelection,
@@ -247,6 +249,61 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     // Auto-fill confirmation state - tracks which new rows are pending auto-fill
     const [pendingAutoFillRows, setPendingAutoFillRows] = React.useState<Set<string>>(new Set());
     const [autoFillInProgress, setAutoFillInProgress] = React.useState<Set<string>>(new Set());
+
+    // Row drag fill state - tracks which rows are being targeted during drag
+    const [rowDragFillTargets, setRowDragFillTargets] = React.useState<Set<number>>(new Set());
+    const [rowDragFillSource, setRowDragFillSource] = React.useState<number | null>(null);
+
+    // Cell selection state for multi-cell drag fill
+    // Format: Set of "rowIndex-columnKey" strings
+    const [selectedCells, setSelectedCells] = React.useState<Set<string>>(new Set());
+    const [selectionAnchor, setSelectionAnchor] = React.useState<{ row: number; column: string } | null>(null);
+    const [isSelecting, setIsSelecting] = React.useState<boolean>(false);
+    const [selectionBounds, setSelectionBounds] = React.useState<{
+        startRow: number;
+        endRow: number;
+        startColIndex: number;
+        endColIndex: number;
+    } | null>(null);
+
+    // Handle mouse up to end selection
+    React.useEffect(() => {
+        const handleMouseUp = () => {
+            setIsSelecting(false);
+        };
+        
+        document.addEventListener('mouseup', handleMouseUp);
+        return () => document.removeEventListener('mouseup', handleMouseUp);
+    }, []);
+
+    // Clear selection when clicking outside or pressing Escape
+    React.useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                setSelectedCells(new Set());
+                setSelectionAnchor(null);
+                setSelectionBounds(null);
+            }
+        };
+        
+        const handleClickOutside = (e: MouseEvent) => {
+            // Check if click is outside the grid
+            const target = e.target as HTMLElement;
+            const isInsideGrid = target.closest('.virtualized-editable-grid-container');
+            if (!isInsideGrid && selectedCells.size > 0) {
+                setSelectedCells(new Set());
+                setSelectionAnchor(null);
+                setSelectionBounds(null);
+            }
+        };
+        
+        document.addEventListener('keydown', handleKeyDown);
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [selectedCells.size]);
 
     // Helper function to evaluate a single filter condition
     const evaluateCondition = React.useCallback((fieldValue: any, condition: any): boolean => {
@@ -1064,6 +1121,176 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         return memoizedColumnWidths.reduce((sum, width) => sum + width, 0);
     }, [memoizedColumnWidths]);
 
+    // ========== CELL SELECTION HELPERS (depend on effectiveColumns) ==========
+    
+    // Helper to get column index from column key
+    const getColumnIndex = React.useCallback((columnKey: string): number => {
+        return effectiveColumns.findIndex(col => (col.fieldName || col.key) === columnKey);
+    }, [effectiveColumns]);
+
+    // Helper to check if a cell is the bottom-right of the selection (where the green handle should appear)
+    const isBottomRightOfSelection = React.useCallback((rowIndex: number, columnKey: string): boolean => {
+        if (selectedCells.size <= 1 || !selectionBounds) return false;
+        
+        const colIndex = getColumnIndex(columnKey);
+        return rowIndex === selectionBounds.endRow && colIndex === selectionBounds.endColIndex;
+    }, [selectedCells.size, selectionBounds, getColumnIndex]);
+
+    // Helper to check if a cell is selected
+    const isCellSelected = React.useCallback((rowIndex: number, columnKey: string): boolean => {
+        return selectedCells.has(`${rowIndex}-${columnKey}`);
+    }, [selectedCells]);
+
+    // Update selection bounds when selectedCells changes
+    React.useEffect(() => {
+        if (selectedCells.size === 0) {
+            setSelectionBounds(null);
+            return;
+        }
+
+        let minRow = Infinity, maxRow = -Infinity;
+        let minCol = Infinity, maxCol = -Infinity;
+
+        selectedCells.forEach(cellKey => {
+            const [rowStr, ...colParts] = cellKey.split('-');
+            const colKey = colParts.join('-'); // Handle column keys with dashes
+            const row = parseInt(rowStr);
+            const colIndex = getColumnIndex(colKey);
+            
+            if (!isNaN(row) && colIndex >= 0) {
+                minRow = Math.min(minRow, row);
+                maxRow = Math.max(maxRow, row);
+                minCol = Math.min(minCol, colIndex);
+                maxCol = Math.max(maxCol, colIndex);
+            }
+        });
+
+        if (minRow !== Infinity) {
+            setSelectionBounds({
+                startRow: minRow,
+                endRow: maxRow,
+                startColIndex: minCol,
+                endColIndex: maxCol
+            });
+        }
+    }, [selectedCells, getColumnIndex]);
+
+    // Handle cell selection on mouse down
+    // REQUIRES Ctrl key to be held to start selection (to not interfere with inline editing)
+    // CONSTRAINED to single row only - selecting on a different row clears the previous selection
+    const handleCellMouseDown = React.useCallback((e: React.MouseEvent, rowIndex: number, columnKey: string) => {
+        // Only handle left-click for selection
+        if (e.button !== 0) return;
+        
+        // Don't interfere with editing
+        if (editingState) return;
+        
+        // REQUIRE Ctrl/Cmd key to be held for cell selection (to not interfere with inline editing)
+        if (!e.ctrlKey && !e.metaKey) {
+            // Regular click without Ctrl - clear any existing selection and don't start new one
+            if (selectedCells.size > 0) {
+                setSelectedCells(new Set());
+                setSelectionAnchor(null);
+            }
+            return;
+        }
+        
+        const cellKey = `${rowIndex}-${columnKey}`;
+        
+        // Check if there's an existing selection on a different row
+        // If so, clear it and start fresh on this row
+        let currentSelectionRow: number | null = null;
+        if (selectedCells.size > 0) {
+            // Get the row from the first selected cell
+            const firstCellKey = selectedCells.values().next().value;
+            if (firstCellKey) {
+                const [rowStr] = firstCellKey.split('-');
+                currentSelectionRow = parseInt(rowStr);
+            }
+        }
+        
+        // If clicking on a different row, clear selection and start fresh
+        if (currentSelectionRow !== null && currentSelectionRow !== rowIndex) {
+            setSelectedCells(new Set([cellKey]));
+            setSelectionAnchor({ row: rowIndex, column: columnKey });
+            setIsSelecting(true);
+            return;
+        }
+        
+        if (e.shiftKey && selectionAnchor) {
+            // Ctrl+Shift+click: select range from anchor to current cell (same row only)
+            // If anchor is on a different row, just select the current cell
+            if (selectionAnchor.row !== rowIndex) {
+                setSelectedCells(new Set([cellKey]));
+                setSelectionAnchor({ row: rowIndex, column: columnKey });
+                return;
+            }
+            
+            const anchorColIndex = getColumnIndex(selectionAnchor.column);
+            const currentColIndex = getColumnIndex(columnKey);
+            
+            const startCol = Math.min(anchorColIndex, currentColIndex);
+            const endCol = Math.max(anchorColIndex, currentColIndex);
+            
+            const newSelection = new Set<string>();
+            // Only select cells on the same row
+            for (let c = startCol; c <= endCol; c++) {
+                const col = effectiveColumns[c];
+                if (col) {
+                    const colKey = col.fieldName || col.key;
+                    // Skip special columns
+                    if (colKey !== '__selection__' && colKey !== '__delete__' && colKey !== '__autofill__') {
+                        newSelection.add(`${rowIndex}-${colKey}`);
+                    }
+                }
+            }
+            setSelectedCells(newSelection);
+        } else {
+            // Ctrl+click: toggle cell in selection or start new selection (same row only)
+            setSelectedCells(prev => {
+                const newSet = new Set(prev);
+                if (newSet.has(cellKey)) {
+                    newSet.delete(cellKey);
+                } else {
+                    newSet.add(cellKey);
+                }
+                return newSet;
+            });
+            setSelectionAnchor({ row: rowIndex, column: columnKey });
+            setIsSelecting(true);
+        }
+    }, [editingState, selectionAnchor, getColumnIndex, effectiveColumns, selectedCells]);
+
+    // Handle mouse move for drag selection (constrained to single row)
+    const handleCellMouseEnter = React.useCallback((rowIndex: number, columnKey: string) => {
+        if (!isSelecting || !selectionAnchor) return;
+        
+        // Constrain to same row as anchor - ignore if dragging to a different row
+        if (rowIndex !== selectionAnchor.row) return;
+        
+        const anchorColIndex = getColumnIndex(selectionAnchor.column);
+        const currentColIndex = getColumnIndex(columnKey);
+        
+        const startCol = Math.min(anchorColIndex, currentColIndex);
+        const endCol = Math.max(anchorColIndex, currentColIndex);
+        
+        const newSelection = new Set<string>();
+        // Only select cells on the anchor row
+        for (let c = startCol; c <= endCol; c++) {
+            const col = effectiveColumns[c];
+            if (col) {
+                const colKey = col.fieldName || col.key;
+                // Skip special columns
+                if (colKey !== '__selection__' && colKey !== '__delete__' && colKey !== '__autofill__') {
+                    newSelection.add(`${selectionAnchor.row}-${colKey}`);
+                }
+            }
+        }
+        setSelectedCells(newSelection);
+    }, [isSelecting, selectionAnchor, getColumnIndex, effectiveColumns]);
+
+    // ========== END CELL SELECTION HELPERS ==========
+
     // Helper function to convert alignment values to CSS properties
     const getAlignmentStyles = (horizontalAlign?: string, verticalAlign?: string) => {
         const horizontal = horizontalAlign?.toLowerCase() || 'start';
@@ -1357,7 +1584,9 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         if (!item) return null;
 
         const isEven = index % 2 === 0;
-        const rowClassName = `virtualized-row ${isEven ? 'even' : 'odd'}`;
+        const isRowDragTarget = rowDragFillTargets.has(index) && index !== rowDragFillSource;
+        const isRowDragSource = rowDragFillSource === index;
+        const rowClassName = `virtualized-row ${isEven ? 'even' : 'odd'}${isRowDragTarget ? ' row-drag-target' : ''}${isRowDragSource ? ' row-drag-source' : ''}`;
         
         // Apply alternating row color if specified
         const rowStyle: React.CSSProperties = {
@@ -1609,19 +1838,50 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                         );
                     }
 
+                    // Check if this cell is selected and if it's the bottom-right of a multi-cell selection
+                    // Disable cell selection visuals when selection mode is enabled (row checkboxes take precedence)
+                    const isCellInSelection = !enableSelectionMode && isCellSelected(index, columnKey);
+                    const showGreenHandle = !enableSelectionMode && isBottomRightOfSelection(index, columnKey);
+                    const showBlueHandle = !enableSelectionMode && !showGreenHandle && (!isCellInSelection || selectedCells.size === 1);
+
                     return (
                         <div
                             key={columnKey}
-                            className={`virtualized-cell ${isReadOnly ? 'read-only' : 'editable'}`}
-                            style={cellStyle}
-                            onClick={() => !isReadOnly && startEdit(index, columnKey)}
+                            className={`virtualized-cell ${isReadOnly ? 'read-only' : 'editable'}${isCellInSelection ? ' cell-selected' : ''}`}
+                            style={{
+                                ...cellStyle,
+                                outline: isCellInSelection ? '2px solid #0078d4' : 'none',
+                                outlineOffset: '-2px',
+                                zIndex: isCellInSelection ? 1 : 'auto',
+                            }}
+                            onClick={(e) => {
+                                if (!isReadOnly) {
+                                    // If not selecting, start edit on click
+                                    if (!e.ctrlKey && !e.shiftKey && !e.metaKey) {
+                                        startEdit(index, columnKey);
+                                    }
+                                }
+                            }}
+                            onMouseDown={(e) => {
+                                // Don't handle cell selection when selection mode is enabled (row checkboxes take precedence)
+                                if (!isReadOnly && !enableSelectionMode) {
+                                    handleCellMouseDown(e, index, columnKey);
+                                }
+                            }}
+                            onMouseEnter={() => {
+                                // Don't handle cell selection when selection mode is enabled
+                                if (!isReadOnly && !enableSelectionMode && isSelecting) {
+                                    handleCellMouseEnter(index, columnKey);
+                                }
+                            }}
                             title={hasChanges ? `Changed from: ${pendingChanges.get(cellKey)?.oldValue}` : formatCellValue(cellValue, column.dataType, getColumnDataType, columnKey, columnEditorMapping)}
                         >
                             {column.onRender ? 
                                 column.onRender(item, index, column) : 
                                 formatCellValue(cellValue, column.dataType, getColumnDataType, columnKey, columnEditorMapping)
                             }
-                            {!isReadOnly && enableDragFill && !enableSelectionMode && (
+                            {/* Blue handle - single cell drag fill */}
+                            {!isReadOnly && enableDragFill && !enableSelectionMode && showBlueHandle && (
                                 <div 
                                     className="drag-fill-handle"
                                     style={{
@@ -1634,10 +1894,12 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                         border: '1px solid white',
                                         cursor: 'crosshair',
                                         opacity: 0,
-                                        transition: 'opacity 0.15s ease'
+                                        transition: 'opacity 0.15s ease',
+                                        zIndex: 10,
                                     }}
                                     onMouseDown={(e) => {
                                         e.preventDefault();
+                                        e.stopPropagation();
                                         // Implement basic drag fill functionality
                                         const startDragFill = (startIndex: number, columnKey: string, startValue: any) => {
                                             const dragFillChanges = new Map<string, any>();
@@ -1666,7 +1928,44 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                                 existingPendingChanges: pendingChanges.size
                                             });
                                             
+                                            // Auto-scroll variables
+                                            let currentMouseY = 0;
+                                            let autoScrollInterval: ReturnType<typeof setInterval> | null = null;
+                                            const SCROLL_EDGE_THRESHOLD = 50; // pixels from edge to trigger scroll
+                                            const SCROLL_SPEED = 8; // pixels per interval
+                                            
+                                            const startAutoScroll = () => {
+                                                if (autoScrollInterval) return;
+                                                autoScrollInterval = setInterval(() => {
+                                                    const scrollContainer = parentRef.current;
+                                                    if (!scrollContainer) return;
+                                                    
+                                                    const rect = scrollContainer.getBoundingClientRect();
+                                                    const distanceFromBottom = rect.bottom - currentMouseY;
+                                                    const distanceFromTop = currentMouseY - rect.top;
+                                                    
+                                                    if (distanceFromBottom < SCROLL_EDGE_THRESHOLD && distanceFromBottom > 0) {
+                                                        // Scroll down
+                                                        scrollContainer.scrollTop += SCROLL_SPEED;
+                                                    } else if (distanceFromTop < SCROLL_EDGE_THRESHOLD && distanceFromTop > 0) {
+                                                        // Scroll up
+                                                        scrollContainer.scrollTop -= SCROLL_SPEED;
+                                                    }
+                                                }, 16); // ~60fps
+                                            };
+                                            
+                                            const stopAutoScroll = () => {
+                                                if (autoScrollInterval) {
+                                                    clearInterval(autoScrollInterval);
+                                                    autoScrollInterval = null;
+                                                }
+                                            };
+                                            
                                             const handleMouseMove = (moveEvent: MouseEvent) => {
+                                                // Update current mouse position for auto-scroll
+                                                currentMouseY = moveEvent.clientY;
+                                                startAutoScroll();
+                                                
                                                 // Find the target cell based on mouse position
                                                 const element = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY);
                                                 if (element && element.closest('.virtualized-row')) {
@@ -1745,6 +2044,9 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                             };
                                             
                                             const handleMouseUp = () => {
+                                                // Stop auto-scrolling
+                                                stopAutoScroll();
+                                                
                                                 // When drag ends, call onCellEdit once for all the changes
                                                 if (dragFillChanges.size > 0 && onCellEdit) {
                                                     // Call onCellEdit for all the drag filled changes
@@ -1765,12 +2067,242 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                     }}
                                 />
                             )}
+                            {/* Green handle - multi-cell selection drag fill (appears at bottom-right of selection) */}
+                            {!isReadOnly && enableDragFill && !enableSelectionMode && showGreenHandle && (
+                                <div 
+                                    className="multi-cell-drag-fill-handle"
+                                    style={{
+                                        position: 'absolute',
+                                        bottom: -2,
+                                        right: -2,
+                                        width: 10,
+                                        height: 10,
+                                        backgroundColor: '#107c10',
+                                        border: '2px solid white',
+                                        borderRadius: '2px',
+                                        cursor: 'crosshair',
+                                        opacity: 1,
+                                        zIndex: 20,
+                                        boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                                    }}
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        
+                                        if (!selectionBounds || selectedCells.size === 0) return;
+                                        
+                                        // Collect values ONLY from actually selected cells (not entire bounding box)
+                                        // selectionValues maps rowOffset -> (columnKey -> value)
+                                        const selectionValues = new Map<string, Map<string, any>>();
+                                        
+                                        // Build a map of which columns are actually selected per row
+                                        // This respects Ctrl+click non-contiguous selections
+                                        const rowColumnsMap = new Map<number, Set<string>>(); // rowIndex -> Set of columnKeys
+                                        const allSelectedColumns = new Set<string>(); // All unique columns across selection
+                                        
+                                        selectedCells.forEach(cellKey => {
+                                            const [rowStr, ...colParts] = cellKey.split('-');
+                                            const colKey = colParts.join('-'); // Handle column keys with dashes
+                                            const rowIndex = parseInt(rowStr);
+                                            
+                                            // Skip special columns and read-only columns
+                                            if (colKey === '__selection__' || colKey === '__delete__' || colKey === '__autofill__' || readOnlyColumns.includes(colKey)) {
+                                                return;
+                                            }
+                                            
+                                            if (!rowColumnsMap.has(rowIndex)) {
+                                                rowColumnsMap.set(rowIndex, new Set());
+                                            }
+                                            rowColumnsMap.get(rowIndex)!.add(colKey);
+                                            allSelectedColumns.add(colKey);
+                                        });
+                                        
+                                        // Get the sorted row indices to establish the pattern
+                                        const sortedRows = Array.from(rowColumnsMap.keys()).sort((a, b) => a - b);
+                                        const selectionHeight = sortedRows.length;
+                                        
+                                        if (selectionHeight === 0) return;
+                                        
+                                        // Get values for each selected row (only the actually selected columns)
+                                        for (let rowOffset = 0; rowOffset < selectionHeight; rowOffset++) {
+                                            const sourceRowIndex = sortedRows[rowOffset];
+                                            const sourceItem = filteredItems[sourceRowIndex];
+                                            const selectedColumnsForRow = rowColumnsMap.get(sourceRowIndex);
+                                            
+                                            if (sourceItem && selectedColumnsForRow) {
+                                                const rowValues = new Map<string, any>();
+                                                selectedColumnsForRow.forEach(colKey => {
+                                                    rowValues.set(colKey, getPCFValue(sourceItem, colKey));
+                                                });
+                                                selectionValues.set(rowOffset.toString(), rowValues);
+                                            }
+                                        }
+                                        
+                                        const multiCellDragChanges = new Map<string, any>();
+                                        const originalValuesSnapshot = new Map<string, any>();
+                                        
+                                        // Pre-populate with existing pending changes
+                                        pendingChanges.forEach((change, changeKey) => {
+                                            originalValuesSnapshot.set(changeKey, change.oldValue);
+                                        });
+                                        
+                                        // Set visual feedback
+                                        setRowDragFillSource(selectionBounds.startRow);
+                                        setRowDragFillTargets(new Set());
+                                        
+                                        console.log(`🎯 Multi-cell drag fill starting:`, {
+                                            selectionBounds,
+                                            columns: Array.from(allSelectedColumns),
+                                            selectionHeight,
+                                            sortedRows,
+                                            selectionValues: Object.fromEntries(selectionValues)
+                                        });
+                                        
+                                        // Auto-scroll variables for multi-cell drag fill
+                                        let currentMouseY = 0;
+                                        let autoScrollInterval: ReturnType<typeof setInterval> | null = null;
+                                        const SCROLL_EDGE_THRESHOLD = 50; // pixels from edge to trigger scroll
+                                        const SCROLL_SPEED = 8; // pixels per interval
+                                        
+                                        const startAutoScroll = () => {
+                                            if (autoScrollInterval) return;
+                                            autoScrollInterval = setInterval(() => {
+                                                const scrollContainer = parentRef.current;
+                                                if (!scrollContainer) return;
+                                                
+                                                const rect = scrollContainer.getBoundingClientRect();
+                                                const distanceFromBottom = rect.bottom - currentMouseY;
+                                                const distanceFromTop = currentMouseY - rect.top;
+                                                
+                                                if (distanceFromBottom < SCROLL_EDGE_THRESHOLD && distanceFromBottom > 0) {
+                                                    // Scroll down
+                                                    scrollContainer.scrollTop += SCROLL_SPEED;
+                                                } else if (distanceFromTop < SCROLL_EDGE_THRESHOLD && distanceFromTop > 0) {
+                                                    // Scroll up
+                                                    scrollContainer.scrollTop -= SCROLL_SPEED;
+                                                }
+                                            }, 16); // ~60fps
+                                        };
+                                        
+                                        const stopAutoScroll = () => {
+                                            if (autoScrollInterval) {
+                                                clearInterval(autoScrollInterval);
+                                                autoScrollInterval = null;
+                                            }
+                                        };
+                                        
+                                        const handleMouseMove = (moveEvent: MouseEvent) => {
+                                            // Update current mouse position for auto-scroll
+                                            currentMouseY = moveEvent.clientY;
+                                            startAutoScroll();
+                                            
+                                            const element = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY);
+                                            if (element && element.closest('.virtualized-row')) {
+                                                const rowElement = element.closest('.virtualized-row') as HTMLElement;
+                                                const targetEndRow = parseInt(rowElement.dataset.index || '0');
+                                                
+                                                // Only fill downward from the selection end
+                                                if (targetEndRow <= selectionBounds.endRow) {
+                                                    setRowDragFillTargets(new Set());
+                                                    return;
+                                                }
+                                                
+                                                // Update visual feedback
+                                                const newTargets = new Set<number>();
+                                                for (let r = selectionBounds.endRow + 1; r <= targetEndRow; r++) {
+                                                    newTargets.add(r);
+                                                }
+                                                setRowDragFillTargets(newTargets);
+                                                
+                                                // Clear previous changes
+                                                multiCellDragChanges.forEach((_, changeKey) => {
+                                                    const [indexStr] = changeKey.split('-');
+                                                    const idx = parseInt(indexStr);
+                                                    if (idx > selectionBounds.endRow) {
+                                                        setPendingChanges(prev => {
+                                                            const newMap = new Map(prev);
+                                                            newMap.delete(changeKey);
+                                                            return newMap;
+                                                        });
+                                                    }
+                                                });
+                                                multiCellDragChanges.clear();
+                                                
+                                                // Fill with repeating pattern from selection
+                                                for (let targetRow = selectionBounds.endRow + 1; targetRow <= targetEndRow; targetRow++) {
+                                                    const targetItem = filteredItems[targetRow];
+                                                    if (targetItem) {
+                                                        const itemId = targetItem.key || targetItem.id || targetItem.getRecordId?.() || targetRow.toString();
+                                                        // Calculate which source row in the pattern to use
+                                                        const patternIndex = (targetRow - selectionBounds.endRow - 1) % selectionHeight;
+                                                        const sourceRowValues = selectionValues.get(patternIndex.toString());
+                                                        
+                                                        if (sourceRowValues) {
+                                                            // Only apply values for columns that were actually selected in this source row
+                                                            sourceRowValues.forEach((newValue, colKey) => {
+                                                                const changeKey = getCellKey(targetRow, colKey);
+                                                                
+                                                                let originalValue: any;
+                                                                if (originalValuesSnapshot.has(changeKey)) {
+                                                                    originalValue = originalValuesSnapshot.get(changeKey);
+                                                                } else {
+                                                                    const existingChange = pendingChanges.get(changeKey);
+                                                                    originalValue = existingChange ? existingChange.oldValue : getPCFValue(targetItem, colKey);
+                                                                    originalValuesSnapshot.set(changeKey, originalValue);
+                                                                }
+                                                                
+                                                                const change = {
+                                                                    itemId,
+                                                                    itemIndex: targetRow,
+                                                                    columnKey: colKey,
+                                                                    newValue,
+                                                                    oldValue: originalValue
+                                                                };
+                                                                
+                                                                setPendingChanges(prev => new Map(prev.set(changeKey, change)));
+                                                                setPCFValue(targetItem, colKey, newValue);
+                                                                multiCellDragChanges.set(changeKey, change);
+                                                            });
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        };
+                                        
+                                        const handleMouseUp = () => {
+                                            // Stop auto-scrolling
+                                            stopAutoScroll();
+                                            
+                                            setRowDragFillSource(null);
+                                            setRowDragFillTargets(new Set());
+                                            
+                                            if (multiCellDragChanges.size > 0 && onCellEdit) {
+                                                Array.from(multiCellDragChanges.values()).forEach(change => {
+                                                    onCellEdit(change.itemId, change.columnKey, change.newValue);
+                                                });
+                                            }
+                                            
+                                            // Clear selection after drag fill
+                                            setSelectedCells(new Set());
+                                            setSelectionAnchor(null);
+                                            setRefreshTrigger(prev => prev + 1);
+                                            
+                                            document.removeEventListener('mousemove', handleMouseMove);
+                                            document.removeEventListener('mouseup', handleMouseUp);
+                                        };
+                                        
+                                        document.addEventListener('mousemove', handleMouseMove);
+                                        document.addEventListener('mouseup', handleMouseUp);
+                                    }}
+                                    title="Drag to copy selected cells to rows below"
+                                />
+                            )}
                         </div>
                     );
                 })}
             </div>
         );
-    }, [filteredItems, columns, memoizedColumnWidths, editingState, pendingChanges, readOnlyColumns, enableInlineEditing, enableDragFill, startEdit, commitEdit, cancelEdit, memoizedAvailableValues, onItemClick, onItemDoubleClick, refreshTrigger]);
+    }, [filteredItems, columns, memoizedColumnWidths, editingState, pendingChanges, readOnlyColumns, enableInlineEditing, enableDragFill, startEdit, commitEdit, cancelEdit, memoizedAvailableValues, onItemClick, onItemDoubleClick, refreshTrigger, effectiveColumns, enableSelectionMode, onCellEdit, rowDragFillTargets, rowDragFillSource, selectedCells, selectionBounds, isCellSelected, isBottomRightOfSelection, handleCellMouseDown, handleCellMouseEnter, isSelecting, setSelectedCells, setSelectionAnchor]);
 
     // PERFORMANCE OPTIMIZATION: Create stable render function to prevent unnecessary re-renders
     const renderRow = React.useCallback((virtualRow: any) => {
@@ -1864,18 +2396,21 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                 overflow: 'hidden'
                             }}
                         >
-                            <HeaderSelectionCheckbox
-                                selectAllState={selectAllState}
-                                selectedCount={selectedItems.size}
-                                totalCount={filteredItems.length}
-                                onToggleSelectAll={() => {
-                                    if (selectAllState === 'all') {
-                                        onClearAllSelections?.();
-                                    } else {
-                                        onSelectAll?.();
-                                    }
-                                }}
-                            />
+                            {/* Only show Select All checkbox for Multiple selection mode (selectionType === '2') */}
+                            {selectionType === '2' && (
+                                <HeaderSelectionCheckbox
+                                    selectAllState={selectAllState}
+                                    selectedCount={selectedItems.size}
+                                    totalCount={filteredItems.length}
+                                    onToggleSelectAll={() => {
+                                        if (selectAllState === 'all') {
+                                            onClearAllSelections?.();
+                                        } else {
+                                            onSelectAll?.();
+                                        }
+                                    }}
+                                />
+                            )}
                         </div>
                     );
                 }

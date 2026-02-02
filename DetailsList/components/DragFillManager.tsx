@@ -1,10 +1,24 @@
 import * as React from 'react';
 
+// Multi-column row data for drag fill
+export interface RowFillData {
+    row: number;
+    values: Map<string, any>; // columnKey -> value
+}
+
 export interface DragFillManagerProps {
     onDragFill?: (
         startCell: { row: number; column: string },
         endCell: { row: number; column: string },
         value: any,
+        fillType: 'copy' | 'series' | 'pattern',
+    ) => void;
+    // New callback for multi-column row drag fill
+    onRowDragFill?: (
+        startRow: number,
+        endRow: number,
+        sourceRowValues: Map<string, any>,
+        columns: string[],
         fillType: 'copy' | 'series' | 'pattern',
     ) => void;
     children: React.ReactNode;
@@ -19,6 +33,13 @@ export interface DragFillHandle {
     onStartDragFill: (row: number, column: string, value: any) => void;
 }
 
+export interface RowDragFillHandle {
+    row: number;
+    rowValues: Map<string, any>;
+    columns: string[];
+    onStartRowDragFill: (row: number, rowValues: Map<string, any>, columns: string[]) => void;
+}
+
 export interface DragFillData {
     startRow: number;
     startColumn: string;
@@ -29,25 +50,53 @@ export interface DragFillData {
     predictedValues?: any[];
 }
 
+export interface RowDragFillData {
+    startRow: number;
+    endRow: number;
+    sourceRowValues: Map<string, any>;
+    columns: string[];
+    fillType: 'copy' | 'series' | 'pattern';
+}
+
 export const DragFillManager: React.FC<DragFillManagerProps> = ({ 
-    onDragFill, 
+    onDragFill,
+    onRowDragFill, 
     children, 
     enableSmartFill = true,
     enablePatternDetection = true 
 }) => {
     const [isDragging, setIsDragging] = React.useState(false);
+    const [isRowDragging, setIsRowDragging] = React.useState(false);
     const [dragStart, setDragStart] = React.useState<{ row: number; column: string; value: any } | null>(null);
+    const [rowDragStart, setRowDragStart] = React.useState<{ row: number; rowValues: Map<string, any>; columns: string[] } | null>(null);
     const [dragEnd, setDragEnd] = React.useState<{ row: number; column: string } | null>(null);
+    const [rowDragEnd, setRowDragEnd] = React.useState<number | null>(null);
     const [dragOverCells, setDragOverCells] = React.useState<Set<string>>(new Set());
+    const [dragOverRows, setDragOverRows] = React.useState<Set<number>>(new Set());
     const [fillPreview, setFillPreview] = React.useState<Map<string, any>>(new Map());
     const [fillType, setFillType] = React.useState<'copy' | 'series' | 'pattern'>('copy');
 
     const startDragFill = React.useCallback((row: number, column: string, value: any) => {
         setIsDragging(true);
+        setIsRowDragging(false);
         setDragStart({ row, column, value });
         setDragEnd({ row, column });
         setDragOverCells(new Set([`${row}-${column}`]));
         setFillType('copy'); // Default fill type
+
+        // Prevent text selection during drag
+        document.body.style.userSelect = 'none';
+        document.body.style.webkitUserSelect = 'none';
+    }, []);
+
+    // Start row-based drag fill (entire row/multiple columns)
+    const startRowDragFill = React.useCallback((row: number, rowValues: Map<string, any>, columns: string[]) => {
+        setIsRowDragging(true);
+        setIsDragging(false);
+        setRowDragStart({ row, rowValues, columns });
+        setRowDragEnd(row);
+        setDragOverRows(new Set([row]));
+        setFillType('copy'); // Default fill type for rows
 
         // Prevent text selection during drag
         document.body.style.userSelect = 'none';
@@ -100,6 +149,36 @@ export const DragFillManager: React.FC<DragFillManagerProps> = ({
         [isDragging, dragStart, enableSmartFill, enablePatternDetection],
     );
 
+    // Update row drag fill - tracks which rows are being dragged over
+    const updateRowDragFill = React.useCallback(
+        (row: number) => {
+            if (!isRowDragging || !rowDragStart) return;
+
+            setRowDragEnd(row);
+
+            // Calculate all rows in the drag range
+            const startRow = Math.min(rowDragStart.row, row);
+            const endRow = Math.max(rowDragStart.row, row);
+            const newDragOverRows = new Set<number>();
+            const newFillPreview = new Map<string, any>();
+
+            for (let r = startRow; r <= endRow; r++) {
+                newDragOverRows.add(r);
+                
+                // Generate preview values for each column in the row
+                rowDragStart.columns.forEach((columnKey) => {
+                    const sourceValue = rowDragStart.rowValues.get(columnKey);
+                    const cellKey = `${r}-${columnKey}`;
+                    newFillPreview.set(cellKey, sourceValue);
+                });
+            }
+
+            setDragOverRows(newDragOverRows);
+            setFillPreview(newFillPreview);
+        },
+        [isRowDragging, rowDragStart],
+    );
+
     const endDragFill = React.useCallback(() => {
         if (!isDragging || !dragStart || !dragEnd || !onDragFill) {
             setIsDragging(false);
@@ -131,7 +210,40 @@ export const DragFillManager: React.FC<DragFillManagerProps> = ({
         document.body.style.webkitUserSelect = '';
     }, [isDragging, dragStart, dragEnd, onDragFill, fillType]);
 
-    // Handle mouse events globally during drag
+    // End row drag fill
+    const endRowDragFill = React.useCallback(() => {
+        if (!isRowDragging || !rowDragStart || rowDragEnd === null || !onRowDragFill) {
+            setIsRowDragging(false);
+            setRowDragStart(null);
+            setRowDragEnd(null);
+            setDragOverRows(new Set());
+            setFillPreview(new Map());
+            document.body.style.userSelect = '';
+            document.body.style.webkitUserSelect = '';
+            return;
+        }
+
+        // Only trigger if we actually dragged to different rows
+        if (rowDragStart.row !== rowDragEnd) {
+            onRowDragFill(
+                rowDragStart.row,
+                rowDragEnd,
+                rowDragStart.rowValues,
+                rowDragStart.columns,
+                fillType,
+            );
+        }
+
+        setIsRowDragging(false);
+        setRowDragStart(null);
+        setRowDragEnd(null);
+        setDragOverRows(new Set());
+        setFillPreview(new Map());
+        document.body.style.userSelect = '';
+        document.body.style.webkitUserSelect = '';
+    }, [isRowDragging, rowDragStart, rowDragEnd, onRowDragFill, fillType]);
+
+    // Handle mouse events globally during single-cell drag
     React.useEffect(() => {
         if (!isDragging) return;
 
@@ -152,19 +264,47 @@ export const DragFillManager: React.FC<DragFillManagerProps> = ({
         };
     }, [isDragging, endDragFill]);
 
+    // Handle mouse events globally during row drag
+    React.useEffect(() => {
+        if (!isRowDragging) return;
+
+        const handleMouseUp = () => {
+            endRowDragFill();
+        };
+
+        const handleMouseLeave = () => {
+            endRowDragFill();
+        };
+
+        document.addEventListener('mouseup', handleMouseUp);
+        document.addEventListener('mouseleave', handleMouseLeave);
+
+        return () => {
+            document.removeEventListener('mouseup', handleMouseUp);
+            document.removeEventListener('mouseleave', handleMouseLeave);
+        };
+    }, [isRowDragging, endRowDragFill]);
+
     const contextValue = React.useMemo(
         () => ({
             isDragging,
+            isRowDragging,
             dragStart,
+            rowDragStart,
             dragEnd,
+            rowDragEnd,
             dragOverCells,
+            dragOverRows,
             fillPreview,
             fillType,
             startDragFill,
+            startRowDragFill,
             updateDragFill,
+            updateRowDragFill,
             endDragFill,
+            endRowDragFill,
         }),
-        [isDragging, dragStart, dragEnd, dragOverCells, fillPreview, fillType, startDragFill, updateDragFill, endDragFill],
+        [isDragging, isRowDragging, dragStart, rowDragStart, dragEnd, rowDragEnd, dragOverCells, dragOverRows, fillPreview, fillType, startDragFill, startRowDragFill, updateDragFill, updateRowDragFill, endDragFill, endRowDragFill],
     );
 
     return <DragFillContext.Provider value={contextValue}>{children}</DragFillContext.Provider>;
@@ -172,26 +312,40 @@ export const DragFillManager: React.FC<DragFillManagerProps> = ({
 
 export interface DragFillContextType {
     isDragging: boolean;
+    isRowDragging: boolean;
     dragStart: { row: number; column: string; value: any } | null;
+    rowDragStart: { row: number; rowValues: Map<string, any>; columns: string[] } | null;
     dragEnd: { row: number; column: string } | null;
+    rowDragEnd: number | null;
     dragOverCells: Set<string>;
+    dragOverRows: Set<number>;
     fillPreview: Map<string, any>;
     fillType: 'copy' | 'series' | 'pattern';
     startDragFill: (row: number, column: string, value: any) => void;
+    startRowDragFill: (row: number, rowValues: Map<string, any>, columns: string[]) => void;
     updateDragFill: (row: number, column: string) => void;
+    updateRowDragFill: (row: number) => void;
     endDragFill: () => void;
+    endRowDragFill: () => void;
 }
 
 export const DragFillContext = React.createContext<DragFillContextType>({
     isDragging: false,
+    isRowDragging: false,
     dragStart: null,
+    rowDragStart: null,
     dragEnd: null,
+    rowDragEnd: null,
     dragOverCells: new Set(),
+    dragOverRows: new Set(),
     fillPreview: new Map(),
     fillType: 'copy',
     startDragFill: () => {},
+    startRowDragFill: () => {},
     updateDragFill: () => {},
+    updateRowDragFill: () => {},
     endDragFill: () => {},
+    endRowDragFill: () => {},
 });
 
 export const useDragFill = () => {
@@ -228,6 +382,49 @@ export const DragFillHandle: React.FC<DragFillHandleProps> = ({ row, column, val
             title={`Drag to fill cells (${fillType})`}
             style={{
                 cursor: isDragging ? 'crosshair' : 'grab',
+            }}
+        />
+    );
+};
+
+// Row Drag Fill Handle - for copying entire rows
+export interface RowDragFillHandleProps {
+    row: number;
+    rowValues: Map<string, any>;
+    columns: string[];
+    className?: string;
+}
+
+export const RowDragFillHandle: React.FC<RowDragFillHandleProps> = ({ row, rowValues, columns, className }) => {
+    const { startRowDragFill, fillType, isRowDragging } = useDragFill();
+
+    const handleMouseDown = React.useCallback(
+        (e: React.MouseEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            startRowDragFill(row, rowValues, columns);
+        },
+        [row, rowValues, columns, startRowDragFill],
+    );
+
+    return (
+        <div
+            className={`row-drag-fill-handle ${className || ''} ${isRowDragging ? 'dragging' : ''}`}
+            onMouseDown={handleMouseDown}
+            title={`Drag to copy row to other rows (${fillType})`}
+            style={{
+                position: 'absolute',
+                bottom: 0,
+                right: 0,
+                width: 10,
+                height: 10,
+                backgroundColor: '#0078d4',
+                border: '2px solid white',
+                borderRadius: '2px',
+                cursor: isRowDragging ? 'crosshair' : 'grab',
+                opacity: 0,
+                transition: 'opacity 0.15s ease',
+                zIndex: 10,
             }}
         />
     );

@@ -54,6 +54,7 @@ export interface IUltimateEnterpriseGridProps {
     
     // Selection mode properties
     enableSelectionMode?: boolean;
+    selectionType?: '0' | '1' | '2'; // 0=None, 1=Single, 2=Multiple
     selectedItems?: Set<string>;
     selectAllState?: 'none' | 'some' | 'all';
     
@@ -134,6 +135,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     
     // Selection mode props
     enableSelectionMode = false,
+    selectionType = '2', // Default to Multiple for backward compatibility
     selectedItems = new Set(),
     selectAllState = 'none',
     onItemSelection,
@@ -955,6 +957,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                     
                     // Selection mode props
                     enableSelectionMode={enableSelectionMode}
+                    selectionType={selectionType}
                     selectedItems={selectedItems}
                     selectAllState={selectAllState}
                     onItemSelection={onItemSelection}

@@ -736,6 +736,89 @@
     background-color: transparent;
 }
 
+/* Row Drag Fill Handle - for copying entire rows */
+.virtualized-row .row-drag-fill-handle {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 10px;
+    height: 10px;
+    background: linear-gradient(135deg, #107c10 0%, #0b5a0b 100%);
+    border: 2px solid #ffffff;
+    border-radius: 2px;
+    cursor: crosshair;
+    opacity: 0;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 10;
+    box-shadow: 
+        0 2px 6px rgba(16, 124, 16, 0.3),
+        0 0 0 1px rgba(16, 124, 16, 0.1);
+}
+
+.virtualized-row:hover .row-drag-fill-handle {
+    opacity: 0.8;
+}
+
+.virtualized-row .row-drag-fill-handle:hover {
+    opacity: 1;
+    transform: scale(1.3);
+    box-shadow: 
+        0 4px 12px rgba(16, 124, 16, 0.4),
+        0 0 0 2px rgba(16, 124, 16, 0.2);
+    background: linear-gradient(135deg, #0b5a0b 0%, #073d07 100%);
+}
+
+/* Row being dragged over during row fill */
+.virtualized-row.row-drag-target {
+    background: linear-gradient(135deg, rgba(16, 124, 16, 0.08) 0%, rgba(11, 90, 11, 0.12) 100%) !important;
+    outline: 2px dashed #107c10;
+    outline-offset: -2px;
+    border-radius: 2px;
+}
+
+/* Source row during row drag fill */
+.virtualized-row.row-drag-source {
+    background: linear-gradient(135deg, rgba(16, 124, 16, 0.15) 0%, rgba(11, 90, 11, 0.20) 100%) !important;
+    outline: 2px solid #107c10;
+    outline-offset: -2px;
+    border-radius: 2px;
+    box-shadow: 0 2px 8px rgba(16, 124, 16, 0.3);
+}
+
+/* Cell Selection Styles */
+.virtualized-cell.cell-selected {
+    outline: 2px solid #0078d4 !important;
+    outline-offset: -2px;
+    background: rgba(0, 120, 212, 0.05) !important;
+    z-index: 1;
+}
+
+/* Multi-cell drag fill handle (green) - appears at bottom-right of multi-cell selection */
+.multi-cell-drag-fill-handle {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    width: 10px;
+    height: 10px;
+    background: linear-gradient(135deg, #107c10 0%, #0b5a0b 100%);
+    border: 2px solid #ffffff;
+    border-radius: 2px;
+    cursor: crosshair;
+    z-index: 20;
+    box-shadow: 
+        0 2px 6px rgba(16, 124, 16, 0.4),
+        0 0 0 1px rgba(16, 124, 16, 0.2);
+    transition: all 0.15s ease;
+}
+
+.multi-cell-drag-fill-handle:hover {
+    transform: scale(1.3);
+    box-shadow: 
+        0 4px 12px rgba(16, 124, 16, 0.5),
+        0 0 0 2px rgba(16, 124, 16, 0.3);
+    background: linear-gradient(135deg, #0b5a0b 0%, #073d07 100%);
+}
+
 /* Enhanced Filter Icon Styling */
 .virtualized-header-filter-icon {
     border-radius: 6px;
