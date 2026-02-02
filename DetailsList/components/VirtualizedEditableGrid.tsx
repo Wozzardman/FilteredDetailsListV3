@@ -477,7 +477,6 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
             const item = filteredItems.find(item => (item.recordId || item.key || item.id) === itemId);
             if (!item || !columnEditorMapping) return;
 
-            console.log(`🎯 Applying auto-fill confirmation for item ${itemId}`);
 
             // Use PowerAppsConditionalProcessor to determine what values should be applied
             const processor = PowerAppsConditionalProcessor.getInstance();
@@ -533,7 +532,6 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                 );
 
                                 if (newValue !== undefined && newValue !== getPCFValue(item, dependentField)) {
-                                    console.log(`🔄 Auto-fill applying ${dependentField} = ${newValue}`);
                                     
                                     // Get the original value BEFORE making changes
                                     const originalValue = getPCFValue(item, dependentField);
@@ -598,14 +596,11 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     const triggerAutoFillConfirmation = React.useCallback((itemId: string) => {
         // Prevent adding to pending if auto-fill is already in progress for this item
         if (autoFillInProgress.has(itemId)) {
-            console.log(`⏭️ Auto-fill already in progress for ${itemId}, skipping duplicate trigger`);
             return;
         }
         
-        console.log(`🔔 triggerAutoFillConfirmation called for ${itemId}`);
         setPendingAutoFillRows(prev => {
             const newSet = new Set(prev.add(itemId));
-            console.log(`📝 Updated pendingAutoFillRows:`, Array.from(newSet));
             return newSet;
         });
     }, [autoFillInProgress]);
@@ -663,12 +658,6 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     React.useEffect(() => {
         if (!columnEditorMapping) return;
         
-        console.log('🔍 Auto-fill detection running:', {
-            hasColumnEditorMapping: !!columnEditorMapping,
-            columnMappingKeys: Object.keys(columnEditorMapping || {}),
-            filteredItemsCount: filteredItems.length,
-            newRowsCount: filteredItems.filter(item => item.isNewRow).length
-        });
         
         // Find new rows that have conditional dependencies with auto-fill confirmation required
         const newRowsNeedingAutoFill = new Set<string>();
@@ -688,40 +677,25 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                         if (config.conditional && 
                             'dependsOn' in config.conditional && 
                             typeof config.conditional.dependsOn === 'string') {
-                            console.log('✅ Found PowerApps conditional dependency with confirmation required:', config.conditional.dependsOn);
                             return true;
                         }
                         
                         // Check for direct DependsOn property (your column config style)
                         if ('DependsOn' in config && typeof config.DependsOn === 'string') {
-                            console.log('✅ Found DependsOn dependency with confirmation required:', config.DependsOn);
                             return true;
                         }
                         
                         // Check for camelCase dependsOn property
                         if ('dependsOn' in config && typeof config.dependsOn === 'string') {
-                            console.log('✅ Found dependsOn dependency with confirmation required:', config.dependsOn);
                             return true;
                         }
                         
                         return false;
                     });
                     
-                    console.log('🎯 Auto-fill check for item:', {
-                        itemId,
-                        isNewRow: item.isNewRow,
-                        hasConditionalDependenciesWithConfirmation,
-                        columnConfigs: Object.keys(columnEditorMapping).map(key => ({
-                            key,
-                            hasDependsOn: 'DependsOn' in columnEditorMapping[key],
-                            hasConditional: 'conditional' in columnEditorMapping[key],
-                            requiresConfirmation: columnEditorMapping[key].RequiresAutoFillConfirmation === true
-                        }))
-                    });
                     
                     if (hasConditionalDependenciesWithConfirmation) {
                         newRowsNeedingAutoFill.add(itemId);
-                        console.log('🚀 Added to auto-fill pending:', itemId);
                     }
                 }
             }
@@ -741,7 +715,6 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 // Only remove if it was a new row that no longer exists
                 // Keep existing rows that may have triggered auto-fill via dropdown changes
                 if (!currentNewRowIds.has(id) && !existingRowIds.has(id)) {
-                    console.log(`🗑️ Removing ${id} from pendingAutoFillRows (row no longer exists)`);
                     newSet.delete(id);
                 }
             });
@@ -1034,7 +1007,6 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         let result = visibilityManager.filterVisibleColumns(columns);
         
         const metrics = visibilityManager.getPerformanceMetrics();
-        console.log(`� Ultra-fast visibility filter: ${columns.length} → ${result.length} columns (${columns.length - result.length} hidden) | Cache: ${metrics.cacheSize} items, Age: ${metrics.cacheAge.toFixed(2)}ms`);
         
         // Add selection column at the beginning if enabled
         if (enableSelectionMode) {
@@ -1498,63 +1470,44 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
 
     // Cancel all changes
     const cancelAllChanges = React.useCallback(() => {
-        console.log('🚫 VirtualizedEditableGrid: Starting cancel operation');
-        console.log('📊 Pending changes to revert:', pendingChanges.size);
         
         // Create a snapshot of changes to avoid modification during iteration
         const changesToRevert = Array.from(pendingChanges.entries());
-        console.log('📸 Created snapshot of changes:', changesToRevert.length);
         
         // Revert items to original values
         changesToRevert.forEach(([changeKey, change]) => {
-            console.log(`🔄 Reverting change ${changeKey}:`, {
-                itemIndex: change.itemIndex,
-                columnKey: change.columnKey,
-                currentValue: change.newValue,
-                revertingTo: change.oldValue
-            });
             
             // Use filteredItems to match the same array used in drag fill
             const item = filteredItems[change.itemIndex];
             if (item) {
                 const currentValue = getPCFValue(item, change.columnKey);
-                console.log(`📋 Current item value before revert:`, currentValue);
                 
                 setPCFValue(item, change.columnKey, change.oldValue);
                 
                 const valueAfterRevert = getPCFValue(item, change.columnKey);
-                console.log(`✅ Value after revert:`, valueAfterRevert);
             } else {
                 console.warn(`⚠️ Item not found at index ${change.itemIndex} for change ${changeKey}`);
             }
         });
 
-        console.log('🗑️ Clearing pending changes map');
         setPendingChanges(new Map());
         setEditingState(null);
 
         // Clear auto-fill confirmations since pending changes are being cancelled
-        console.log('🗑️ Clearing auto-fill confirmations');
         setPendingAutoFillRows(new Set());
 
         if (changeManager) {
-            console.log('🔄 Calling changeManager.cancelAllChanges()');
             changeManager.cancelAllChanges();
         }
         
         // Force grid re-render to show reverted values
-        console.log('🔄 Triggering grid refresh to show reverted values');
         setRefreshTrigger(prev => prev + 1);
         
         // Call the parent cancel handler if provided
         if (onCancelChanges) {
-            console.log('📞 Calling parent onCancelChanges handler');
             onCancelChanges();
         }
         
-        console.log('✅ VirtualizedEditableGrid: Cancel operation completed successfully');
-        console.log('📊 Final pending changes count:', pendingChanges.size);
-        console.log('📊 Final auto-fill confirmations count:', 0);
     }, [pendingChanges, filteredItems, changeManager, onCancelChanges, setRefreshTrigger, setPendingAutoFillRows]);
 
     // Expose methods through ref

@@ -20,7 +20,6 @@ try {
         (window as any).registerPowerAppsDataSource = (name: string, data: any) => {
             try {
                 (window as any).PowerAppsDataSources[name] = data;
-                console.log(`📊 Registered data source: ${name}`, data);
             } catch (e) {
                 // Silently fail on restricted iOS WebView environments
             }
@@ -201,7 +200,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             this.onSelectionManagerChange(state);
         });
         
-        console.log('✅ Native Power Apps selection initialized with performance optimization');
     }
 
     /**
@@ -213,14 +211,12 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         try {
             const dataset = this.context?.parameters?.records;
             if (!dataset) {
-                console.log(`⚠️ updateNativeSelectionState: No dataset available`);
                 return;
             }
 
             // Safely get selected IDs, handling undefined/null cases
             const selectedIds = dataset.getSelectedRecordIds() || [];
             
-            console.log(`📊 updateNativeSelectionState: selectedIds from dataset:`, selectedIds);
             
             // Update native selection state for compatibility
             this.nativeSelectionState.selectedItems = new Set(selectedIds);
@@ -246,7 +242,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                     this.selectionManager.initialize(this.sortedRecordsIds);
                     // Set selection from Power Apps dataset
                     selectedIds.forEach(id => this.selectionManager.setItemSelection(id, true));
-                    console.log(`🔄 SelectionManager synced with Power Apps dataset selection`);
                 }
             }
         } catch (error) {
@@ -259,11 +254,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             };
         }
         
-        console.log(`📋 Updated nativeSelectionState:`, {
-            selectedCount: this.nativeSelectionState.selectedCount,
-            selectAllState: this.nativeSelectionState.selectAllState,
-            selectedItems: Array.from(this.nativeSelectionState.selectedItems)
-        });
     }
 
     /**
@@ -320,7 +310,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         try {
             const dataset = this.context?.parameters?.records;
             if (!dataset) {
-                console.log(`⚠️ getNativeSelectedItemsJson: No dataset available`);
                 return '[]';
             }
 
@@ -361,17 +350,14 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     private initializeEnterpriseFeatures(): void {
         // Enable AI insights if configured
         if (this.enableAIInsights) {
-            console.log('🤖 AI insights enabled');
         }
 
         // Performance monitoring is enabled by default
         if (this.enablePerformanceMonitoring) {
-            console.log('📊 Performance monitoring enabled');
             const endComponentInit = performanceMonitor.startMeasure('component-initialization');
             endComponentInit();
         }
 
-        console.log('🚀 Enterprise features initialized');
     }
 
     /**
@@ -379,7 +365,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
      */
     private detectLegacyMode(context: ComponentFramework.Context<IInputs>): boolean {
         // Always use modern mode
-        console.log('🆕 MODERN MODE - Using Records + Columns datasets only');
         return false;
     }
 
@@ -390,7 +375,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         records: { [id: string]: ComponentFramework.PropertyHelper.DataSetApi.EntityRecord };
         sortedRecordIds: string[];
     } {
-        console.log('🔄 Converting legacy fields to modern columns format');
 
         const convertedRecords: { [id: string]: ComponentFramework.PropertyHelper.DataSetApi.EntityRecord } = {};
         const sortedIds: string[] = [];
@@ -446,7 +430,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             });
         }
 
-        console.log(`✅ Converted ${sortedIds.length} legacy fields to modern columns`);
         return { records: convertedRecords, sortedRecordIds: sortedIds };
     }
 
@@ -474,7 +457,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             if (this.isLoading && this.loadingStartTime > 0) {
                 const loadingDuration = Date.now() - this.loadingStartTime;
                 if (loadingDuration > this.maxForceRecoveryTime) {
-                    console.log(`🚨 Loading state stuck for ${loadingDuration}ms - forcing recovery`);
                     this.forceRecovery();
                 }
             }
@@ -509,11 +491,9 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         let columns: ComponentFramework.PropertyTypes.DataSet;
 
         if (this.isLegacyMode) {
-            console.log('🔄 LEGACY MODE DETECTED - Using Items + Fields datasets');
             // Legacy mode removed - this should never execute
             throw new Error('Legacy mode is no longer supported');
         } else {
-            console.log('🆕 MODERN MODE - Using Records + Columns datasets');
             dataset = context.parameters.records;
             columns = context.parameters.columns;
         }
@@ -558,7 +538,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
 
         // Clear error state if we reach this point successfully
         if (this.isInErrorState) {
-            console.log('✅ Error state cleared - control recovered successfully');
             this.isInErrorState = false;
             this.errorRecoveryAttempts = 0;
             this.clearErrorRecoveryTimer();
@@ -567,7 +546,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         // Handle loading state - show loading overlay instead of error messages
         if (dataset.loading || columns.loading) {
             this.startLoading('Loading data...');
-            console.log('📊 Datasets still loading, showing loading overlay');
             
             // Return basic grid structure with loading overlay
             return React.createElement('div', {
@@ -593,38 +571,18 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         }
 
         // Add comprehensive debug logging
-        console.log('=== PCF CONTROL UPDATE VIEW DEBUG ===');
-        console.log('Dataset loading:', dataset.loading);
-        console.log('Dataset initialized:', dataset.paging.totalResultCount);
-        console.log('Dataset record count:', dataset.sortedRecordIds?.length || 0);
-        console.log('Dataset columns count:', columns.sortedRecordIds?.length || 0);
-        console.log('Allocated width:', context.mode.allocatedWidth);
-        console.log('Allocated height:', context.mode.allocatedHeight);
-        console.log('📐 SIZING DEBUG - Using dimensions:', {
-            width: context.mode.allocatedWidth > 0 ? context.mode.allocatedWidth : '100%',
-            height: context.mode.allocatedHeight > 0 ? context.mode.allocatedHeight : 400,
-            allocatedWidth: context.mode.allocatedWidth,
-            allocatedHeight: context.mode.allocatedHeight,
-            isSelectionMode: this.isSelectionMode
-        });
 
         if (dataset.sortedRecordIds && dataset.sortedRecordIds.length > 0) {
-            console.log('First 3 record IDs:', dataset.sortedRecordIds.slice(0, 3));
             const firstRecord = dataset.records[dataset.sortedRecordIds[0]];
             if (firstRecord) {
-                console.log('First record getNamedReference:', firstRecord.getNamedReference());
-                console.log('Sample record data:');
                 // Check dataset columns instead
                 if (columns.sortedRecordIds && columns.sortedRecordIds.length > 0) {
-                    console.log('Available column definitions:', columns.sortedRecordIds.slice(0, 5));
                     columns.sortedRecordIds.slice(0, 5).forEach((colId) => {
                         const value = firstRecord.getValue(colId);
-                        console.log(`  ${colId}: ${value}`);
                     });
                 }
             }
         }
-        console.log('=== END PCF CONTROL DEBUG ===');
 
         this.setPageSize(context);
 
@@ -638,48 +596,23 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
 
         if (datasetChanged || datasetNotInitialized) {
             // === PCF DATASET DEBUG ===
-            console.log('=== PCF DATASET DEBUG ===');
-            console.log('Dataset loading:', dataset.loading);
-            console.log('Columns loading:', columns.loading);
-            console.log('Dataset records count:', Object.keys(dataset.records || {}).length);
-            console.log('Dataset columns count:', dataset.columns?.length || 0);
-            console.log(
-                'Dataset column details:',
-                dataset.columns?.map((col) => ({
-                    name: col.name,
-                    displayName: col.displayName,
-                    dataType: col.dataType,
-                    alias: (col as any).alias,
-                })),
-            );
-            console.log('Columns records count:', Object.keys(columns.records || {}).length);
-            console.log('sortedRecordIds sample:', dataset.sortedRecordIds?.slice(0, 3));
-            console.log('sortedColumnIds:', columns.sortedRecordIds);
 
             // Check if we're in test harness with placeholder data
             const isTestHarnessData = this.isTestHarnessData(dataset, columns);
-            console.log('Test harness detected:', isTestHarnessData);
 
             // Sample record data
             if (dataset.records && dataset.sortedRecordIds?.length > 0) {
                 const firstRecordId = dataset.sortedRecordIds[0];
                 const firstRecord = dataset.records[firstRecordId];
                 if (firstRecord) {
-                    console.log('First record ID:', firstRecordId);
-                    console.log('First record methods available:', typeof firstRecord.getFormattedValue === 'function');
-                    console.log('Available columns for first record:');
                     dataset.columns?.forEach((col) => {
                         const value = firstRecord.getValue(col.name);
                         const formattedValue = firstRecord.getFormattedValue(col.name);
                         const rawValue = (value as any)?.raw;
-                        console.log(
-                            `  ${col.name}: value="${value}", formatted="${formattedValue}", raw="${rawValue}"`,
-                        );
                     });
 
                     // Also check column configuration
                     if (columns.sortedRecordIds && columns.sortedRecordIds.length > 0) {
-                        console.log('Column configuration details:');
                         columns.sortedRecordIds.slice(0, 3).forEach((colId) => {
                             const colConfig = columns.records[colId];
                             if (colConfig) {
@@ -687,18 +620,13 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                                     const colName = colConfig.getFormattedValue('ColName');
                                     const colDisplayName = colConfig.getFormattedValue('ColDisplayName');
                                     const colWidth = colConfig.getValue('ColWidth');
-                                    console.log(
-                                        `  Config [${colId}]: name="${colName}", display="${colDisplayName}", width="${colWidth}"`,
-                                    );
                                 } catch (e) {
-                                    console.log(`  Config [${colId}]: Error reading config -`, e);
                                 }
                             }
                         });
                     }
                 }
             }
-            console.log('=== END PCF DATASET DEBUG ===\n');
 
             // If this is the first time we are setting the records, clear the selection in case there is state from a previous
             // time the screen was shown
@@ -712,17 +640,14 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             // Initialize SelectionManager with current dataset items for performance optimization
             if (this.isSelectionMode && this.sortedRecordsIds?.length > 0) {
                 this.selectionManager.initialize(this.sortedRecordsIds);
-                console.log(`🚀 SelectionManager initialized with ${this.sortedRecordsIds.length} items`);
             }
 
             // Handle legacy vs modern column configuration
             if (this.isLegacyMode) {
-                console.log('🔄 Processing legacy fields dataset');
                 const convertedColumns = this.convertLegacyFieldsToColumns(columns);
                 this.columns = convertedColumns.records;
                 this.sortedColumnsIds = convertedColumns.sortedRecordIds;
             } else {
-                console.log('🆕 Processing modern columns dataset');
                 this.columns = columns.records;
                 this.sortedColumnsIds = columns.sortedRecordIds;
             }
@@ -735,7 +660,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             let jumpToColumnDisplayName = '';
             
             if (columns && columns.sortedRecordIds && columns.sortedRecordIds.length > 0) {
-                console.log('🔍 Processing column definitions from columns dataset:', columns.sortedRecordIds.length);
                 columns.sortedRecordIds.forEach(colId => {
                     const columnRecord = columns.records[colId];
                     if (columnRecord) {
@@ -765,10 +689,8 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                                 jumpToColumnDisplayName = String(displayName);
                                 this.jumpToColumnName = jumpToColumnName;
                                 this.jumpToColumnDisplayName = jumpToColumnDisplayName;
-                                console.log(`🎯 Found Jump To column: ${columnName} (${displayName})`);
                             }
                             
-                            console.log(`🔧 Processing column: ${columnName} (${displayName}) - Width: ${colWidth}, Visible: ${isVisible}`);
                             
                             // ⚡ ALWAYS process all columns, but mark visibility for later filtering
                             processedColumns.push({
@@ -785,7 +707,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                             });
                             
                             if (!isVisible) {
-                                console.log(`👁️‍🗨️ Column ${columnName} marked as hidden (ColVisible=false)`);
                             }
                         } catch (e) {
                             console.warn(`⚠️ Error processing column ${colId}:`, e);
@@ -793,11 +714,9 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                     }
                 });
             } else {
-                console.log('⚠️ No columns dataset available, using data columns directly');
                 // Use dataset columns directly since metadata columns are no longer defined
                 const actualDataColumns = dataset.columns || [];
                 actualDataColumns.forEach(col => {
-                    console.log(`🔧 Direct column: ${col.name} (${col.displayName})`);
                     processedColumns.push({
                         name: col.name,
                         displayName: col.displayName,
@@ -911,7 +830,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             }
         }
         
-        console.log('📋 Enhanced records for grid (preserving data types):', items.slice(0, 1)); // Log first item for debugging
         
         // Convert columns to UltimateEnterpriseGrid format using actual data columns
         const actualDataColumns = dataset.columns || [];
@@ -951,20 +869,16 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 // Use configured width from columns dataset if available and reasonable
                 if (configuredWidth && configuredWidth > 50 && configuredWidth <= 1000) {
                     columnWidth = configuredWidth;
-                    console.log(`📏 Using columns dataset width for ${col.name}: ${columnWidth}`);
                 }
                 // Fall back to PCF visualSizeFactor if DefaultColumnWidth wasn't explicitly set
                 else if (context.parameters.DefaultColumnWidth?.raw === undefined || context.parameters.DefaultColumnWidth?.raw === null) {
                     if (pcfVisualSizeFactor > 50 && pcfVisualSizeFactor <= 500) {
                         columnWidth = pcfVisualSizeFactor;
-                        console.log(`📏 Using PCF visualSizeFactor for ${col.name}: ${columnWidth}`);
                     }
                 }
                 else {
-                    console.log(`� Using default width for ${col.name}: ${columnWidth}`);
                 }
                 
-                console.log(`🔧 Final column config: ${col.name} (${col.displayName}) - ConfigWidth: ${configuredWidth}, PCF: ${pcfVisualSizeFactor}, Default: ${defaultWidth}, Final: ${columnWidth}, Visible: ${isVisible}`);
                 
                 // Check if column resizing is enabled globally and per-column
                 const globalResizeEnabled = context.parameters.EnableColumnResizing?.raw ?? true;
@@ -1002,7 +916,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 };
             });
             
-        console.log(`✅ Final grid columns: ${gridColumns.length}`, gridColumns.map(c => ({ name: c.name, visible: (c as any).isVisible })));
 
         // Create a wrapper for handleCellEdit to match the expected signature
         const onCellEditWrapper = (item: any, column: any, newValue: any) => {
@@ -1021,7 +934,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 try {
                     const records = editorConfigDataset.records;
                     const recordIds = Object.keys(records);
-                    console.log('📊 Processing table-based editor configuration with', recordIds.length, 'records');
                     
                     for (const recordId of recordIds) {
                         const record = records[recordId];
@@ -1170,7 +1082,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                         }
                     }
                     
-                    console.log('🎯 Table-based column editor configuration loaded:', columnEditorMapping);
                 } catch (error) {
                     console.warn('⚠️ Error processing table-based editor configuration:', error);
                 }
@@ -1183,7 +1094,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                     columnEditorMapping = PowerAppsFxColumnEditorParser.parseSimpleFormulaString(
                         formulasProperty.raw
                     );
-                    console.log('🚀 Column editor configuration loaded from Power Apps FX formulas:', columnEditorMapping);
                 } catch (error) {
                     console.warn('⚠️ Error parsing Power Apps FX formulas:', error);
                 }
@@ -1192,7 +1102,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             else if ((context.parameters as any).ColumnEditorConfig?.raw) {
                 try {
                     columnEditorMapping = JSON.parse((context.parameters as any).ColumnEditorConfig.raw);
-                    console.log('📝 Column editor configuration loaded from JSON (legacy):', columnEditorMapping);
                 } catch (error) {
                     console.warn('⚠️ Invalid column editor configuration JSON:', error);
                 }
@@ -1500,7 +1409,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         if (this.newRowCreated) {
             setTimeout(() => {
                 this.newRowCreated = null;
-                console.log('🔄 New row created event cleared after output');
             }, 0);
         }
         
@@ -1513,7 +1421,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 this.buttonEventType = '';
                 this.clickedButtonName = '';
                 this.clickedButtonText = '';
-                console.log('🔄 Button event properties cleared after output');
             }, 0);
         }
         
@@ -1533,7 +1440,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         // Flush any pending SelectionManager updates to ensure Power Apps compatibility
         if (this.selectionManager) {
             this.selectionManager.flushPendingUpdates();
-            console.log('🔄 SelectionManager pending updates flushed on destroy');
         }
     }
 
@@ -1545,7 +1451,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             return; // Already running or max attempts reached
         }
 
-        console.log(`🔄 Starting error recovery, attempt ${this.errorRecoveryAttempts + 1}/${this.maxRecoveryAttempts}`);
         
         // Start force recovery timer to prevent infinite loading
         this.startForceRecoveryTimer();
@@ -1561,14 +1466,12 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
      */
     private attemptRecovery(): void {
         try {
-            console.log('🔄 Attempting error recovery...');
             
             // Check if the conditions that caused the error are resolved
             const dataset = this.context.parameters.records;
             const columns = this.context.parameters.columns;
             
             if (dataset && columns && !dataset.loading && !columns.loading) {
-                console.log('✅ Error conditions resolved, triggering re-render');
                 this.isInErrorState = false;
                 this.errorRecoveryAttempts = 0;
                 this.clearErrorRecoveryTimer();
@@ -1579,13 +1482,11 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 // Force a re-render by notifying of output changes
                 this.notifyOutputChanged();
             } else {
-                console.log(`⏳ Error conditions still present, will retry (${this.errorRecoveryAttempts}/${this.maxRecoveryAttempts})`);
                 
                 if (this.errorRecoveryAttempts < this.maxRecoveryAttempts) {
                     // Schedule next recovery attempt
                     this.startErrorRecovery();
                 } else {
-                    console.log('❌ Max recovery attempts reached, giving up auto-recovery');
                     this.clearErrorRecoveryTimer();
                     // CRITICAL: Stop loading state when recovery fails
                     this.stopLoading();
@@ -1618,9 +1519,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             return; // Already running
         }
 
-        console.log(`⏰ Starting force recovery timer (${this.maxForceRecoveryTime}ms)`);
         this.forceRecoveryTimer = window.setTimeout(() => {
-            console.log('🚨 Force recovery timeout reached - clearing error state');
             this.forceRecovery();
         }, this.maxForceRecoveryTime);
     }
@@ -1639,7 +1538,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
      * Force recovery from stuck states
      */
     private forceRecovery(): void {
-        console.log('🚨 Forcing recovery from stuck state');
         
         // Clear all timers and state
         this.clearErrorRecoveryTimer();
@@ -1666,7 +1564,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         if (this.isLoading) {
             this.consecutiveLoadingCalls++;
             if (this.consecutiveLoadingCalls >= this.maxConsecutiveLoading) {
-                console.log('🚨 Too many consecutive loading calls detected - forcing recovery');
                 this.forceRecovery();
                 return;
             }
@@ -1677,7 +1574,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         this.isLoading = true;
         this.loadingMessage = message;
         this.loadingStartTime = Date.now();
-        console.log(`🔄 Loading started: ${message}`);
     }
 
     /**
@@ -1686,7 +1582,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     private stopLoading(): void {
         if (this.isLoading) {
             const duration = Date.now() - this.loadingStartTime;
-            console.log(`✅ Loading completed in ${duration}ms`);
         }
         this.isLoading = false;
         this.loadingMessage = 'Loading...';
@@ -1740,14 +1635,12 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                     this.selectionManager.clearAll();
                 }
                 this.ref && this.ref.forceUpdate();
-                console.log('✅ Selection cleared via InputEvent');
             });
         } else if (inputEvent.indexOf(InputEvents.SetSelection) > -1) {
             this.asyncOperations(() => {
                 // set the default selection
                 this.setSelected();
                 this.ref && this.ref.forceUpdate();
-                console.log('✅ Selection set from dataset via InputEvent');
             });
         } else if (inputEvent.indexOf(InputEvents.SelectRowById) > -1) {
             // Format: SelectRowById:<recordId>[:<additive>]
@@ -1765,7 +1658,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                         }
                         // Select the specified row
                         this.selectionManager.setItemSelection(recordId, true);
-                        console.log(`✅ Row selected via InputEvent: ${recordId} (additive: ${additive})`);
                     }
                     this.ref && this.ref.forceUpdate();
                 });
@@ -1785,7 +1677,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                         recordIds.forEach(recordId => {
                             this.selectionManager.setItemSelection(recordId.trim(), true);
                         });
-                        console.log(`✅ Rows selected via InputEvent: ${recordIds.length} rows`);
                     }
                     this.ref && this.ref.forceUpdate();
                 });
@@ -2119,7 +2010,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
      * Handle individual cell edits with auto-update tracking
      */
     private handleCellEdit = (recordId: string, columnName: string, newValue: any): void => {
-        console.log(`🖊️ Cell edit: Record ${recordId}, Column ${columnName}, New value:`, newValue);
 
         // Get the original value before making changes
         const dataset = this.context.parameters.records;
@@ -2146,8 +2036,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         this.currentOldValue = oldValue ? oldValue.toString() : '';
         this.currentNewValue = newValue ? newValue.toString() : '';
 
-        console.log(`📝 Pending changes for record ${recordId}:`, Object.fromEntries(recordChanges));
-        console.log(`🔄 Change event: ${recordId}.${columnName}: ${this.currentOldValue} → ${this.currentNewValue}`);
         
         // Auto-select the edited record for Power Apps .Selected integration
         this.autoSelectEditedRecord(recordId);
@@ -2222,7 +2110,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         };
 
         this.autoUpdateManager.registerRecord(recordId, identity);
-        console.log(`✅ Registered record ${recordId} with AutoUpdateManager`);
     };
 
     /**
@@ -2268,22 +2155,15 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         const manualDataSourceName = this.undefinedIfEmpty(this.context.parameters.DataSourceName);
         if (manualDataSourceName) {
             dataSourceName = manualDataSourceName;
-            console.log('✅ Using manually configured data source name:', dataSourceName);
         } else {
             // Enhanced data source detection with comprehensive logging
             try {
-                console.log('🔍 Starting enhanced data source detection...');
-                console.log('📊 Dataset object:', dataset);
-                console.log('📋 Dataset properties:', Object.getOwnPropertyNames(dataset));
-                console.log('📋 Dataset prototype methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(dataset)));
                 
                 // Method 1: dataset.getTitle() - Primary method
                 if (dataset.getTitle && typeof dataset.getTitle === 'function') {
                     const title = dataset.getTitle();
-                    console.log('🎯 Method 1 - getTitle():', title);
                     if (title && title !== '' && title !== 'val') {
                         dataSourceName = title;
-                        console.log('✅ Data source from getTitle():', dataSourceName);
                     }
                 }
 
@@ -2291,10 +2171,8 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 if (!dataSourceName || dataSourceName === 'DataSource') {
                     if (dataset.getTargetEntityType && typeof dataset.getTargetEntityType === 'function') {
                         const entityType = dataset.getTargetEntityType();
-                        console.log('🎯 Method 2 - getTargetEntityType():', entityType);
                         if (entityType && entityType !== '') {
                             dataSourceName = entityType;
-                            console.log('✅ Data source from getTargetEntityType():', dataSourceName);
                         }
                     }
                 }
@@ -2302,10 +2180,8 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             // Method 3: Direct entityType property
             if (!dataSourceName || dataSourceName === 'DataSource') {
                 const entityType = (dataset as any).entityType;
-                console.log('🎯 Method 3 - entityType property:', entityType);
                 if (entityType && entityType !== '') {
                     dataSourceName = entityType;
-                    console.log('✅ Data source from entityType property:', dataSourceName);
                 }
             }
 
@@ -2313,25 +2189,19 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             if (!dataSourceName || dataSourceName === 'DataSource') {
                 if ((dataset as any).getNamedReference && typeof (dataset as any).getNamedReference === 'function') {
                     const namedRef = (dataset as any).getNamedReference();
-                    console.log('🎯 Method 4 - getNamedReference():', namedRef);
                     if (namedRef && namedRef.entityType) {
                         dataSourceName = namedRef.entityType;
-                        console.log('✅ Data source from getNamedReference().entityType:', dataSourceName);
                     }
                 }
             }
 
             // Method 5: Check context for app-level information
             if (!dataSourceName || dataSourceName === 'DataSource') {
-                console.log('🎯 Method 5 - Checking context for app info...');
-                console.log('📋 Context properties:', Object.getOwnPropertyNames(this.context));
                 
                 // Try to find app or page context that might contain the Items property source
                 if ((this.context as any).page) {
-                    console.log('📄 Page context found:', (this.context as any).page);
                 }
                 if ((this.context as any).app) {
-                    console.log('📱 App context found:', (this.context as any).app);
                 }
             }
 
@@ -2340,16 +2210,11 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 if (dataset.records && Object.keys(dataset.records).length > 0) {
                     const firstRecordId = Object.keys(dataset.records)[0];
                     const firstRecord = dataset.records[firstRecordId];
-                    console.log('🎯 Method 6 - Analyzing first record:', firstRecord);
-                    console.log('📋 First record properties:', Object.getOwnPropertyNames(firstRecord));
-                    console.log('📋 First record prototype:', Object.getOwnPropertyNames(Object.getPrototypeOf(firstRecord)));
                     
                     if (firstRecord && (firstRecord as any).getNamedReference) {
                         const ref = (firstRecord as any).getNamedReference();
-                        console.log('🔗 Record named reference:', ref);
                         if (ref && ref.entityType) {
                             dataSourceName = ref.entityType;
-                            console.log('✅ Data source from record getNamedReference().entityType:', dataSourceName);
                         }
                     }
                 }
@@ -2357,8 +2222,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
 
             // Final fallback - if still DataSource, try common Power Apps table names
             if (dataSourceName === 'DataSource') {
-                console.log('🤔 Still using fallback, checking for common patterns...');
-                console.log('💡 Hint: You can manually set the DataSourceName property to override auto-detection');
             }
 
             } catch (error) {
@@ -2366,7 +2229,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             }
         }
         
-        console.log(`📊 Final data source determined: ${dataSourceName}`);
         
         const controlName = 'MyGrid'; // This could be made configurable
         const changes: string[] = [];
@@ -2463,7 +2325,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             
             // Check if the record exists in the dataset
             if (!dataset.records[recordId]) {
-                console.log(`⚠️ Record ${recordId} not found in dataset for auto-selection`);
                 return;
             }
 
@@ -2474,7 +2335,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             // Update our internal selection state to stay in sync
             this.updateNativeSelectionState();
             
-            console.log(`✅ Auto-selected edited record: ${recordId} for Power Apps .Selected integration`);
         } catch (error) {
             console.error('❌ Error auto-selecting edited record:', error);
         }
@@ -2518,7 +2378,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     private handleSaveTriggerReset = (context: ComponentFramework.Context<IInputs>): void => {
         const resetTrigger = context.parameters.SaveTriggerReset?.raw;
         if (resetTrigger && resetTrigger !== this.lastSaveTriggerReset) {
-            console.log('🔄 Resetting SaveTrigger for next use');
             
             // Reset the SaveTrigger so it can be triggered again
             this.lastSaveTimestamp = '';
@@ -2545,7 +2404,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             try {
                 const records = templateConfigDataset.records;
                 const recordIds = Object.keys(records);
-                console.log('📊 Processing table-based template configuration with', recordIds.length, 'records');
                 
                 for (const recordId of recordIds) {
                     const record = records[recordId];
@@ -2590,7 +2448,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                     }
                 }
                 
-                console.log('🎯 Table-based new row template loaded:', newRowTemplate);
             } catch (error) {
                 console.warn('⚠️ Error processing table-based template configuration:', error);
             }
@@ -2602,7 +2459,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             if (columnSpecificTemplate) {
                 try {
                     newRowTemplate = JSON.parse(columnSpecificTemplate);
-                    console.log('📝 Column-specific template loaded:', newRowTemplate);
                     return newRowTemplate;
                 } catch (error) {
                     console.warn('⚠️ Invalid column-specific template JSON:', error);
@@ -2614,7 +2470,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             if (newRowTemplateParam) {
                 try {
                     newRowTemplate = JSON.parse(newRowTemplateParam);
-                    console.log('📝 Global JSON template loaded:', newRowTemplate);
                 } catch (error) {
                     console.warn('⚠️ Invalid NewRowTemplate JSON:', error);
                     newRowTemplate = {};
@@ -2652,7 +2507,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         if (triggerFound) {
             // Use the helper method to get template with priority order
             const newRowTemplate = this.getNewRowTemplate(columnSpecificTemplate);
-            console.log('🆕 Add new row triggered with template:', newRowTemplate);
             this.createNewRow(newRowTemplate);
             this.notifyOutputChanged();
         }
@@ -2691,7 +2545,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                         // Apply increment based on value type
                         if (typeof baseValue === 'number') {
                             template[columnName] = baseValue + incrementIndex;
-                            console.log(`🔢 Auto-increment: ${columnName} = ${template[columnName]} (base: ${baseValue} + ${incrementIndex})`);
                         } else {
                             console.warn(`⚠️ Auto-increment skipped for ${columnName}: base value is not numeric (${typeof baseValue})`);
                         }
@@ -2711,7 +2564,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             return; // Add new row is not enabled
         }
 
-        console.log('🆕 Add new row button clicked, creating', count, 'new rows');
         
         // Use the helper method to get template with priority order
         const baseTemplate = this.getNewRowTemplate();
@@ -2780,7 +2632,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             }
         }
 
-        console.log('🆕 Creating new row with data:', newRowData);
 
         // Add the new row to pending changes for tracking
         const changeMap = new Map<string, any>();
@@ -2807,7 +2658,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
      * Handle delete new row operation - remove a specific newly created row
      */
     private handleDeleteNewRow = (itemId: string): void => {
-        console.log('🗑️ Deleting new row:', itemId);
         
         try {
             // Check if this is actually a new row in pending changes
@@ -2819,7 +2669,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             
             // Remove the entire new row from pending changes
             this.pendingChanges.delete(itemId);
-            console.log('🗑️ Removed new row from pending changes:', itemId);
             
             // Remove any related cell-level changes for this row
             const cellKeysToRemove: string[] = [];
@@ -2834,13 +2683,11 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             });
             
             if (cellKeysToRemove.length > 0) {
-                console.log('🗑️ Removed cell-level changes for deleted row:', cellKeysToRemove);
             }
             
             // Trigger a refresh to update the grid
             this.notifyOutputChanged();
             
-            console.log('✅ Successfully deleted new row:', itemId);
             
         } catch (error) {
             console.error('❌ Error deleting new row:', error);
@@ -2869,8 +2716,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             
             // If dataset state changed and we have pending changes, this might be a cancel operation
             if ((recordCountChanged || recordIdsChanged) && timeSinceLastRefresh > 100) {
-                console.log('🔍 Dataset state change detected with pending changes - possible cancel operation');
-                console.log('📊 Record count changed:', recordCountChanged, 'IDs changed:', recordIdsChanged);
                 
                 // Check if all our pending change record IDs still exist in the dataset
                 let allRecordsStillExist = true;
@@ -2883,7 +2728,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 
                 // If records still exist but dataset refreshed, likely a cancel operation
                 if (allRecordsStillExist && (recordIdsChanged || timeSinceLastRefresh < 2000)) {
-                    console.log('🚫 Cancel operation detected - clearing pending changes');
                     this.handleCancelOperation();
                 }
             }
@@ -2901,7 +2745,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
      * Handle cancel operation - clear pending changes but preserve new rows
      */
     private handleCancelOperation = (): void => {
-        console.log('🚫 Executing cancel operation - clearing pending changes but preserving new rows');
         
         // Set button event properties
         this.triggerButtonEvent('Cancel Changes', 'cancel', 'Cancel Changes');
@@ -2926,7 +2769,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 }
                 
                 newRowsToPreserve.set(recordId, cleanTemplate);
-                console.log('🔄 Preserving new row with reset template:', recordId, Object.fromEntries(cleanTemplate));
             }
         });
         
@@ -2947,14 +2789,12 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                     if (!cleanTemplate.has(columnKey)) {
                         keysToRemove.push(columnKey);
                     } else {
-                        console.log('🔒 Preserving template field:', newRowId + '.' + columnKey, '=', value);
                     }
                 });
                 
                 // Remove non-template field changes
                 keysToRemove.forEach(columnKey => {
                     currentChanges.delete(columnKey);
-                    console.log('🧹 Removed user edit for new row:', newRowId + '.' + columnKey);
                 });
             }
         });
@@ -2970,7 +2810,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         
         recordKeysToRemove.forEach(recordId => {
             this.pendingChanges.delete(recordId);
-            console.log('🧹 Removed changes for existing row:', recordId);
         });
         this.autoUpdateManager.clearAllChanges();
         this.clearCurrentChange();
@@ -2980,7 +2819,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             this.pendingChanges.set(recordId, cleanTemplate);
         });
         
-        console.log(`✅ Cancel operation completed - preserved ${newRowsToPreserve.size} new rows, cleared other changes`);
         
         // Force a UI refresh to clear any visual pending change indicators
         if (this.ref) {
@@ -3000,11 +2838,9 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             const pendingChangesSummary = this.autoUpdateManager.getPendingChangesSummary();
             
             if (pendingChangesSummary.totalChanges === 0) {
-                console.log('ℹ️ No pending changes to save');
                 return;
             }
 
-            console.log(`💾 Auto-saving ${pendingChangesSummary.totalChanges} changes across ${pendingChangesSummary.totalRecords} records`);
 
             // For each changed record, set it as the current change and trigger PowerApps
             pendingChangesSummary.recordSummaries.forEach((recordSummary, index) => {
@@ -3020,7 +2856,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                     this.currentChangedColumn = firstField;
                     this.currentNewValue = String(newValue || '');
                     
-                    console.log(`📤 Triggering auto-save for record ${recordSummary.recordId}, field ${firstField} = ${this.currentNewValue}`);
                 }
             });
 
@@ -3039,7 +2874,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
      */
     private handleSaveButtonClick = (): void => {
         try {
-            console.log('💾 Save button clicked - triggering SaveTrigger for Power Apps');
             
             // Set button event properties
             this.triggerButtonEvent('Save Changes', 'save', `Save Changes (${this.pendingChanges.size})`);
@@ -3065,7 +2899,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
      * to prevent persistence across subsequent OnChange events
      */
     private triggerButtonEvent = (buttonName: string, buttonType: string, buttonText: string): void => {
-        console.log(`🔘 Button event: ${buttonName} (${buttonType})`);
         
         // Increment sequence number for proper event ordering
         this.buttonEventSequence++;
@@ -3092,12 +2925,9 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             this.isSelectionMode = isSelectionModeActive;
             
             if (this.isSelectionMode) {
-                console.log('✅ Selection mode enabled - Grid editing disabled, row selection active');
-                console.log(`   Selection type: ${selectionType === '1' ? 'Single' : 'Multiple'}`);
                 // Update selection state from native Power Apps APIs
                 this.updateNativeSelectionState();
             } else {
-                console.log('❌ Grid edit mode enabled - Selection mode disabled, inline editing active');
                 // Clear all selections using native Power Apps API
                 const dataset = this.context.parameters.records;
                 dataset.setSelectedRecordIds([]);
@@ -3112,7 +2942,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
      * Handle Jump To navigation result
      */
     private handleJumpToResult = (result: string, rowIndex: number): void => {
-        console.log(`🎯 Jump To Result: ${result}, Row Index: ${rowIndex}`);
         
         // Update output properties for Power Apps
         this.jumpToResult = result;
@@ -3126,16 +2955,13 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
      * Handle selection events with performance optimization - ensures Power Apps' native .Selected property works
      */
     private handleItemSelection = (itemId: string): void => {
-        console.log(`🔄 handleItemSelection called with itemId: ${itemId}, isSelectionMode: ${this.isSelectionMode}`);
         
         try {
             if (!this.isSelectionMode) {
-                console.log(`⚠️ Selection mode not enabled, ignoring selection event`);
                 return;
             }
 
             const selectionType = this.context.parameters.SelectionType?.raw;
-            console.log(`📊 Selection type: ${selectionType}, using SelectionManager for performance`);
             
             if (selectionType === '1') {
                 // Single selection mode - this enables Power Apps' native .Selected property
@@ -3143,21 +2969,17 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 if (isCurrentlySelected) {
                     // Deselect all if already selected
                     this.selectionManager.clearAll();
-                    console.log(`✅ Deselected item: ${itemId}`);
                 } else {
                     // Clear all and select only this item - populates Power Apps' .Selected property
                     this.selectionManager.clearAll();
                     this.selectionManager.setItemSelection(itemId, true);
-                    console.log(`✅ Selected item: ${itemId} - Power Apps .Selected should now work`);
                 }
             } else {
                 // Multiple selection mode with performance optimization
                 this.selectionManager.toggleItem(itemId);
                 const isSelected = this.selectionManager.isItemSelected(itemId);
-                console.log(`✅ Toggled selection for item: ${itemId}, now selected: ${isSelected}`);
             }
             
-            console.log(`🚀 Selection updated using performance-optimized SelectionManager`);
         } catch (error) {
             console.error(`❌ Error in handleItemSelection for item ${itemId}:`, error);
         }
@@ -3166,7 +2988,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     private handleSelectAll = (): void => {
         try {
             if (!this.isSelectionMode) {
-                console.log(`⚠️ Selection mode not enabled, ignoring select all`);
                 return;
             }
 
@@ -3175,13 +2996,11 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             const performanceStart = safeNow();
             
             const stats = this.selectionManager.getSelectionStats();
-            console.log(`🚀 Select All using performance-optimized SelectionManager - Current stats:`, stats);
             
             // Use SelectionManager's built-in performance optimization for large datasets
             this.selectionManager.toggleSelectAll();
             
             const performanceEnd = safeNow();
-            console.log(`🔄 Select all completed in ${(performanceEnd - performanceStart).toFixed(2)}ms using SelectionManager`);
         } catch (error) {
             console.error('❌ Error in handleSelectAll:', error);
         }
@@ -3190,13 +3009,11 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     private handleClearAllSelections = (): void => {
         try {
             if (!this.isSelectionMode) {
-                console.log(`⚠️ Selection mode not enabled, ignoring clear all`);
                 return;
             }
 
             // Use SelectionManager's optimized clear operation
             this.selectionManager.clearAll();
-            console.log('🗑️ All selections cleared using performance-optimized SelectionManager');
         } catch (error) {
             console.error('❌ Error in handleClearAllSelections:', error);
         }
@@ -3207,7 +3024,6 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
      */
     private handleClipboardOperation = (operation: 'copy' | 'paste', data?: any): void => {
         try {
-            console.log(`📋 Clipboard operation: ${operation}`, data);
             
             // Set output properties for Power Apps
             this.eventName = operation === 'copy' ? 'ClipboardCopy' : 'ClipboardPaste';
@@ -3326,16 +3142,12 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
      * doesn't properly set the CancelChangesTrigger property
      */
     public clearAllPendingChanges = (): void => {
-        console.log('🧹 clearAllPendingChanges called directly (test harness workaround)');
-        console.log('📊 Pending changes size before clear:', this.pendingChanges.size);
         
         // Clear all pending changes without committing
         this.pendingChanges.clear();
         this.autoUpdateManager.clearAllChanges();
         this.clearCurrentChange();
         
-        console.log('📊 Pending changes size after clear:', this.pendingChanges.size);
-        console.log('📊 Pending changes entries after clear:', Array.from(this.pendingChanges.entries()));
         
         // Force a UI refresh to clear any visual pending change indicators
         if (this.ref) {
@@ -3345,6 +3157,5 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         // Notify PCF framework that outputs have changed
         this.notifyOutputChanged();
         
-        console.log('🚫 All pending changes cleared via direct method call');
     };
 }

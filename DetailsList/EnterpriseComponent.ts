@@ -88,7 +88,6 @@ export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.React
             this.setColumnLimit(context);
 
             // Log initialization
-            console.log('🚀 Enterprise FilteredDetailsListV2 initialized with essential features');
         } finally {
             endMeasurement();
         }
@@ -107,11 +106,6 @@ export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.React
             // Enable virtualization for large datasets
             this.virtualizedMode = this.shouldUseVirtualization();
 
-            console.log('✅ Enterprise features enabled:', {
-                virtualization: this.virtualizedMode,
-                performance: true,
-                accessibility: true,
-            });
         }
     }
 
@@ -185,17 +179,6 @@ export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.React
 
     private logPerformanceMetrics(dataset: any, columns: any, context: ComponentFramework.Context<IInputs>) {
         if (process.env.NODE_ENV === 'development') {
-            console.log('=== ENTERPRISE PCF PERFORMANCE METRICS ===');
-            console.log('Dataset loading:', dataset.loading);
-            console.log('Dataset record count:', dataset.sortedRecordIds?.length || 0);
-            console.log('Dataset columns count:', columns.sortedRecordIds?.length || 0);
-            console.log('Allocated dimensions:', {
-                width: context.mode.allocatedWidth,
-                height: context.mode.allocatedHeight,
-            });
-            console.log('Memory usage:', this.getMemoryUsage());
-            console.log('Virtualization enabled:', this.virtualizedMode);
-            console.log('=== END PERFORMANCE METRICS ===');
         }
     }
 
@@ -399,7 +382,6 @@ export class EnterpriseFilteredDetailsListV2 implements ComponentFramework.React
             this.accessibilityManager.destroy();
         }
 
-        console.log('🧹 Enterprise FilteredDetailsListV2 destroyed and cleaned up');
     }
 
     // Utility methods (placeholder implementations)

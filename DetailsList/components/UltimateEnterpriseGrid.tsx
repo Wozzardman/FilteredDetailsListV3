@@ -428,7 +428,6 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     // Handle export functionality
     const handleExport = useCallback(async (format: 'CSV' | 'Excel' | 'PDF' | 'JSON') => {
         try {
-            console.log(`🚀 Starting ${format} export of ${filteredItems.length} items...`);
             
             // Create export options with metadata
             const exportOptions: IExportOptions = {
@@ -450,7 +449,6 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
             // Use the real DataExportService to export
             await exportService.exportData(filteredItems, exportOptions);
             
-            console.log(`✅ ${format} export completed successfully!`);
             
             // Call the optional callback
             onExport?.(format, filteredItems);
@@ -528,13 +526,11 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
         });
 
         if (matchingIndex >= 0) {
-            console.log(`🎯 Jump To: Found record at index ${matchingIndex}`);
             
             // ENTERPRISE-GRADE LIGHTNING-FAST SCROLLING - Google/Meta competitive performance
             // Instant virtualized scrolling with zero performance overhead
             if (gridRef.current?.scrollToIndex) {
                 gridRef.current.scrollToIndex(matchingIndex);
-                console.log(`⚡ Lightning scroll to index ${matchingIndex} - META/Google competitive performance`);
             }
             
             // No visual feedback text - just silent navigation with row index for Power Apps integration

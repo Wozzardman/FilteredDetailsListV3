@@ -230,7 +230,6 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
     ) => {
         const valueToUse = newValue !== undefined ? newValue : currentValue;
         
-        console.log(`🔥 handleConditionalTrigger called: type=${triggerType}, column=${column.key}, newValue=${newValue}, currentValue=${currentValue}, valueToUse=${valueToUse}`);
         
         if (column.key && config.conditional) {
             // Handle enterprise conditional logic
@@ -245,8 +244,6 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
 
         // Handle PowerApps-compatible conditional logic
         if (column.key && triggerType === 'onChange' && onItemChange && allColumns && columnEditorMapping) {
-            console.log(`🔍 PowerApps conditional check: column=${column.key}, hasAllColumns=${!!allColumns}, hasMapping=${!!columnEditorMapping}`);
-            console.log(`📊 Current allColumns:`, allColumns);
             
             const processor = PowerAppsConditionalProcessor.getInstance();
             
@@ -267,7 +264,6 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
             const dependencies = processor.getDependencies(allEditorConfigs);
             const dependentFields = dependencies[column.key];
             
-            console.log(`📋 Dependencies found for ${column.key}:`, dependentFields);
 
             if (dependentFields && dependentFields.length > 0) {
                 const context = {
@@ -276,9 +272,6 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                     globalDataSources: (window as any).PowerAppsDataSources || {}
                 };
 
-                console.log(`🔍 Processing conditional logic for ${column.key} = ${valueToUse}`);
-                console.log(`📋 Dependent fields:`, dependentFields);
-                console.log(`🔄 Current context:`, context.currentValues);
 
                 // First pass: Check if ANY dependent field requires auto-fill confirmation
                 let hasPendingAutoFillConfirmations = false;
@@ -302,7 +295,6 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                             const requiresConfirmation = fieldConfig?.RequiresAutoFillConfirmation === true;
                             
                             if (requiresConfirmation) {
-                                console.log(`⏸️ Auto-fill for ${dependentField} requires confirmation - will defer ALL auto-fill`);
                                 hasPendingAutoFillConfirmations = true;
                             }
                         }
@@ -311,12 +303,10 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
 
                 // Second pass: Apply updates based on whether confirmation is needed
                 if (hasPendingAutoFillConfirmations) {
-                    console.log(`🚫 Deferring ALL auto-fill updates due to confirmation requirement`);
                     // Don't apply any changes immediately - let the auto-fill confirmation system handle them all
                 } else {
                     // Apply all changes immediately as no confirmation is required
                     for (const update of autoFillUpdates) {
-                        console.log(`🔄 Auto-updating ${update.field} from ${allColumns[update.field]} to ${update.value}`);
                         onItemChange(update.field, update.value);
                     }
                 }
@@ -324,10 +314,8 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                 // If any dependent fields require confirmation, trigger the auto-fill confirmation system
                 if (hasPendingAutoFillConfirmations && onTriggerAutoFillConfirmation) {
                     const itemId = item?.recordId || item?.key || item?.id || 'current-item';
-                    console.log(`🎯 Triggering auto-fill confirmation for item ${itemId}, trigger field: ${column.key}, new value: ${valueToUse}`);
                     onTriggerAutoFillConfirmation(itemId);
                 } else if (autoFillUpdates.length > 0) {
-                    console.log(`ℹ️ No confirmation required for ${autoFillUpdates.length} auto-fill updates`);
                 }
             }
         }
