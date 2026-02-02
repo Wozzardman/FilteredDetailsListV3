@@ -15,7 +15,7 @@ describe('Date Parsing Utilities', () => {
             expect(isDateLikeString('hello world')).toBe(false);
             expect(isDateLikeString('123456')).toBe(false);
             expect(isDateLikeString('')).toBe(false);
-            expect(isDateLikeString(null as any)).toBe(false);
+            expect(isDateLikeString(null as unknown as string)).toBe(false);
         });
     });
 

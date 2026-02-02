@@ -270,20 +270,10 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
             console.log(`📋 Dependencies found for ${column.key}:`, dependentFields);
 
             if (dependentFields && dependentFields.length > 0) {
-                // iOS WebView Safety: Safely access global data sources
-                let globalDataSources = {};
-                try {
-                    if (typeof window !== 'undefined' && window !== null) {
-                        globalDataSources = (window as any).PowerAppsDataSources || {};
-                    }
-                } catch (e) {
-                    // Ignore window access errors on restricted iOS WebView
-                }
-                
                 const context = {
                     currentValues: { ...allColumns, [column.key]: valueToUse },
                     isNewRecord: !item || Object.keys(item).every(key => !item[key]),
-                    globalDataSources: globalDataSources
+                    globalDataSources: (window as any).PowerAppsDataSources || {}
                 };
 
                 console.log(`🔍 Processing conditional logic for ${column.key} = ${valueToUse}`);
@@ -827,28 +817,12 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                     handleFocus();
                 },
                 // Custom onBlur that respects calendar interactions
-                onBlur: (event: React.FocusEvent) => {
-                    // Check if the focus is moving to a calendar-related element
-                    const relatedTarget = event.relatedTarget as HTMLElement;
-                    const isCalendarNavigation = relatedTarget && (
-                        relatedTarget.closest('.ms-DatePicker-monthAndYear') ||
-                        relatedTarget.closest('.ms-DatePicker-yearPicker') ||
-                        relatedTarget.closest('.ms-DatePicker-monthPicker') ||
-                        relatedTarget.closest('[role="grid"]') ||
-                        relatedTarget.classList.contains('ms-Button') ||
-                        relatedTarget.closest('.ms-DatePicker-wrap')
-                    );
-                    
-                    if (isCalendarNavigation) {
-                        // Focus is moving within the calendar, don't close yet
-                        return;
-                    }
-                    
-                    // Focus is leaving the calendar entirely, safe to close
+                onBlur: () => {
+                    // Delay the blur handling to allow calendar selection to complete
                     setTimeout(() => {
                         setIsDatePickerActive(false);
                         handleBlur();
-                    }, 50);
+                    }, 200);
                 },
                 className: `enhanced-editor ${className} ${hasError ? 'has-error' : ''}`,
                 autoFocus: true,

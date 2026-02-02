@@ -1919,15 +1919,6 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                                 originalValuesSnapshot.set(changeKey, change.oldValue);
                                             });
                                             
-                                            console.log(`🎯 Drag fill starting from cell ${startCellKey}:`, {
-                                                startIndex,
-                                                columnKey,
-                                                startValue,
-                                                startOriginalValue,
-                                                hasExistingChange: !!existingStartChange,
-                                                existingPendingChanges: pendingChanges.size
-                                            });
-                                            
                                             // Auto-scroll variables
                                             let currentMouseY = 0;
                                             let autoScrollInterval: ReturnType<typeof setInterval> | null = null;
@@ -1972,17 +1963,18 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                                     const rowElement = element.closest('.virtualized-row') as HTMLElement;
                                                     const targetIndex = parseInt(rowElement.dataset.index || '0');
                                                     
-                                                    // Clear previous drag fill changes (but preserve original values)
+                                                    // PERFORMANCE: Batch all state updates instead of updating per-cell
+                                                    // Collect all changes first, then update state once
+                                                    const batchedChanges = new Map<string, any>();
+                                                    const keysToRemove: string[] = [];
+                                                    
+                                                    // Mark previous drag fill changes for removal (but preserve original values)
                                                     dragFillChanges.forEach((_, changeKey) => {
                                                         const [indexStr] = changeKey.split('-');
                                                         const index = parseInt(indexStr);
                                                         // Don't remove the starting cell's original change
                                                         if (index !== startIndex) {
-                                                            setPendingChanges(prev => {
-                                                                const newMap = new Map(prev);
-                                                                newMap.delete(changeKey);
-                                                                return newMap;
-                                                            });
+                                                            keysToRemove.push(changeKey);
                                                         }
                                                     });
                                                     dragFillChanges.clear();
@@ -2001,30 +1993,16 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                                                 let originalValue: any;
                                                                 
                                                                 if (i === startIndex) {
-                                                                    // For the starting cell, preserve its true original value
                                                                     originalValue = startOriginalValue;
                                                                 } else {
-                                                                    // For other cells, check our snapshot first, then existing changes, then current value
                                                                     if (originalValuesSnapshot.has(changeKey)) {
-                                                                        // Use the original value from our snapshot
                                                                         originalValue = originalValuesSnapshot.get(changeKey);
                                                                     } else {
-                                                                        // This is a new cell being touched - capture its current value as original
                                                                         const existingChange = pendingChanges.get(changeKey);
                                                                         originalValue = existingChange ? existingChange.oldValue : getPCFValue(targetItem, columnKey);
-                                                                        // Store this original value for future reference
                                                                         originalValuesSnapshot.set(changeKey, originalValue);
                                                                     }
                                                                 }
-                                                                
-                                                                console.log(`🖱️ Drag fill - Cell ${changeKey}:`, {
-                                                                    itemIndex: i,
-                                                                    columnKey,
-                                                                    originalValue,
-                                                                    newValue: startValue,
-                                                                    isStartCell: i === startIndex,
-                                                                    hadSnapshot: originalValuesSnapshot.has(changeKey)
-                                                                });
                                                                 
                                                                 const change = {
                                                                     itemId,
@@ -2034,12 +2012,23 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                                                     oldValue: originalValue
                                                                 };
                                                                 
-                                                                setPendingChanges(prev => new Map(prev.set(changeKey, change)));
+                                                                // Collect changes for batched update
+                                                                batchedChanges.set(changeKey, change);
                                                                 setPCFValue(targetItem, columnKey, startValue);
                                                                 dragFillChanges.set(changeKey, change);
                                                             }
                                                         }
                                                     }
+                                                    
+                                                    // PERFORMANCE: Single batched state update
+                                                    setPendingChanges(prev => {
+                                                        const newMap = new Map(prev);
+                                                        // Remove old keys
+                                                        keysToRemove.forEach(key => newMap.delete(key));
+                                                        // Add new changes
+                                                        batchedChanges.forEach((change, key) => newMap.set(key, change));
+                                                        return newMap;
+                                                    });
                                                 }
                                             };
                                             
@@ -2150,14 +2139,6 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                         setRowDragFillSource(selectionBounds.startRow);
                                         setRowDragFillTargets(new Set());
                                         
-                                        console.log(`🎯 Multi-cell drag fill starting:`, {
-                                            selectionBounds,
-                                            columns: Array.from(allSelectedColumns),
-                                            selectionHeight,
-                                            sortedRows,
-                                            selectionValues: Object.fromEntries(selectionValues)
-                                        });
-                                        
                                         // Auto-scroll variables for multi-cell drag fill
                                         let currentMouseY = 0;
                                         let autoScrollInterval: ReturnType<typeof setInterval> | null = null;
@@ -2214,16 +2195,16 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                                 }
                                                 setRowDragFillTargets(newTargets);
                                                 
-                                                // Clear previous changes
+                                                // PERFORMANCE: Batch all state updates
+                                                const keysToRemove: string[] = [];
+                                                const batchedChanges = new Map<string, any>();
+                                                
+                                                // Mark previous changes for removal
                                                 multiCellDragChanges.forEach((_, changeKey) => {
                                                     const [indexStr] = changeKey.split('-');
                                                     const idx = parseInt(indexStr);
                                                     if (idx > selectionBounds.endRow) {
-                                                        setPendingChanges(prev => {
-                                                            const newMap = new Map(prev);
-                                                            newMap.delete(changeKey);
-                                                            return newMap;
-                                                        });
+                                                        keysToRemove.push(changeKey);
                                                     }
                                                 });
                                                 multiCellDragChanges.clear();
@@ -2259,13 +2240,24 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                                                     oldValue: originalValue
                                                                 };
                                                                 
-                                                                setPendingChanges(prev => new Map(prev.set(changeKey, change)));
+                                                                // Collect for batched update
+                                                                batchedChanges.set(changeKey, change);
                                                                 setPCFValue(targetItem, colKey, newValue);
                                                                 multiCellDragChanges.set(changeKey, change);
                                                             });
                                                         }
                                                     }
                                                 }
+                                                
+                                                // PERFORMANCE: Single batched state update
+                                                setPendingChanges(prev => {
+                                                    const newMap = new Map(prev);
+                                                    // Remove old keys
+                                                    keysToRemove.forEach(key => newMap.delete(key));
+                                                    // Add new changes
+                                                    batchedChanges.forEach((change, key) => newMap.set(key, change));
+                                                    return newMap;
+                                                });
                                             }
                                         };
                                         

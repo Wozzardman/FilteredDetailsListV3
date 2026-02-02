@@ -20,6 +20,7 @@
   },
   "scripts": {
     "build": "pcf-scripts build",
+    "build:prod": "pcf-scripts build && node scripts/strip-console-logs.js",
     "build:with-cleanup": "pcf-scripts build && node scripts/remove-telemetry.js && node scripts/optimize-for-canvas.js",
     "build:original": "pcf-scripts build",
     "build:minimal": "pcf-scripts build && node scripts/remove-telemetry.js && node scripts/optimize-for-canvas.js && node scripts/create-minimal.js",
