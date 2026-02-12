@@ -1,6 +1,100 @@
 /* VirtualizedEditableGrid - Ultimate Performance CSS */
 /* META/Google competitive virtualized grid with inline editing */
 
+/* ===================== Frozen / Freeze Column Styles ===================== */
+/* Excel-like frozen columns that stay pinned while scrolling horizontally */
+
+/* Consistent font rendering across composited (sticky) and non-composited cells.
+   Prevents text appearing bold/different when toggling freeze state. */
+.virtualized-cell,
+.virtualized-header-cell {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.virtualized-cell.frozen-column,
+.virtualized-header-cell.frozen-column {
+    position: sticky;
+    z-index: 3;
+    background-color: inherit;
+    /* Ensure frozen cells paint over scrolling cells */
+    will-change: auto; /* override the row-level will-change so sticky works */
+}
+
+.virtualized-header-cell.frozen-column {
+    z-index: 7; /* Above both header (z:5) and body frozen cells */
+    background: linear-gradient(180deg, #ffffff 0%, #f6f8fa 50%, #eaeef2 100%);
+}
+
+/* Right-side shadow to visually separate frozen pane from scrollable area */
+.frozen-column.frozen-column-last::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: -4px;
+    bottom: 0;
+    width: 4px;
+    background: linear-gradient(90deg, rgba(0,0,0,0.08) 0%, transparent 100%);
+    pointer-events: none;
+}
+
+/* Row must not use will-change:transform when it contains sticky children */
+.virtualized-row.has-frozen-columns {
+    will-change: auto;
+    contain: layout style; /* remove paint containment so sticky works */
+}
+
+/* Freeze column indicator icon in the header */
+.frozen-column-indicator {
+    margin-left: 2px;
+    font-size: 11px;
+    opacity: 0.6;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* Context menu for freeze/unfreeze */
+.freeze-column-context-menu {
+    position: fixed;
+    z-index: 10000;
+    background: #ffffff;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    padding: 4px 0;
+    min-width: 180px;
+    animation: contextMenuFadeIn 0.12s ease;
+}
+
+@keyframes contextMenuFadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.freeze-column-context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #24292f;
+    transition: background-color 0.1s ease;
+    white-space: nowrap;
+}
+
+.freeze-column-context-menu-item:hover {
+    background-color: #f3f2f1;
+}
+
+.freeze-column-context-menu-item .menu-icon {
+    width: 16px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+/* ===================== End Frozen Column Styles ===================== */
+
 /* Global style for when user is resizing columns */
 .resizing-columns {
     -webkit-user-select: none;
@@ -26,15 +120,21 @@
     padding: 0 !important;
 }
 
-/* Header Container - Fixed wrapper for transform-based sync */
+/* Header Container - Fixed wrapper with scrollLeft sync for frozen column support */
 .virtualized-header-container {
     width: 100%;
-    overflow: hidden; /* Changed from overflow-x: auto */
+    overflow-x: auto; /* Enable scrollLeft sync so position:sticky works */
     overflow-y: hidden;
     flex-shrink: 0;
     position: relative;
     margin: 0 !important;
     padding: 0 !important;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+}
+
+.virtualized-header-container::-webkit-scrollbar {
+    display: none; /* Chrome/Safari - hide header scrollbar */
 }
 
 /* Header Styles */
@@ -48,7 +148,6 @@
     z-index: 2;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     flex-shrink: 0; /* Prevent header from shrinking */
-    transition: transform 0.1ms linear; /* Smooth transform for scroll sync */
 }
 
 .virtualized-header-cell {
@@ -693,27 +792,36 @@
     gap: 8px;
 }
 
-/* Filter Button in Header */
-.virtualized-header-filter-button {
-    margin-left: auto;
+/* Filter Button in Header - positioned at bottom-right of header cell */
+.virtualized-header-filter-button,
+.virtualized-header-filter-icon {
+    position: absolute;
+    right: 3px;
+    bottom: 2px;
     opacity: 0;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    border-radius: 4px; /* Reduced to match inline styles */
-    padding: 2px; /* Reduced padding to make button more compact */
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 3px;
+    padding: 1px;
     background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
 }
 
-.virtualized-header-cell:hover .virtualized-header-filter-button {
+/* Show filter icon on header cell hover */
+.virtualized-header-cell:hover .virtualized-header-filter-button,
+.virtualized-header-cell:hover .virtualized-header-filter-icon {
     opacity: 1;
-    background: rgba(9, 105, 218, 0.08);
-    transform: scale(1.05);
 }
 
-.virtualized-header-filter-button.active {
+/* Always show filter icon when a filter is active */
+.virtualized-header-filter-button.active,
+.virtualized-header-filter-icon.active {
     opacity: 1;
     color: #0969da;
     background: rgba(9, 105, 218, 0.15);
-    box-shadow: 0 2px 6px rgba(9, 105, 218, 0.2);
+    box-shadow: 0 1px 4px rgba(9, 105, 218, 0.2);
 }
 
 /* Drag Fill Handle - Only show on cell hover */
@@ -819,35 +927,35 @@
     background: linear-gradient(135deg, #0b5a0b 0%, #073d07 100%);
 }
 
-/* Enhanced Filter Icon Styling */
+/* Enhanced Filter Icon Styling - bottom-right absolute positioning */
 .virtualized-header-filter-icon {
-    border-radius: 6px;
+    border-radius: 3px;
     transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     align-items: center;
     justify-content: center;
-    position: relative;
+    position: absolute;
+    right: 3px;
+    bottom: 2px;
     z-index: 20; /* Higher than resize handle */
-    -webkit-backdrop-filter: blur(4px);
-    backdrop-filter: blur(4px);
 }
 
 .virtualized-header-filter-icon:hover {
-    transform: scale(1.05) translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 120, 212, 0.25);
+    transform: scale(1.1);
+    box-shadow: 0 2px 8px rgba(0, 120, 212, 0.25);
 }
 
 .virtualized-header-filter-icon.active {
     background-color: rgba(0, 120, 212, 0.1) !important;
     border-color: rgba(0, 120, 212, 0.3) !important;
-    box-shadow: 0 2px 8px rgba(0, 120, 212, 0.2);
-    transform: scale(1.02);
+    box-shadow: 0 1px 4px rgba(0, 120, 212, 0.2);
+    opacity: 1;
 }
 
 .virtualized-header-filter-icon.active:hover {
     background-color: rgba(0, 120, 212, 0.15) !important;
-    box-shadow: 0 4px 12px rgba(0, 120, 212, 0.3);
-    transform: scale(1.05) translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 120, 212, 0.3);
+    transform: scale(1.1);
 }
 
 /* Enhanced Column Resize Handle */

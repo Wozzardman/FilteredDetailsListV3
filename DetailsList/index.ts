@@ -682,6 +682,15 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                             // Get visibility property for lightning-fast show/hide
                             const isVisible = columnRecord.getValue('ColVisible') !== false; // Default to true if not specified
                             
+                            // Get frozen property for Excel-like freeze columns
+                            const isFrozen = columnRecord.getValue('ColFrozen') === true;
+                            
+                            // Get accessibility text for column header tooltip
+                            const accessibilityText = String(columnRecord.getValue('ColAccessibilityText') || '');
+                            
+                            // Get header color for per-column header background
+                            const headerColor = String(columnRecord.getValue('ColHeaderColor') || '');
+                            
                             // Check if this is the jump-to column
                             const isJumpToColumn = columnRecord.getValue('JumptoColumn') === true;
                             if (isJumpToColumn) {
@@ -703,7 +712,10 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                                 headerHorizontalAlign: headerHorizontalAlign,
                                 headerVerticalAlign: headerVerticalAlign,
                                 isMultiLine: isMultiLine,
-                                isVisible: isVisible // Store visibility for grid component to handle
+                                isVisible: isVisible, // Store visibility for grid component to handle
+                                isFrozen: isFrozen, // Store frozen state for freeze columns feature
+                                accessibilityText: accessibilityText, // Store accessibility text for header tooltip
+                                headerColor: headerColor // Store header background color
                             });
                             
                             if (!isVisible) {
@@ -856,6 +868,9 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 const headerVerticalAlign = (columnConfig as any)?.headerVerticalAlign || verticalAlign;
                 const isMultiLine = (columnConfig as any)?.isMultiLine || false;
                 const isVisible = (columnConfig as any)?.isVisible !== false; // Default to visible for backward compatibility
+                const isFrozen = (columnConfig as any)?.isFrozen === true; // Default to not frozen
+                const accessibilityText = (columnConfig as any)?.accessibilityText || '';
+                const headerColor = (columnConfig as any)?.headerColor || '';
                 
                 // Priority 2: Use PCF dataset visualSizeFactor
                 const pcfVisualSizeFactor = typeof col.visualSizeFactor === 'number' && !isNaN(col.visualSizeFactor) ? col.visualSizeFactor : 0;
@@ -910,6 +925,12 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                     isMultiline: isMultiLine,
                     // Add visibility property for column show/hide functionality
                     isVisible: isVisible,
+                    // Add frozen column property for Excel-like freeze panes
+                    isFrozen: isFrozen,
+                    // Add accessibility text for column header tooltip
+                    accessibilityText: accessibilityText,
+                    // Add header background color
+                    headerColor: headerColor,
                     // Add PCF-specific properties for proper data access
                     pcfDataType: col.dataType,
                     pcfColumnName: col.name
