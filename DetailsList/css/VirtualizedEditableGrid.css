@@ -784,27 +784,36 @@
     gap: 8px;
 }
 
-/* Filter Button in Header */
-.virtualized-header-filter-button {
-    margin-left: auto;
+/* Filter Button in Header - positioned at bottom-right of header cell */
+.virtualized-header-filter-button,
+.virtualized-header-filter-icon {
+    position: absolute;
+    right: 3px;
+    bottom: 2px;
     opacity: 0;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    border-radius: 4px; /* Reduced to match inline styles */
-    padding: 2px; /* Reduced padding to make button more compact */
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 3px;
+    padding: 1px;
     background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
 }
 
-.virtualized-header-cell:hover .virtualized-header-filter-button {
+/* Show filter icon on header cell hover */
+.virtualized-header-cell:hover .virtualized-header-filter-button,
+.virtualized-header-cell:hover .virtualized-header-filter-icon {
     opacity: 1;
-    background: rgba(9, 105, 218, 0.08);
-    transform: scale(1.05);
 }
 
-.virtualized-header-filter-button.active {
+/* Always show filter icon when a filter is active */
+.virtualized-header-filter-button.active,
+.virtualized-header-filter-icon.active {
     opacity: 1;
     color: #0969da;
     background: rgba(9, 105, 218, 0.15);
-    box-shadow: 0 2px 6px rgba(9, 105, 218, 0.2);
+    box-shadow: 0 1px 4px rgba(9, 105, 218, 0.2);
 }
 
 /* Drag Fill Handle - Only show on cell hover */
@@ -910,35 +919,35 @@
     background: linear-gradient(135deg, #0b5a0b 0%, #073d07 100%);
 }
 
-/* Enhanced Filter Icon Styling */
+/* Enhanced Filter Icon Styling - bottom-right absolute positioning */
 .virtualized-header-filter-icon {
-    border-radius: 6px;
+    border-radius: 3px;
     transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     align-items: center;
     justify-content: center;
-    position: relative;
+    position: absolute;
+    right: 3px;
+    bottom: 2px;
     z-index: 20; /* Higher than resize handle */
-    -webkit-backdrop-filter: blur(4px);
-    backdrop-filter: blur(4px);
 }
 
 .virtualized-header-filter-icon:hover {
-    transform: scale(1.05) translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 120, 212, 0.25);
+    transform: scale(1.1);
+    box-shadow: 0 2px 8px rgba(0, 120, 212, 0.25);
 }
 
 .virtualized-header-filter-icon.active {
     background-color: rgba(0, 120, 212, 0.1) !important;
     border-color: rgba(0, 120, 212, 0.3) !important;
-    box-shadow: 0 2px 8px rgba(0, 120, 212, 0.2);
-    transform: scale(1.02);
+    box-shadow: 0 1px 4px rgba(0, 120, 212, 0.2);
+    opacity: 1;
 }
 
 .virtualized-header-filter-icon.active:hover {
     background-color: rgba(0, 120, 212, 0.15) !important;
-    box-shadow: 0 4px 12px rgba(0, 120, 212, 0.3);
-    transform: scale(1.05) translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 120, 212, 0.3);
+    transform: scale(1.1);
 }
 
 /* Enhanced Column Resize Handle */

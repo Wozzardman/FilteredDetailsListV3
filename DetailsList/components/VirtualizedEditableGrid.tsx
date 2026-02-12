@@ -2606,9 +2606,9 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                             zIndex: isFrozenHeader ? 7 : undefined,
                             display: 'flex',
                             alignItems: enableHeaderTextWrapping ? 'flex-start' : 'center', // Top align when wrapping
-                            justifyContent: 'space-between', // Keep space-between for filter icon positioning
+                            justifyContent: 'flex-start',
                             background: '#faf9f8',
-                            padding: enableHeaderTextWrapping ? '2px 12px 2px 8px' : '0 12px 0 8px', // Minimal vertical padding when wrapping
+                            padding: enableHeaderTextWrapping ? '2px 8px 2px 8px' : '0 8px 0 8px',
                             boxSizing: 'border-box', // Ensure consistent box model
                             overflow: 'hidden'
                         }}
@@ -2648,82 +2648,81 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                             )}
                         </span>
                         
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', position: 'relative', zIndex: 15 }}>
-                            {enableColumnFilters && (
-                                <span
-                                    className={`virtualized-header-filter-icon ${hasFilter ? 'active' : ''}`}
-                                    title={`Filter ${column.name}`}
-                                    onClick={(e: React.MouseEvent<HTMLSpanElement>) => {
-                                        const target = e.currentTarget as HTMLElement;
-                                        handleFilterButtonClick(columnKey, target);
-                                    }}
-                                    style={{
-                                        cursor: 'pointer',
-                                        fontSize: '14px',
-                                        color: hasFilter ? '#0078d4' : '#8a8886',
-                                        userSelect: 'none',
-                                        padding: '2px', // Reduced padding to make button more compact
-                                        borderRadius: '4px', // Slightly smaller border radius to match reduced padding
-                                        backgroundColor: hasFilter ? 'rgba(0, 120, 212, 0.1)' : 'transparent',
-                                        border: hasFilter ? '1px solid rgba(0, 120, 212, 0.3)' : '1px solid transparent',
-                                        transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
-                                        lineHeight: 1,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        width: '18px', // Reduced width to be more compact
-                                        height: '18px', // Reduced height to be more compact
-                                        position: 'relative',
-                                        zIndex: 20,
-                                        boxShadow: hasFilter ? '0 2px 4px rgba(0, 120, 212, 0.2)' : 'none'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        const target = e.target as HTMLElement;
-                                        if (!hasFilter) {
-                                            target.style.backgroundColor = 'rgba(0, 120, 212, 0.05)';
-                                            target.style.borderColor = 'rgba(0, 120, 212, 0.2)';
-                                            target.style.transform = 'scale(1.05)';
-                                        } else {
-                                            target.style.backgroundColor = 'rgba(0, 120, 212, 0.15)';
-                                            target.style.transform = 'scale(1.05)';
-                                            target.style.boxShadow = '0 4px 8px rgba(0, 120, 212, 0.3)';
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        const target = e.target as HTMLElement;
-                                        if (!hasFilter) {
-                                            target.style.backgroundColor = 'transparent';
-                                            target.style.borderColor = 'transparent';
-                                            target.style.transform = 'scale(1)';
-                                        } else {
-                                            target.style.backgroundColor = 'rgba(0, 120, 212, 0.1)';
-                                            target.style.transform = 'scale(1)';
-                                            target.style.boxShadow = '0 2px 4px rgba(0, 120, 212, 0.2)';
-                                        }
+                        {/* Filter icon – absolutely positioned at bottom-right so it never overlaps header text */}
+                        {enableColumnFilters && (
+                            <span
+                                className={`virtualized-header-filter-icon ${hasFilter ? 'active' : ''}`}
+                                title={`Filter ${column.name}`}
+                                onClick={(e: React.MouseEvent<HTMLSpanElement>) => {
+                                    const target = e.currentTarget as HTMLElement;
+                                    handleFilterButtonClick(columnKey, target);
+                                }}
+                                style={{
+                                    cursor: 'pointer',
+                                    fontSize: '14px',
+                                    color: hasFilter ? '#0078d4' : '#8a8886',
+                                    userSelect: 'none',
+                                    padding: '1px',
+                                    borderRadius: '3px',
+                                    backgroundColor: hasFilter ? 'rgba(0, 120, 212, 0.1)' : 'transparent',
+                                    border: hasFilter ? '1px solid rgba(0, 120, 212, 0.3)' : '1px solid transparent',
+                                    transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    lineHeight: 1,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: '16px',
+                                    height: '16px',
+                                    position: 'absolute',
+                                    right: '3px',
+                                    bottom: '2px',
+                                    zIndex: 20,
+                                    boxShadow: hasFilter ? '0 1px 3px rgba(0, 120, 212, 0.2)' : 'none'
+                                }}
+                                onMouseEnter={(e) => {
+                                    const target = e.target as HTMLElement;
+                                    if (!hasFilter) {
+                                        target.style.backgroundColor = 'rgba(0, 120, 212, 0.05)';
+                                        target.style.borderColor = 'rgba(0, 120, 212, 0.2)';
+                                        target.style.transform = 'scale(1.1)';
+                                    } else {
+                                        target.style.backgroundColor = 'rgba(0, 120, 212, 0.15)';
+                                        target.style.transform = 'scale(1.1)';
+                                        target.style.boxShadow = '0 3px 6px rgba(0, 120, 212, 0.3)';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    const target = e.target as HTMLElement;
+                                    if (!hasFilter) {
+                                        target.style.backgroundColor = 'transparent';
+                                        target.style.borderColor = 'transparent';
+                                        target.style.transform = 'scale(1)';
+                                    } else {
+                                        target.style.backgroundColor = 'rgba(0, 120, 212, 0.1)';
+                                        target.style.transform = 'scale(1)';
+                                        target.style.boxShadow = '0 1px 3px rgba(0, 120, 212, 0.2)';
+                                    }
+                                }}
+                            >
+                                <svg
+                                    width="12"
+                                    height="12"
+                                    viewBox="0 0 16 16"
+                                    fill={hasFilter ? '#0078d4' : 'none'}
+                                    stroke={hasFilter ? '#0078d4' : '#8a8886'}
+                                    strokeWidth="1.5"
+                                    style={{ 
+                                        display: 'block',
+                                        filter: hasFilter ? 'drop-shadow(0 1px 2px rgba(0, 120, 212, 0.3))' : 'none'
                                     }}
                                 >
-                                    {/* Enhanced Funnel icon with better styling */}
-                                    <svg
-                                        width="14"
-                                        height="14"
-                                        viewBox="0 0 16 16"
-                                        fill={hasFilter ? '#0078d4' : 'none'}
-                                        stroke={hasFilter ? '#0078d4' : '#8a8886'}
-                                        strokeWidth="1.5"
-                                        style={{ 
-                                            display: 'block',
-                                            filter: hasFilter ? 'drop-shadow(0 1px 2px rgba(0, 120, 212, 0.3))' : 'none'
-                                        }}
-                                    >
-                                        <path d="M2 3h12l-4 5v4.5a0.5 0.5 0 0 1-0.276 0.447l-2 1A0.5 0.5 0 0 1 7 13.5V8L2 3z" />
-                                        {/* Add a dot indicator when filter is active */}
-                                        {hasFilter && (
-                                            <circle cx="12" cy="4" r="2" fill="#ff6b35" stroke="white" strokeWidth="0.5" />
-                                        )}
-                                    </svg>
-                                </span>
-                            )}
-                        </div>
+                                    <path d="M2 3h12l-4 5v4.5a0.5 0.5 0 0 1-0.276 0.447l-2 1A0.5 0.5 0 0 1 7 13.5V8L2 3z" />
+                                    {hasFilter && (
+                                        <circle cx="12" cy="4" r="2" fill="#ff6b35" stroke="white" strokeWidth="0.5" />
+                                    )}
+                                </svg>
+                            </span>
+                        )}
 
                         {/* Column resize handle - Adjusted positioning to avoid filter icon overlap */}
                         {column.isResizable && (
