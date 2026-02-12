@@ -536,6 +536,17 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             // Continue processing - this is not a critical error
         }
 
+        // Set page size for editorConfig dataset so all rows are loaded (default is 25)
+        try {
+            const editorConfigDataset = (context.parameters as any).editorConfig;
+            if (editorConfigDataset?.paging && editorConfigDataset.paging.pageSize < FilteredDetailsListV2.COLUMN_LIMIT) {
+                editorConfigDataset.paging.setPageSize(FilteredDetailsListV2.COLUMN_LIMIT);
+                editorConfigDataset.refresh();
+            }
+        } catch (editorConfigError) {
+            console.warn('⚠️ Error setting editorConfig page size:', editorConfigError);
+        }
+
         // Clear error state if we reach this point successfully
         if (this.isInErrorState) {
             this.isInErrorState = false;
