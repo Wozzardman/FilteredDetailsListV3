@@ -38,6 +38,12 @@ export interface IGridColumn extends IColumn {
     // Frozen column property (Excel-like freeze panes)
     isFrozen?: boolean;
     
+    // Accessibility text for column header tooltip
+    accessibilityText?: string;
+    
+    // Header background color (CSS color name or hex)
+    headerColor?: string;
+    
     // Drag & Drop properties
     isDragDisabled?: boolean;
     dragData?: any;

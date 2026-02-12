@@ -1206,12 +1206,33 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
             onFrozenColumnsChange?.(Array.from(next));
             return next;
         });
+        // Force browser repaint so text anti-aliasing updates correctly
+        // when switching between sticky (composited) and normal rendering
+        requestAnimationFrame(() => {
+            const container = document.querySelector('.virtualized-grid-body');
+            if (container) {
+                (container as HTMLElement).style.transform = 'translateZ(0)';
+                requestAnimationFrame(() => {
+                    (container as HTMLElement).style.transform = '';
+                });
+            }
+        });
     }, [onFrozenColumnsChange]);
 
     // Unfreeze all columns
     const unfreezeAllColumns = React.useCallback(() => {
         setFrozenColumnKeys(new Set());
         onFrozenColumnsChange?.([]);
+        // Force browser repaint for consistent text rendering
+        requestAnimationFrame(() => {
+            const container = document.querySelector('.virtualized-grid-body');
+            if (container) {
+                (container as HTMLElement).style.transform = 'translateZ(0)';
+                requestAnimationFrame(() => {
+                    (container as HTMLElement).style.transform = '';
+                });
+            }
+        });
     }, [onFrozenColumnsChange]);
 
     // Close freeze context menu when clicking anywhere
@@ -1876,7 +1897,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                         textOverflow: 'ellipsis',
                         whiteSpace: column.isMultiline ? 'normal' : 'nowrap', // Support multiline display
                         cursor: isReadOnly ? 'default' : 'pointer',
-                        backgroundColor: hasChanges ? '#fff4ce' : 'transparent',
+                        backgroundColor: hasChanges ? '#fff4ce' : rowBg, // Always use opaque bg so frozen/unfrozen look identical
                         borderLeft: hasChanges ? '3px solid #ffb900' : 'none',
                         position: 'relative',
                         boxSizing: 'border-box', // Ensure consistent box model
@@ -2410,51 +2431,66 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         return renderRowContent(virtualRow);
     }, [renderRowContent]);
 
-    // Calculate the maximum header height needed across all columns
+    // Calculate the maximum header height needed across all columns using canvas measurement
     const uniformHeaderHeight = React.useMemo(() => {
         if (!enableHeaderTextWrapping) return '48px';
         
-        let maxHeight = 20; // Start with minimum height of 20px
+        // Use an off-screen canvas to accurately measure text width
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return '48px'; // Fallback if canvas unavailable
+        ctx.font = `600 ${headerTextSize}px "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif`;
         
-        // Calculate height needed for each column individually
+        const lineHeight = Math.ceil(headerTextSize * 1.15); // Tight line height matching CSS lineHeight: 1
+        const filterIconHeight = enableColumnFilters ? 20 : 0; // 16px icon + 2px bottom + 2px gap
+        let maxHeight = 36; // Minimum useful header height
+        
         effectiveColumns.forEach((col, index) => {
             const headerText = col.name || '';
+            if (!headerText) return;
             
-            // Get the actual column width - use the memoized width which handles custom ColWidth properly
             const actualColumnWidth = memoizedColumnWidths[index];
-            if (!actualColumnWidth) return; // Skip if no width available
+            if (!actualColumnWidth) return;
             
-            // Check text alignment - center/right aligned text is less likely to wrap naturally
-            const headerAlignment = col.headerHorizontalAligned || 'start';
-            const isNonLeftAligned = headerAlignment === 'center' || headerAlignment === 'end' || headerAlignment === 'right';
+            // Available width = column width minus horizontal padding (8px each side)
+            const availableTextWidth = Math.max(40, actualColumnWidth - 16);
             
-            // Account for horizontal padding (20px: 8px left + 12px right) and filter icon space (~20px)
-            // For center/right aligned text, be more conservative as wrapping looks worse
-            const paddingAndIconSpace = isNonLeftAligned ? 35 : 30;
-            const availableTextWidth = Math.max(60, actualColumnWidth - paddingAndIconSpace);
+            // Word-wrap the text to count actual lines
+            const words = headerText.split(/\s+/);
+            let lines = 1;
+            let currentLineWidth = 0;
             
-            // Conservative character width estimate - use 7px for left-aligned, 8px for center/right
-            const charWidth = isNonLeftAligned ? 8 : 7;
-            const charsPerLine = Math.floor(availableTextWidth / charWidth);
-            const estimatedLines = Math.max(1, Math.ceil(headerText.length / charsPerLine));
-            
-            // Only add extra height if we're actually wrapping (more than 1 line)
-            let columnHeight;
-            if (estimatedLines > 1) {
-                // Multiple lines: minimal padding + lines * tight line height
-                columnHeight = 4 + (estimatedLines * 16);
-            } else {
-                // Single line: use minimum height
-                columnHeight = 20;
+            for (const word of words) {
+                const wordWidth = ctx.measureText(word).width;
+                const spaceWidth = currentLineWidth > 0 ? ctx.measureText(' ').width : 0;
+                
+                if (currentLineWidth + spaceWidth + wordWidth > availableTextWidth && currentLineWidth > 0) {
+                    lines++;
+                    currentLineWidth = wordWidth;
+                } else {
+                    currentLineWidth += spaceWidth + wordWidth;
+                }
             }
             
-            // Update max height if this column needs more space
+            // Also check if any single word is wider than available space (CSS word-wrap: break-word)
+            for (const word of words) {
+                const wordWidth = ctx.measureText(word).width;
+                if (wordWidth > availableTextWidth) {
+                    // This word will be broken across lines
+                    const extraLines = Math.ceil(wordWidth / availableTextWidth) - 1;
+                    lines += extraLines;
+                }
+            }
+            
+            // Height = top padding + text lines + bottom space for filter icon
+            const textHeight = lines * lineHeight;
+            const columnHeight = 4 + textHeight + (lines > 1 ? filterIconHeight : 0) + 4; // 4px top + text + icon clearance + 4px bottom
             maxHeight = Math.max(maxHeight, columnHeight);
         });
         
-        // Ensure reasonable bounds: minimum 20px, maximum 120px
-        return `${Math.max(20, Math.min(120, maxHeight))}px`;
-    }, [enableHeaderTextWrapping, effectiveColumns, memoizedColumnWidths]);
+        // Clamp between 36px minimum and 200px maximum
+        return `${Math.max(36, Math.min(200, maxHeight))}px`;
+    }, [enableHeaderTextWrapping, effectiveColumns, memoizedColumnWidths, headerTextSize, enableColumnFilters]);
 
     // Render header with Excel-like filter buttons and column resizing
     const renderHeader = () => (
@@ -2592,6 +2628,9 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 
                 const isFrozenHeader = frozenColumnInfo[index]?.isFrozen;
                 
+                // Determine header background color: per-column headerColor or default
+                const headerBg = column.headerColor || '#faf9f8';
+                
                 return (
                     <div
                         key={column.key}
@@ -2607,7 +2646,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                             display: 'flex',
                             alignItems: enableHeaderTextWrapping ? 'flex-start' : 'center', // Top align when wrapping
                             justifyContent: 'flex-start',
-                            background: '#faf9f8',
+                            background: headerBg,
                             padding: enableHeaderTextWrapping ? '2px 8px 2px 8px' : '0 8px 0 8px',
                             boxSizing: 'border-box', // Ensure consistent box model
                             overflow: 'hidden'
@@ -2625,6 +2664,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                     >
                         <span 
                             className="virtualized-header-text"
+                            title={column.accessibilityText || column.name}
                             style={{ 
                                 flex: 1, 
                                 fontWeight: 600,

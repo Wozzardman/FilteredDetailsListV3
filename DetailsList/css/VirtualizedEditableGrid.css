@@ -4,6 +4,14 @@
 /* ===================== Frozen / Freeze Column Styles ===================== */
 /* Excel-like frozen columns that stay pinned while scrolling horizontally */
 
+/* Consistent font rendering across composited (sticky) and non-composited cells.
+   Prevents text appearing bold/different when toggling freeze state. */
+.virtualized-cell,
+.virtualized-header-cell {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
 .virtualized-cell.frozen-column,
 .virtualized-header-cell.frozen-column {
     position: sticky;
