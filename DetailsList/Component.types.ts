@@ -35,6 +35,9 @@ export interface IGridColumn extends IColumn {
     filterType?: FilterTypes;
     hasActiveFilter?: boolean;
     
+    // Frozen column property (Excel-like freeze panes)
+    isFrozen?: boolean;
+    
     // Drag & Drop properties
     isDragDisabled?: boolean;
     dragData?: any;

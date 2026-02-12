@@ -32,6 +32,7 @@
       <property-set name="ColRowHeader" display-name-key="ColRowHeader" of-type="TwoOptions" usage="bound" required="false" />
       <property-set name="ColFilterable" display-name-key="ColFilterable" of-type="TwoOptions" usage="bound" required="false" />
       <property-set name="ColFilterType" display-name-key="ColFilterType" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ColFrozen" display-name-key="ColFrozen" of-type="TwoOptions" usage="bound" required="false" />
       <property-set name="JumptoColumn" display-name-key="JumptoColumn" of-type="TwoOptions" usage="bound" required="false" />
     </data-set>
     <!-- Input properties -->

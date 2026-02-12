@@ -148,6 +148,10 @@ export interface VirtualizedEditableGridProps {
     // Row styling properties
     alternateRowColor?: string; // Color for alternating rows
     
+    // Frozen column props (Excel-like freeze panes)
+    frozenColumnKeys?: string[]; // Column keys that are initially frozen
+    onFrozenColumnsChange?: (frozenKeys: string[]) => void; // Callback when user toggles freeze via context menu
+    
     // New row management
     onDeleteNewRow?: (itemId: string) => void; // Callback to delete individual new rows
 }
@@ -213,6 +217,10 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     // Row styling props
     alternateRowColor,
     
+    // Frozen column props
+    frozenColumnKeys: initialFrozenColumnKeys = [],
+    onFrozenColumnsChange,
+    
     // New row management
     onDeleteNewRow,
     
@@ -233,6 +241,45 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     
     // Force refresh trigger for grid re-rendering
     const [refreshTrigger, setRefreshTrigger] = React.useState<number>(0);
+
+    // Frozen columns state - tracks which columns are frozen
+    const [frozenColumnKeys, setFrozenColumnKeys] = React.useState<Set<string>>(() => {
+        // Initialize from props: both explicitly passed keys and columns with isFrozen=true
+        const initial = new Set<string>(initialFrozenColumnKeys);
+        columns.forEach(col => {
+            if ((col as any).isFrozen) {
+                initial.add(col.key || col.fieldName || '');
+            }
+        });
+        return initial;
+    });
+    
+    // Context menu state for freeze/unfreeze
+    const [freezeContextMenu, setFreezeContextMenu] = React.useState<{
+        visible: boolean;
+        x: number;
+        y: number;
+        columnKey: string;
+        columnName: string;
+    } | null>(null);
+
+    // Sync frozen column keys when columns prop changes (pick up isFrozen from column config)
+    React.useEffect(() => {
+        const fromProps = new Set<string>(initialFrozenColumnKeys);
+        columns.forEach(col => {
+            if ((col as any).isFrozen) {
+                fromProps.add(col.key || col.fieldName || '');
+            }
+        });
+        if (fromProps.size > 0) {
+            setFrozenColumnKeys(prev => {
+                // Merge: keep user-toggled keys, add prop-based keys
+                const merged = new Set(prev);
+                fromProps.forEach(k => merged.add(k));
+                return merged;
+            });
+        }
+    }, [columns, initialFrozenColumnKeys]);
 
     // Excel-like column filtering state
     const [columnFilters, setColumnFilters] = React.useState<IFilterState>({});
@@ -722,22 +769,18 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         });
     }, [columnEditorMapping, filteredItems]);
 
-    // Header horizontal scroll synchronization - TRANSFORM APPROACH
+    // Header horizontal scroll synchronization - SCROLLLEFT APPROACH
+    // Uses scrollLeft sync instead of transform so that position:sticky works on frozen header cells
     React.useEffect(() => {
         const scrollContainer = parentRef.current;
         const headerContainer = headerRef.current;
 
         if (!scrollContainer || !headerContainer) return;
 
-        let isScrolling = false;
         let lastScrollLeft = 0;
         let animationId: number | null = null;
 
         const syncHeaderScroll = () => {
-            if (isScrolling) return; // Prevent recursive calls
-            
-            isScrolling = true;
-            
             if (animationId) {
                 cancelAnimationFrame(animationId);
             }
@@ -745,16 +788,11 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
             animationId = requestAnimationFrame(() => {
                 if (scrollContainer && headerContainer) {
                     const currentScrollLeft = scrollContainer.scrollLeft;
-                    if (Math.abs(currentScrollLeft - lastScrollLeft) > 0.5) { // Only sync if there's meaningful change
-                        // Use transform instead of scrollLeft for smoother sync
-                        const headerContent = headerContainer.querySelector('.virtualized-header');
-                        if (headerContent) {
-                            (headerContent as HTMLElement).style.transform = `translateX(-${currentScrollLeft}px)`;
-                        }
+                    if (Math.abs(currentScrollLeft - lastScrollLeft) > 0.5) {
+                        headerContainer.scrollLeft = currentScrollLeft;
                         lastScrollLeft = currentScrollLeft;
                     }
                 }
-                isScrolling = false;
                 animationId = null;
             });
         };
@@ -1092,6 +1130,97 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     const totalGridWidth = React.useMemo(() => {
         return memoizedColumnWidths.reduce((sum, width) => sum + width, 0);
     }, [memoizedColumnWidths]);
+
+    // ========== FROZEN COLUMN COMPUTATIONS ==========
+    // Compute per-column frozen info: whether each column is frozen and its sticky left offset
+    const frozenColumnInfo = React.useMemo(() => {
+        let cumulativeLeft = 0;
+        let lastFrozenIndex = -1;
+
+        // Frozen columns must be contiguous from the left.
+        // Walk columns left→right; a column is effectively frozen if either:
+        //   • it's a special prefix column (__selection__, __autofill__, __delete__) that
+        //     appears before any user data column and there is at least one frozen data column, OR
+        //   • its key is in the frozenColumnKeys set.
+        // Once we encounter the first non-frozen data column, we stop freezing.
+        const info: Array<{ isFrozen: boolean; stickyLeft: number; isLastFrozen: boolean }> = [];
+        
+        // First pass: determine which columns are frozen
+        // Special columns at the beginning are auto-frozen if any data column is frozen
+        const hasAnyFrozenDataColumn = effectiveColumns.some(col => {
+            const key = col.key || col.fieldName || '';
+            return !key.startsWith('__') && frozenColumnKeys.has(key);
+        });
+
+        let hitFirstNonFrozenDataColumn = false;
+
+        for (let i = 0; i < effectiveColumns.length; i++) {
+            const col = effectiveColumns[i];
+            const key = col.key || col.fieldName || '';
+            const isSpecialColumn = key.startsWith('__');
+
+            let isFrozen = false;
+            if (!hitFirstNonFrozenDataColumn) {
+                if (isSpecialColumn) {
+                    // Auto-freeze special columns if there are frozen data columns
+                    isFrozen = hasAnyFrozenDataColumn;
+                } else if (frozenColumnKeys.has(key)) {
+                    isFrozen = true;
+                } else {
+                    // First non-frozen data column – stop freezing from here on
+                    hitFirstNonFrozenDataColumn = true;
+                    isFrozen = false;
+                }
+            }
+
+            info.push({ isFrozen, stickyLeft: isFrozen ? cumulativeLeft : 0, isLastFrozen: false });
+            if (isFrozen) {
+                lastFrozenIndex = i;
+            }
+            cumulativeLeft += memoizedColumnWidths[i] || 0;
+        }
+
+        // Mark the last frozen column for the shadow
+        if (lastFrozenIndex >= 0) {
+            info[lastFrozenIndex].isLastFrozen = true;
+        }
+
+        return info;
+    }, [effectiveColumns, frozenColumnKeys, memoizedColumnWidths]);
+
+    // Helper: does this grid currently have any frozen columns?
+    const hasFrozenColumns = React.useMemo(
+        () => frozenColumnInfo.some(c => c.isFrozen),
+        [frozenColumnInfo]
+    );
+
+    // Toggle freeze on a column (used by the context menu)
+    const toggleFreezeColumn = React.useCallback((columnKey: string) => {
+        setFrozenColumnKeys(prev => {
+            const next = new Set(prev);
+            if (next.has(columnKey)) {
+                next.delete(columnKey);
+            } else {
+                next.add(columnKey);
+            }
+            onFrozenColumnsChange?.(Array.from(next));
+            return next;
+        });
+    }, [onFrozenColumnsChange]);
+
+    // Unfreeze all columns
+    const unfreezeAllColumns = React.useCallback(() => {
+        setFrozenColumnKeys(new Set());
+        onFrozenColumnsChange?.([]);
+    }, [onFrozenColumnsChange]);
+
+    // Close freeze context menu when clicking anywhere
+    React.useEffect(() => {
+        if (!freezeContextMenu?.visible) return;
+        const handleClick = () => setFreezeContextMenu(null);
+        document.addEventListener('click', handleClick);
+        return () => document.removeEventListener('click', handleClick);
+    }, [freezeContextMenu?.visible]);
 
     // ========== CELL SELECTION HELPERS (depend on effectiveColumns) ==========
     
@@ -1530,6 +1659,25 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         }
     }), [commitAllChanges, cancelAllChanges, pendingChanges.size, virtualizer, filteredItems.length]);
 
+    // Helper: get frozen CSS properties for a cell at the given column index
+    const getFrozenCellStyle = React.useCallback((columnIndex: number, bgColor: string): React.CSSProperties => {
+        const info = frozenColumnInfo[columnIndex];
+        if (!info?.isFrozen) return {};
+        return {
+            position: 'sticky',
+            left: info.stickyLeft,
+            zIndex: 3,
+            backgroundColor: bgColor,
+        };
+    }, [frozenColumnInfo]);
+
+    // Helper: get frozen CSS class names for a cell at the given column index
+    const getFrozenCellClassName = React.useCallback((columnIndex: number): string => {
+        const info = frozenColumnInfo[columnIndex];
+        if (!info?.isFrozen) return '';
+        return info.isLastFrozen ? 'frozen-column frozen-column-last' : 'frozen-column';
+    }, [frozenColumnInfo]);
+
     // Render virtualized row
     const renderRowContent = React.useCallback((virtualRow: any) => {
         const { index } = virtualRow;
@@ -1539,7 +1687,10 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         const isEven = index % 2 === 0;
         const isRowDragTarget = rowDragFillTargets.has(index) && index !== rowDragFillSource;
         const isRowDragSource = rowDragFillSource === index;
-        const rowClassName = `virtualized-row ${isEven ? 'even' : 'odd'}${isRowDragTarget ? ' row-drag-target' : ''}${isRowDragSource ? ' row-drag-source' : ''}`;
+        const rowClassName = `virtualized-row ${isEven ? 'even' : 'odd'}${isRowDragTarget ? ' row-drag-target' : ''}${isRowDragSource ? ' row-drag-source' : ''}${hasFrozenColumns ? ' has-frozen-columns' : ''}`;
+        
+        // Determine row background for frozen cell inheritance
+        const rowBg = (alternateRowColor && isEven) ? alternateRowColor : (isEven ? '#ffffff' : '#faf9f8');
         
         // Apply alternating row color if specified
         const rowStyle: React.CSSProperties = {
@@ -1580,7 +1731,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                         return (
                             <div
                                 key="__selection__"
-                                className="virtualized-cell selection-cell"
+                                className={`virtualized-cell selection-cell ${getFrozenCellClassName(columnIndex)}`}
                                 style={{
                                     width: memoizedColumnWidths[columnIndex], // Use the same width calculation as header
                                     minWidth: memoizedColumnWidths[columnIndex],
@@ -1589,7 +1740,8 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     padding: '0 8px',
-                                    boxSizing: 'border-box' // Ensure consistent box model
+                                    boxSizing: 'border-box', // Ensure consistent box model
+                                    ...getFrozenCellStyle(columnIndex, rowBg)
                                 }}
                             >
                                 <RowSelectionCheckbox
@@ -1609,7 +1761,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                         return (
                             <div
                                 key="__delete__"
-                                className="virtualized-cell delete-cell"
+                                className={`virtualized-cell delete-cell ${getFrozenCellClassName(columnIndex)}`}
                                 style={{
                                     width: memoizedColumnWidths[columnIndex],
                                     minWidth: memoizedColumnWidths[columnIndex],
@@ -1618,7 +1770,8 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     padding: '0 8px',
-                                    boxSizing: 'border-box'
+                                    boxSizing: 'border-box',
+                                    ...getFrozenCellStyle(columnIndex, rowBg)
                                 }}
                             >
                                 <button
@@ -1656,7 +1809,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                         return (
                             <div
                                 key="__autofill__"
-                                className="virtualized-cell autofill-cell"
+                                className={`virtualized-cell autofill-cell ${getFrozenCellClassName(columnIndex)}`}
                                 style={{
                                     width: memoizedColumnWidths[columnIndex],
                                     minWidth: memoizedColumnWidths[columnIndex],
@@ -1665,7 +1818,8 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     padding: '0 8px',
-                                    boxSizing: 'border-box'
+                                    boxSizing: 'border-box',
+                                    ...getFrozenCellStyle(columnIndex, rowBg)
                                 }}
                             >
                                 {needsAutoFill ? (
@@ -1726,7 +1880,9 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                         borderLeft: hasChanges ? '3px solid #ffb900' : 'none',
                         position: 'relative',
                         boxSizing: 'border-box', // Ensure consistent box model
-                        fontSize: `${columnTextSize}px` // Apply custom column text size
+                        fontSize: `${columnTextSize}px`, // Apply custom column text size
+                        // Frozen column sticky positioning
+                        ...getFrozenCellStyle(columnIndex, hasChanges ? '#fff4ce' : rowBg)
                     };
 
                     if (isEditing && enableInlineEditing) {
@@ -1800,12 +1956,12 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                     return (
                         <div
                             key={columnKey}
-                            className={`virtualized-cell ${isReadOnly ? 'read-only' : 'editable'}${isCellInSelection ? ' cell-selected' : ''}`}
+                            className={`virtualized-cell ${isReadOnly ? 'read-only' : 'editable'}${isCellInSelection ? ' cell-selected' : ''} ${getFrozenCellClassName(columnIndex)}`}
                             style={{
                                 ...cellStyle,
                                 outline: isCellInSelection ? '2px solid #0078d4' : 'none',
                                 outlineOffset: '-2px',
-                                zIndex: isCellInSelection ? 1 : 'auto',
+                                zIndex: isCellInSelection ? 1 : (frozenColumnInfo[columnIndex]?.isFrozen ? 3 : 'auto'),
                             }}
                             onClick={(e) => {
                                 if (!isReadOnly) {
@@ -2247,7 +2403,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 })}
             </div>
         );
-    }, [filteredItems, columns, memoizedColumnWidths, editingState, pendingChanges, readOnlyColumns, enableInlineEditing, enableDragFill, startEdit, commitEdit, cancelEdit, memoizedAvailableValues, onItemClick, onItemDoubleClick, refreshTrigger, effectiveColumns, enableSelectionMode, onCellEdit, rowDragFillTargets, rowDragFillSource, selectedCells, selectionBounds, isCellSelected, isBottomRightOfSelection, handleCellMouseDown, handleCellMouseEnter, isSelecting, setSelectedCells, setSelectionAnchor]);
+    }, [filteredItems, columns, memoizedColumnWidths, editingState, pendingChanges, readOnlyColumns, enableInlineEditing, enableDragFill, startEdit, commitEdit, cancelEdit, memoizedAvailableValues, onItemClick, onItemDoubleClick, refreshTrigger, effectiveColumns, enableSelectionMode, onCellEdit, rowDragFillTargets, rowDragFillSource, selectedCells, selectionBounds, isCellSelected, isBottomRightOfSelection, handleCellMouseDown, handleCellMouseEnter, isSelecting, setSelectedCells, setSelectionAnchor, frozenColumnInfo, hasFrozenColumns, getFrozenCellStyle, getFrozenCellClassName]);
 
     // PERFORMANCE OPTIMIZATION: Create stable render function to prevent unnecessary re-renders
     const renderRow = React.useCallback((virtualRow: any) => {
@@ -2325,13 +2481,15 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                     return (
                         <div
                             key="__selection__"
-                            className="virtualized-header-cell selection-header"
+                            className={`virtualized-header-cell selection-header ${getFrozenCellClassName(index)}`}
                             style={{ 
                                 width: memoizedColumnWidths[index], // Use the same width calculation as data cells
                                 minWidth: memoizedColumnWidths[index],
                                 maxWidth: memoizedColumnWidths[index],
                                 height: '100%', // Fill the full height of the header container
-                                position: 'relative',
+                                position: frozenColumnInfo[index]?.isFrozen ? 'sticky' : 'relative',
+                                left: frozenColumnInfo[index]?.isFrozen ? frozenColumnInfo[index].stickyLeft : undefined,
+                                zIndex: frozenColumnInfo[index]?.isFrozen ? 7 : undefined,
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -2367,12 +2525,14 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                     return (
                         <div
                             key="__delete__"
-                            className="virtualized-header-cell delete-header"
+                            className={`virtualized-header-cell delete-header ${getFrozenCellClassName(index)}`}
                             style={{ 
                                 width: memoizedColumnWidths[index],
                                 minWidth: memoizedColumnWidths[index],
                                 maxWidth: memoizedColumnWidths[index],
-                                position: 'relative',
+                                position: frozenColumnInfo[index]?.isFrozen ? 'sticky' : 'relative',
+                                left: frozenColumnInfo[index]?.isFrozen ? frozenColumnInfo[index].stickyLeft : undefined,
+                                zIndex: frozenColumnInfo[index]?.isFrozen ? 7 : undefined,
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -2398,12 +2558,14 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                     return (
                         <div
                             key="__autofill__"
-                            className="virtualized-header-cell autofill-header"
+                            className={`virtualized-header-cell autofill-header ${getFrozenCellClassName(index)}`}
                             style={{ 
                                 width: memoizedColumnWidths[index],
                                 minWidth: memoizedColumnWidths[index],
                                 maxWidth: memoizedColumnWidths[index],
-                                position: 'relative',
+                                position: frozenColumnInfo[index]?.isFrozen ? 'sticky' : 'relative',
+                                left: frozenColumnInfo[index]?.isFrozen ? frozenColumnInfo[index].stickyLeft : undefined,
+                                zIndex: frozenColumnInfo[index]?.isFrozen ? 7 : undefined,
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -2428,16 +2590,20 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 // Get header alignment styles for this column
                 const headerAlignmentStyles = getAlignmentStyles(column.headerHorizontalAligned, column.headerVerticalAligned);
                 
+                const isFrozenHeader = frozenColumnInfo[index]?.isFrozen;
+                
                 return (
                     <div
                         key={column.key}
-                        className={`virtualized-header-cell ${isResizing === column.key ? 'resizing' : ''}`}
+                        className={`virtualized-header-cell ${isResizing === column.key ? 'resizing' : ''} ${getFrozenCellClassName(index)}`}
                         style={{ 
                             width: memoizedColumnWidths[index],
                             minWidth: memoizedColumnWidths[index],
                             maxWidth: memoizedColumnWidths[index],
                             height: '100%', // Fill the full height of the header container
-                            position: 'relative',
+                            position: isFrozenHeader ? 'sticky' : 'relative',
+                            left: isFrozenHeader ? frozenColumnInfo[index].stickyLeft : undefined,
+                            zIndex: isFrozenHeader ? 7 : undefined,
                             display: 'flex',
                             alignItems: enableHeaderTextWrapping ? 'flex-start' : 'center', // Top align when wrapping
                             justifyContent: 'space-between', // Keep space-between for filter icon positioning
@@ -2445,6 +2611,16 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                             padding: enableHeaderTextWrapping ? '2px 12px 2px 8px' : '0 12px 0 8px', // Minimal vertical padding when wrapping
                             boxSizing: 'border-box', // Ensure consistent box model
                             overflow: 'hidden'
+                        }}
+                        onContextMenu={(e) => {
+                            e.preventDefault();
+                            setFreezeContextMenu({
+                                visible: true,
+                                x: e.clientX,
+                                y: e.clientY,
+                                columnKey: column.key || column.fieldName || '',
+                                columnName: column.name || ''
+                            });
                         }}
                     >
                         <span 
@@ -2463,6 +2639,13 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                             }}
                         >
                             {column.name}
+                            {isFrozenHeader && (
+                                <span className="frozen-column-indicator" title="Frozen column">
+                                    <svg width="11" height="11" viewBox="0 0 16 16" fill="#0078d4" style={{ display: 'block' }}>
+                                        <path d="M8 1v3.5L5.5 6 4 4.5 2.5 6 4 7.5 2 9h3.5L8 11.5V15h0V11.5L10.5 9H14l-2-1.5L13.5 6 12 4.5 10.5 6 8 4.5V1z"/>
+                                    </svg>
+                                </span>
+                            )}
                         </span>
                         
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', position: 'relative', zIndex: 15 }}>
@@ -2615,16 +2798,18 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 </MessageBar>
             )}
 
-            {/* Header - FIXED POSITION, no independent scrolling */}
+            {/* Header - Scroll synced with body for frozen column sticky support */}
             <div 
                 ref={headerRef}
                 className="virtualized-header-container"
                 style={{
                     width: '100%',
-                    overflowX: 'hidden', // CHANGED: No independent scrolling
+                    overflowX: 'auto', // Enable scrollLeft sync so position:sticky works on frozen headers
                     overflowY: 'hidden',
                     flexShrink: 0,
-                    position: 'relative'
+                    position: 'relative',
+                    scrollbarWidth: 'none', // Hide scrollbar (Firefox)
+                    msOverflowStyle: 'none', // Hide scrollbar (IE/Edge)
                 }}
             >
                 {renderHeader()}
@@ -2669,6 +2854,42 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                     isOpen={!!activeFilterColumn}
                     getAvailableValues={getAvailableValuesForFilter}
                 />
+            )}
+
+            {/* Freeze/Unfreeze Column Context Menu */}
+            {freezeContextMenu?.visible && (
+                <div
+                    className="freeze-column-context-menu"
+                    style={{ left: freezeContextMenu.x, top: freezeContextMenu.y }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {frozenColumnKeys.has(freezeContextMenu.columnKey) ? (
+                        <>
+                            <div
+                                className="freeze-column-context-menu-item"
+                                onClick={() => { toggleFreezeColumn(freezeContextMenu.columnKey); setFreezeContextMenu(null); }}
+                            >
+                                <span className="menu-icon">🔓</span>
+                                Unfreeze "{freezeContextMenu.columnName}"
+                            </div>
+                            <div
+                                className="freeze-column-context-menu-item"
+                                onClick={() => { unfreezeAllColumns(); setFreezeContextMenu(null); }}
+                            >
+                                <span className="menu-icon">🔓</span>
+                                Unfreeze All Columns
+                            </div>
+                        </>
+                    ) : (
+                        <div
+                            className="freeze-column-context-menu-item"
+                            onClick={() => { toggleFreezeColumn(freezeContextMenu.columnKey); setFreezeContextMenu(null); }}
+                        >
+                            <span className="menu-icon">❄️</span>
+                            Freeze "{freezeContextMenu.columnName}"
+                        </div>
+                    )}
+                </div>
             )}
         </div>
     );
