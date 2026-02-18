@@ -177,6 +177,18 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
     const dropdownContainerRef = React.useRef<HTMLDivElement>(null);
     const [dropdownTarget, setDropdownTarget] = React.useState<HTMLElement | null>(null);
     const [isDatePickerActive, setIsDatePickerActive] = React.useState<boolean>(false);
+    // Ref-based tracking for date picker to avoid stale closures in blur handlers
+    const datePickerActiveRef = React.useRef<boolean>(false);
+    const datePickerBlurTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Cleanup blur timeout on unmount
+    React.useEffect(() => {
+        return () => {
+            if (datePickerBlurTimeoutRef.current) {
+                clearTimeout(datePickerBlurTimeoutRef.current);
+            }
+        };
+    }, []);
 
     // Default editor config if none provided
     const config: ColumnEditorConfig = editorConfig || {
@@ -534,7 +546,8 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
         handleConditionalTrigger('onBlur');
         
         // For date picker, don't commit on blur if the calendar is being used
-        if (config.type === 'date' && isDatePickerActive) {
+        // Use ref to avoid stale closure issues with state-based tracking
+        if (config.type === 'date' && datePickerActiveRef.current) {
             return;
         }
         
@@ -544,7 +557,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                 currentValue;
             onCommit(formattedValue);
         }
-    }, [hasError, currentValue, onCommit, config, item, column, handleConditionalTrigger, isDatePickerActive]);
+    }, [hasError, currentValue, onCommit, config, item, column, handleConditionalTrigger]);
 
     if (config.isReadOnly) {
         const displayValue = config.displayFormatter ? 
@@ -801,16 +814,37 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                 style: { border: 'none', background: 'transparent', ...style },
                 onKeyDown: handleKeyDown,
                 onFocus: () => {
+                    // Clear any pending blur timeout since we regained focus
+                    if (datePickerBlurTimeoutRef.current) {
+                        clearTimeout(datePickerBlurTimeoutRef.current);
+                        datePickerBlurTimeoutRef.current = null;
+                    }
+                    datePickerActiveRef.current = true;
                     setIsDatePickerActive(true);
                     handleFocus();
                 },
-                // Custom onBlur that respects calendar interactions
+                // Custom onBlur that respects calendar interactions (month/year navigation)
                 onBlur: () => {
-                    // Delay the blur handling to allow calendar selection to complete
-                    setTimeout(() => {
+                    // Clear any previous pending blur timeout
+                    if (datePickerBlurTimeoutRef.current) {
+                        clearTimeout(datePickerBlurTimeoutRef.current);
+                    }
+                    // Delay blur handling and check if the calendar callout is still in the DOM
+                    // This prevents committing when the user is navigating months/years
+                    datePickerBlurTimeoutRef.current = setTimeout(() => {
+                        datePickerBlurTimeoutRef.current = null;
+                        // Check if the Fluent UI Calendar is still rendered in the DOM (as a portal/callout)
+                        const calendarStillOpen = document.querySelector('.ms-Calendar-root') ||
+                                                   document.querySelector('.ms-Calendar') ||
+                                                   document.querySelector('.ms-DatePicker-callout');
+                        if (calendarStillOpen) {
+                            // Calendar is still open (user is navigating months/years), don't dismiss
+                            return;
+                        }
+                        datePickerActiveRef.current = false;
                         setIsDatePickerActive(false);
                         handleBlur();
-                    }, 200);
+                    }, 300);
                 },
                 className: `enhanced-editor ${className} ${hasError ? 'has-error' : ''}`,
                 autoFocus: true,
@@ -825,6 +859,13 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                         value={currentValue instanceof Date ? currentValue : 
                                currentValue ? new Date(currentValue) : undefined}
                         onSelectDate={(date) => {
+                            // Clear any pending blur timeout so it doesn't race with this commit
+                            if (datePickerBlurTimeoutRef.current) {
+                                clearTimeout(datePickerBlurTimeoutRef.current);
+                                datePickerBlurTimeoutRef.current = null;
+                            }
+                            datePickerActiveRef.current = false;
+                            setIsDatePickerActive(false);
                             const formattedValue = config.valueFormatter ? 
                                 config.valueFormatter(date, item, column) : 
                                 date;
