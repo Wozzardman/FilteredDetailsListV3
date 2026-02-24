@@ -203,7 +203,7 @@
     border: 2px solid #0969da;
     border-radius: 6px;
     padding: 6px 12px;
-    font-size: 14px;
+    font-size: inherit;
     font-family: inherit;
     background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
     outline: none;
@@ -231,7 +231,7 @@
 }
 
 .enhanced-editor .ms-ComboBox-Input {
-    font-size: 14px;
+    font-size: inherit;
     padding: 6px 8px;
     border: 2px solid #0969da;
     border-radius: 6px;
@@ -271,7 +271,7 @@
 }
 
 .inline-editor .ms-ComboBox-Input {
-    font-size: 14px;
+    font-size: inherit;
     padding: 6px 8px;
     border: 2px solid #0969da;
     border-radius: 6px;
@@ -311,7 +311,7 @@
 }
 
 .enhanced-editor .ms-Dropdown-title {
-    font-size: 14px;
+    font-size: inherit;
     padding: 6px 8px;
     /* Allow dynamic width, no fixed min-width */
 }

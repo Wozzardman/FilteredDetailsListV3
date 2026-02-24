@@ -579,6 +579,11 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
         );
     }
 
+    // Fluent UI styles prop to ensure the inner input/field element gets the correct font size
+    const fluentFieldStyles = {
+        field: { fontSize: `${columnTextSize}px` }
+    };
+
     const commonProps = {
         style: { 
             border: 'none', 
@@ -586,6 +591,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
             fontSize: `${columnTextSize}px`, // Apply dynamic column text size
             ...style 
         },
+        styles: fluentFieldStyles,
         onKeyDown: handleKeyDown,
         onFocus: handleFocus,
         onBlur: handleBlur,
