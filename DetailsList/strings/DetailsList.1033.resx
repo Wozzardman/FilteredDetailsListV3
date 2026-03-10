@@ -150,32 +150,12 @@
     <value>Multi-Line</value>
     <comment/>
   </data>
-  <data name="ColSortable" xml:space="preserve">
-    <value>Sortable</value>
-    <comment/>
-  </data>
-  <data name="ColSortBy" xml:space="preserve">
-    <value>Sort By</value>
-    <comment/>
-  </data>
-  <data name="ColIsBold" xml:space="preserve">
-    <value>Bold</value>
-    <comment/>
-  </data>
   <data name="ColTagColorColumn" xml:space="preserve">
     <value>Tag Color</value>
     <comment/>
   </data>
   <data name="ColShowAsSubTextOf" xml:space="preserve">
     <value>Show As Sub Text Of</value>
-    <comment/>
-  </data>
-  <data name="ColPaddingTop" xml:space="preserve">
-    <value>Padding Top</value>
-    <comment/>
-  </data>
-  <data name="ColPaddingLeft" xml:space="preserve">
-    <value>Padding Top</value>
     <comment/>
   </data>
   <data name="ColLabelAbove" xml:space="preserve">
@@ -190,10 +170,6 @@
     <value>First Multi Value Bold</value>
     <comment/>
   </data>
-  <data name="ColHideWhenBlank" xml:space="preserve">
-    <value>Hide When Blank</value>
-    <comment/>
-  </data>
   <data name="ColSubTextRow" xml:space="preserve">
     <value>Sub Text Row</value>
     <comment/>
@@ -202,36 +178,8 @@
     <value>Cell Type</value>
     <comment/>
   </data>
-  <data name="ColImageWidth" xml:space="preserve">
-    <value>Image Width</value>
-    <comment/>
-  </data>
-  <data name="ColImagePadding" xml:space="preserve">
-    <value>Image Padding</value>
-    <comment/>
-  </data>
-  <data name="ColHeaderPaddingLeft" xml:space="preserve">
-    <value>Header Padding Left</value>
-    <comment/>
-  </data>
   <data name="SelectionType" xml:space="preserve">
     <value>Selection type</value>
-    <comment/>
-  </data>
-  <data name="SelectRowsOnFocus" xml:space="preserve">
-    <value>Select rows on focus</value>
-    <comment/>
-  </data>
-  <data name="CurrentSortColumn" xml:space="preserve">
-    <value>Sort column</value>
-    <comment/>
-  </data>
-  <data name="CurrentSortDirection" xml:space="preserve">
-    <value>Sort direction</value>
-    <comment/>
-  </data>
-  <data name="AccessibilityLabel" xml:space="preserve">
-    <value>Accessibility label</value>
     <comment/>
   </data>
   <data name="InputEvent" xml:space="preserve">
@@ -262,18 +210,6 @@
     <value>Event column</value>
     <comment/>
   </data>
-  <data name="RaiseOnRowSelectionChangeEvent" xml:space="preserve">
-    <value>Raise OnRowSelectionChange event</value>
-    <comment/>
-  </data>
-  <data name="ColAriaTextColumn" xml:space="preserve">
-    <value>Aria text column</value>
-    <comment/>
-  </data>
-  <data name="ColCellActionDisabledColumn" xml:space="preserve">
-    <value>Action disabled column</value>
-    <comment/>
-  </data>
   <data name="Theme" xml:space="preserve">
     <value>Theme</value>
     <comment/>
@@ -288,10 +224,6 @@
   </data>
   <data name="PageNumber" xml:space="preserve">
     <value>Page number</value>
-    <comment/>
-  </data>
-  <data name="HeaderVisible" xml:space="preserve">
-    <value>Header visible</value>
     <comment/>
   </data>
   <data name="SelectionAlwaysVisible" xml:space="preserve">
@@ -324,22 +256,6 @@
     <value>Event row key</value>
     <comment/>
   </data>
-  <data name="Compact" xml:space="preserve">
-    <value>Compact</value>
-    <comment/>
-  </data>
-  <data name="LargeDatasetPaging" xml:space="preserve">
-    <value>Large dataset paging</value>
-    <comment/>
-  </data>
-  <data name="EnableFiltering" xml:space="preserve">
-    <value>Enable filtering</value>
-    <comment/>
-  </data>
-  <data name="FilterConfiguration" xml:space="preserve">
-    <value>Filter configuration</value>
-    <comment/>
-  </data>
   <data name="AppliedFilters" xml:space="preserve">
     <value>Applied filters</value>
     <comment/>
@@ -362,14 +278,6 @@
   </data>
   <data name="AllFilters" xml:space="preserve">
     <value>All filters</value>
-    <comment/>
-  </data>
-  <data name="ColFilterable" xml:space="preserve">
-    <value>Column filterable</value>
-    <comment/>
-  </data>
-  <data name="ColFilterType" xml:space="preserve">
-    <value>Column filter type</value>
     <comment/>
   </data>
   <data name="HeaderTextSize" xml:space="preserve">
@@ -435,10 +343,6 @@
   <data name="FormulaFieldExpression" xml:space="preserve">
     <value>Formula Expression</value>
     <comment>Formula to calculate values from records (e.g. "SUM(amount)", "COUNT(status='Active')", "AVG(score)")</comment>
-  </data>
-  <data name="FormulaFieldValue" xml:space="preserve">
-    <value>Formula Field Value</value>
-    <comment>Calculated result value from Power Apps to pass to PCF control</comment>
   </data>
   
 </root>

@@ -167,7 +167,7 @@ export class PowerAppsFxColumnEditorParser {
         const baseConfig: ColumnEditorConfig = {
             type: functionName as any,
             isRequired: parameters.required || false,
-            isReadOnly: parameters.readonly || false,
+            editLock: parameters.readonly || false,
             placeholder: parameters.placeholder,
         };
 

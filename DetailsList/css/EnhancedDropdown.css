@@ -5,21 +5,20 @@
 }
 
 .enhanced-editor-dropdown .ms-TextField-field {
-    border: 1px solid #d1d1d1 !important;
-    background: white !important;
-    border-radius: 4px !important;
-    padding-right: 32px !important; /* Space for arrow */
-    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    border: none !important;
+    background: transparent !important;
+    padding-right: 24px !important; /* Space for arrow */
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+    overflow: hidden !important;
 }
 
 .enhanced-editor-dropdown .ms-TextField-field:focus {
-    border-color: #0078d4 !important;
-    box-shadow: 0 0 0 1px #0078d4 !important;
     outline: none !important;
 }
 
 .enhanced-editor-dropdown .ms-TextField-field:hover {
-    border-color: #0078d4 !important;
+    /* No border change */
 }
 
 /* Dropdown List Styling */
@@ -122,10 +121,10 @@
 .enhanced-editor-dropdown.narrow-column .ms-TextField-field {
     font-size: inherit !important;
     padding: 4px 24px 4px 8px !important; /* Reduced padding for narrow columns */
-    white-space: nowrap !important;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
     overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    min-height: 28px !important; /* Ensure minimum height */
+    min-height: 0 !important;
 }
 
 .enhanced-editor-dropdown.narrow-column .enhanced-dropdown-arrow {

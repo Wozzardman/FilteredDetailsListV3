@@ -193,7 +193,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
     // Default editor config if none provided
     const config: ColumnEditorConfig = editorConfig || {
         type: 'text',
-        isReadOnly: false,
+        editLock: false,
         isRequired: false
     };
 
@@ -559,7 +559,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
         }
     }, [hasError, currentValue, onCommit, config, item, column, handleConditionalTrigger]);
 
-    if (config.isReadOnly) {
+    if (config.editLock) {
         const displayValue = config.displayFormatter ? 
             config.displayFormatter(value, item, column) : 
             String(value || '');
@@ -580,24 +580,38 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
     }
 
     // Fluent UI styles prop to ensure the inner input/field element gets the correct font size
+    // and proper wrapping for variable row height
     const fluentFieldStyles = {
-        field: { fontSize: `${columnTextSize}px` }
+        field: { 
+            fontSize: `${columnTextSize}px`,
+            whiteSpace: 'pre-wrap' as const,
+            wordBreak: 'break-word' as const,
+        },
+        wrapper: { width: '100%' },
+        root: { width: '100%' },
+        fieldGroup: { minHeight: 0, border: 'none' },
     };
 
-    const commonProps = {
+    const commonPropsBase = {
         style: { 
             border: 'none', 
             background: 'transparent', 
-            fontSize: `${columnTextSize}px`, // Apply dynamic column text size
+            fontSize: `${columnTextSize}px`,
+            width: '100%',
             ...style 
         },
-        styles: fluentFieldStyles,
         onKeyDown: handleKeyDown,
         onFocus: handleFocus,
         onBlur: handleBlur,
         className: `enhanced-editor ${className} ${hasError ? 'has-error' : ''}`,
         autoFocus: true,
         placeholder: config.placeholder
+    };
+
+    // commonProps includes Fluent UI field styles for components that support it (TextField, DatePicker, etc.)
+    const commonProps = {
+        ...commonPropsBase,
+        styles: fluentFieldStyles,
     };
 
     // Render appropriate editor based on type
@@ -636,8 +650,10 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                         handleValueChange(newValue);
                     }}
                     errorMessage={errorMessage}
-                    multiline={config.textConfig?.multiline}
-                    rows={config.textConfig?.rows}
+                    multiline={true}
+                    autoAdjustHeight={true}
+                    rows={config.textConfig?.rows || 1}
+                    resizable={false}
                     maxLength={config.textConfig?.maxLength}
                     onBlur={handleBlur}
                 />
@@ -647,7 +663,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
             const stepValue = config.numberConfig?.step || 1;
             return (
                 <SpinButton
-                    {...commonProps}
+                    {...commonPropsBase}
                     value={String(currentValue || '')}
                     onValidate={(value) => {
                         const numValue = Number(value);
@@ -885,17 +901,18 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                             root: { width: '100%' },
                             textField: {
                                 fieldGroup: {
-                                    border: 'none',
+                                    border: '1px solid #0078d4',
                                     background: 'transparent',
+                                    borderRadius: '2px',
                                     selectors: {
                                         ':hover': {
-                                            border: 'none'
+                                            border: '1px solid #0078d4'
                                         },
                                         ':focus': {
-                                            border: 'none'
+                                            border: '1px solid #0078d4'
                                         },
                                         ':active': {
-                                            border: 'none'
+                                            border: '1px solid #0078d4'
                                         }
                                     }
                                 }
@@ -911,9 +928,9 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                                 position: 'absolute',
                                 top: 0,
                                 left: 0,
-                                right: '32px', // Leave space for clear button
+                                right: '20px', // Leave space for clear button
                                 bottom: 0,
-                                width: 'calc(100% - 32px)',
+                                width: 'calc(100% - 20px)',
                                 height: '100%',
                                 background: 'transparent',
                                 cursor: 'pointer',
@@ -926,12 +943,18 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                             styles: {
                                 fieldGroup: {
                                     cursor: 'pointer',
-                                    userSelect: 'none'
+                                    userSelect: 'none',
+                                    minHeight: 0,
+                                    border: '1px solid #0078d4',
+                                    borderRadius: '2px',
                                 },
                                 field: {
                                     cursor: 'pointer',
                                     userSelect: 'none',
-                                    caretColor: 'transparent'
+                                    caretColor: 'transparent',
+                                    fontSize: `${columnTextSize}px`,
+                                    whiteSpace: 'normal',
+                                    wordBreak: 'break-word',
                                 }
                             }
                         }}
@@ -951,14 +974,15 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                                 top: '50%',
                                 right: '4px',
                                 transform: 'translateY(-50%)',
-                                minWidth: '24px',
-                                width: '24px',
-                                height: '24px',
-                                fontSize: '12px',
+                                minWidth: '16px',
+                                width: '16px',
+                                height: '16px',
+                                padding: 0,
                                 zIndex: 2 // Above the calendar clickable area
                             },
                             icon: {
-                                fontSize: '12px'
+                                fontSize: '10px',
+                                lineHeight: '16px',
                             }
                         }}
                     />
@@ -968,7 +992,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
         case 'boolean':
             return (
                 <Toggle
-                    {...commonProps}
+                    {...commonPropsBase}
                     checked={Boolean(currentValue)}
                     onChange={(_, checked) => {
                         handleValueChange(checked);
@@ -1024,15 +1048,21 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                     ref={dropdownContainerRef}
                     style={{ 
                         position: 'relative',
-                        width: '100%', // Let it fill the available space like text inputs
-                        ...commonProps.style 
+                        width: '100%',
+                        border: 'none',
+                        background: 'transparent',
                     }}
                     className={`enhanced-editor-dropdown ${className} ${hasError ? 'has-error' : ''} ${isNarrowColumn ? 'narrow-column' : ''} ${isExtraNarrow ? 'extra-narrow' : ''}`}
                 >
                     <TextField
+                        {...commonProps}
                         value={filterText}
                         placeholder={config.placeholder || "Type to search or select..."}
                         autoFocus={true}
+                        multiline={true}
+                        autoAdjustHeight={true}
+                        rows={1}
+                        resizable={false}
                         onChange={(_, newValue) => {
                             const searchText = newValue || '';
                             setFilterText(searchText);
@@ -1079,14 +1109,6 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                                     e.preventDefault();
                                     setIsDropdownOpen(true);
                                     break;
-                            }
-                        }}
-                        styles={{
-                            root: { width: '100%' },
-                            field: { 
-                                border: 'none', 
-                                background: 'transparent',
-                                fontSize: `${columnTextSize}px` // Use dynamic column text size
                             }
                         }}
                     />
@@ -1189,7 +1211,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                         }}
                         showValue={sliderConfig.showValue}
                         valueFormat={sliderConfig.valueFormat}
-                        {...commonProps}
+                        {...commonPropsBase}
                     />
                 </div>
             );
@@ -1198,7 +1220,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
             const ratingConfig = config.ratingConfig || { max: 5, allowZero: true };
             return (
                 <Rating
-                    {...commonProps}
+                    {...commonPropsBase}
                     rating={Number(currentValue) || 0}
                     max={ratingConfig.max}
                     allowZeroStars={ratingConfig.allowZero}
@@ -1219,7 +1241,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
         case 'color':
             return (
                 <ColorPicker
-                    {...commonProps}
+                    {...commonPropsBase}
                     color={currentValue || '#000000'}
                     onChange={(_, color) => {
                         const colorValue = color.str;
@@ -1250,7 +1272,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                     onCancel: onCancel,
                     column: column,
                     item: item,
-                    isReadOnly: config.isReadOnly,
+                    isReadOnly: config.editLock,
                     config: config.customConfig.props,
                     ...commonProps
                 });

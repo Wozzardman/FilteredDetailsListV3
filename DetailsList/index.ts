@@ -979,7 +979,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                             
                             // Map table columns to configuration properties
                             const isRequired = record.getValue('IsRequired');
-                            const isReadOnly = record.getValue('IsReadOnly');
+                            const editLock = record.getValue('EditLock');
                             const placeholder = record.getValue('Placeholder');
                             const minValue = record.getValue('MinValue');
                             const maxValue = record.getValue('MaxValue');
@@ -1014,7 +1014,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                             
                             // Apply common properties
                             if (isRequired !== null && isRequired !== undefined) config.isRequired = isRequired;
-                            if (isReadOnly !== null && isReadOnly !== undefined) config.isReadOnly = isReadOnly;
+                            if (editLock !== null && editLock !== undefined) config.editLock = editLock;
                             if (placeholder) config.placeholder = placeholder;
                             if (allowDirectTextInput !== null && allowDirectTextInput !== undefined) config.allowDirectTextInput = allowDirectTextInput;
                             if (requiresAutoFillConfirmation !== null && requiresAutoFillConfirmation !== undefined) config.RequiresAutoFillConfirmation = requiresAutoFillConfirmation;
@@ -2498,7 +2498,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             }
             
             // Then try global template
-            const newRowTemplateParam = this.context?.parameters?.NewRowTemplate?.raw;
+            const newRowTemplateParam = (this.context?.parameters as any)?.NewRowTemplate?.raw;
             if (newRowTemplateParam) {
                 try {
                     newRowTemplate = JSON.parse(newRowTemplateParam);

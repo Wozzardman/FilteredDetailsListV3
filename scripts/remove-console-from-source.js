@@ -12,17 +12,11 @@ const filesToProcess = [
     'DetailsList/components/VirtualizedEditableGrid.tsx',
     'DetailsList/components/UltimateEnterpriseGrid.tsx',
     'DetailsList/components/EnhancedInlineEditor.tsx',
-    'DetailsList/components/DragFillManager.tsx',
     'DetailsList/components/ExcelLikeColumnFilter.tsx',
     'DetailsList/components/LoadingOverlay.tsx',
     'DetailsList/components/SelectionCheckbox.tsx',
-    'DetailsList/components/SelectionToggle.tsx',
     'DetailsList/components/VirtualizedFilterDropdown.tsx',
-    'DetailsList/FilterBar.tsx',
-    'DetailsList/FilterMenu.tsx',
     'DetailsList/FilterUtils.ts',
-    'DetailsList/GridCell.tsx',
-    'DetailsList/EnterpriseComponent.ts',
 ];
 
 // Regex patterns to match console statements as standalone statements
