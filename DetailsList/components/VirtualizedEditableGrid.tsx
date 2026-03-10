@@ -1915,14 +1915,28 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                         const editorConfig = columnEditorMapping[columnKey];
                         const editorType = editorConfig?.type || (dataType === 'date' ? 'date' : dataType === 'number' ? 'number' : 'text');
                         
-                        // For date pickers, expand the cell horizontally so the full date is visible
+                        // For date pickers, expand the cell horizontally only if the date text doesn't fit
                         if (editorType === 'date' && !editorConfig?.allowDirectTextInput) {
-                            const dateMinWidth = Math.max(memoizedColumnWidths[columnIndex], 140);
-                            cellStyle.minWidth = dateMinWidth;
-                            cellStyle.width = dateMinWidth;
-                            delete cellStyle.maxWidth;
-                            cellStyle.overflow = 'visible';
-                            cellStyle.zIndex = 1; // Sit above adjacent cells
+                            // Measure actual date text width to determine if expansion is needed
+                            const dateText = cellValue instanceof Date ? cellValue.toLocaleDateString() :
+                                typeof cellValue === 'string' && !isNaN(Date.parse(cellValue)) ? new Date(cellValue).toLocaleDateString() :
+                                String(cellValue || '');
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            // Text width + clear button (20px) + padding (16px) + calendar icon area (24px)
+                            const extraSpace = 60;
+                            let neededWidth = memoizedColumnWidths[columnIndex];
+                            if (ctx) {
+                                ctx.font = `${columnTextSize}px "Segoe UI", sans-serif`;
+                                neededWidth = Math.ceil(ctx.measureText(dateText).width) + extraSpace;
+                            }
+                            if (neededWidth > memoizedColumnWidths[columnIndex]) {
+                                cellStyle.minWidth = neededWidth;
+                                cellStyle.width = neededWidth;
+                                delete cellStyle.maxWidth;
+                                cellStyle.overflow = 'visible';
+                                cellStyle.zIndex = 1; // Sit above adjacent cells
+                            }
                         }
                         
                         // Create enhanced column object with current width from resizing
@@ -2646,6 +2660,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 
                 // Determine header background color: per-column headerColor or default
                 const headerBg = column.headerColor || '#faf9f8';
+                const headerFontColor = (column as any).headerFontColor || undefined;
                 
                 return (
                     <div
@@ -2685,6 +2700,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                 flex: 1, 
                                 fontWeight: 600,
                                 fontSize: `${headerTextSize}px`, // Apply custom header text size
+                                color: headerFontColor, // Apply per-column header font color
                                 overflow: 'hidden',
                                 textOverflow: enableHeaderTextWrapping ? 'clip' : 'ellipsis',
                                 whiteSpace: enableHeaderTextWrapping ? 'normal' : 'nowrap',

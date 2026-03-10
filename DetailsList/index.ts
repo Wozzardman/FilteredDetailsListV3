@@ -702,6 +702,9 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                             // Get header color for per-column header background
                             const headerColor = String(columnRecord.getValue('ColHeaderColor') || '');
                             
+                            // Get header font color for per-column header text color
+                            const headerFontColor = String(columnRecord.getValue('ColHeaderFontColor') || '');
+                            
                             // Check if this is the jump-to column
                             const isJumpToColumn = columnRecord.getValue('JumptoColumn') === true;
                             if (isJumpToColumn) {
@@ -726,7 +729,8 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                                 isVisible: isVisible, // Store visibility for grid component to handle
                                 isFrozen: isFrozen, // Store frozen state for freeze columns feature
                                 accessibilityText: accessibilityText, // Store accessibility text for header tooltip
-                                headerColor: headerColor // Store header background color
+                                headerColor: headerColor, // Store header background color
+                                headerFontColor: headerFontColor // Store header font color
                             });
                             
                             if (!isVisible) {
@@ -882,6 +886,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 const isFrozen = (columnConfig as any)?.isFrozen === true; // Default to not frozen
                 const accessibilityText = (columnConfig as any)?.accessibilityText || '';
                 const headerColor = (columnConfig as any)?.headerColor || '';
+                const headerFontColor = (columnConfig as any)?.headerFontColor || '';
                 
                 // Priority 2: Use PCF dataset visualSizeFactor
                 const pcfVisualSizeFactor = typeof col.visualSizeFactor === 'number' && !isNaN(col.visualSizeFactor) ? col.visualSizeFactor : 0;
@@ -942,6 +947,8 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                     accessibilityText: accessibilityText,
                     // Add header background color
                     headerColor: headerColor,
+                    // Add header font color
+                    headerFontColor: headerFontColor,
                     // Add PCF-specific properties for proper data access
                     pcfDataType: col.dataType,
                     pcfColumnName: col.name
