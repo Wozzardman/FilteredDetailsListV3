@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<manifest>
+<manifest>                               <!-- version in sandbox is 17.6.26. Today's date is 3/12/2026 -JVT -->
   <control namespace="JVT" constructor="FilteredDetailsListV2" version="17.6.13" display-name-key="FilteredDetailsListV2" description-key="FilteredDetailsListV2_Desc" control-type="virtual">
     <external-service-usage enabled="false">
       <!-- Explicitly declare no external services to avoid CORS issues -->
