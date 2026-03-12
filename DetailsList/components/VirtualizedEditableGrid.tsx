@@ -154,6 +154,15 @@ export interface VirtualizedEditableGridProps {
     
     // New row management
     onDeleteNewRow?: (itemId: string) => void; // Callback to delete individual new rows
+    
+    // Loading state from the PCF dataset refresh
+    isLoading?: boolean;
+    
+    // All items (unfiltered) - used to reconcile pending changes for rows that may be filtered out
+    allItems?: any[];
+    
+    // Callback to notify parent of item IDs with pending edits (keeps them visible through filters)
+    onPendingItemsChange?: (itemIds: Set<string>) => void;
 }
 
 export interface VirtualizedEditableGridRef {
@@ -224,6 +233,15 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     // New row management
     onDeleteNewRow,
     
+    // Loading state
+    isLoading = false,
+    
+    // All items (unfiltered) for reconciliation
+    allItems,
+    
+    // Pending items callback
+    onPendingItemsChange,
+    
     // Excel Clipboard props
     enableExcelClipboard = false,
     clipboardService,
@@ -285,7 +303,59 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     const [columnFilters, setColumnFilters] = React.useState<IFilterState>({});
     const [activeFilterColumn, setActiveFilterColumn] = React.useState<string | null>(null);
     const [filterTargets, setFilterTargets] = React.useState<Record<string, HTMLElement | null>>({});
-    const [originalItems] = React.useState<any[]>(items);
+    const [originalItems, setOriginalItems] = React.useState<any[]>(items);
+
+    // Keep originalItems in sync when the dataset refreshes
+    React.useEffect(() => {
+        setOriginalItems(items);
+    }, [items]);
+
+    // Track loading state transitions to reconcile pending changes after a real server refresh
+    const prevIsLoadingRef = React.useRef(isLoading);
+    React.useEffect(() => {
+        const wasLoading = prevIsLoadingRef.current;
+        prevIsLoadingRef.current = isLoading;
+
+        // Only reconcile when loading transitions from true → false (refresh completed)
+        if (!wasLoading || isLoading) return;
+        if (pendingChanges.size === 0) return;
+
+        const keysToRemove: string[] = [];
+        // Use allItems (unfiltered) when available, so we can reconcile rows that were filtered out of view
+        const reconcileItems = allItems || items;
+        pendingChanges.forEach((change, key) => {
+            const refreshedItem = reconcileItems.find((item: any) => {
+                const id = item.key || item.id || item.getRecordId?.();
+                return id === change.itemId;
+            });
+            if (!refreshedItem) return;
+
+            const currentValue = getPCFValue(refreshedItem, change.columnKey);
+            const currentStr = currentValue == null ? '' : String(currentValue);
+            const pendingStr = change.newValue == null ? '' : String(change.newValue);
+            if (currentStr === pendingStr) {
+                keysToRemove.push(key);
+            }
+        });
+
+        if (keysToRemove.length > 0) {
+            setPendingChanges(prev => {
+                const next = new Map(prev);
+                keysToRemove.forEach(k => next.delete(k));
+                return next;
+            });
+        }
+    }, [isLoading, items]);
+
+    // Notify parent of which item IDs have pending edits (so parent-level filters can keep them visible)
+    React.useEffect(() => {
+        if (!onPendingItemsChange) return;
+        const ids = new Set<string>();
+        pendingChanges.forEach(change => {
+            if (change.itemId) ids.add(change.itemId);
+        });
+        onPendingItemsChange(ids);
+    }, [pendingChanges, onPendingItemsChange]);
 
     // Column resizing state
     const [columnWidthOverrides, setColumnWidthOverrides] = React.useState<Record<string, number>>({});
@@ -414,7 +484,19 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     const filteredItems = React.useMemo(() => {
         if (Object.keys(columnFilters).length === 0) return items;
 
+        // Build set of item IDs with pending changes so we can exempt them from filtering
+        const pendingItemIds = new Set<string>();
+        pendingChanges.forEach(change => {
+            if (change.itemId) pendingItemIds.add(change.itemId);
+        });
+
         return items.filter(item => {
+            // Keep items with pending edits visible regardless of filter
+            if (pendingItemIds.size > 0) {
+                const itemId = item.key || item.id || item.getRecordId?.();
+                if (itemId && pendingItemIds.has(itemId)) return true;
+            }
+
             return Object.entries(columnFilters).every(([columnKey, filter]) => {
                 if (!filter || !filter.isActive) return true;
                 
@@ -428,7 +510,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 }
             });
         });
-    }, [items, columnFilters, evaluateCondition]);
+    }, [items, columnFilters, evaluateCondition, pendingChanges]);
 
     // Filter handlers
     const handleColumnFilterChange = React.useCallback((columnKey: string, selectedValues: any[]) => {

@@ -554,28 +554,35 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             this.clearErrorRecoveryTimer();
         }
 
-        // Handle loading state - show loading overlay instead of error messages
-        if (dataset.loading || columns.loading) {
+        // Handle loading state
+        // On initial load (no cached data), show a loading overlay that replaces the grid.
+        // On subsequent refreshes (cached data exists), keep the grid mounted to preserve
+        // filters, frozen columns, scroll position, and all other UI state.
+        const isDatasetLoading = dataset.loading || columns.loading;
+        if (isDatasetLoading) {
             this.startLoading('Loading data...');
             
-            // Return basic grid structure with loading overlay
-            return React.createElement('div', {
-                style: {
-                    position: 'relative',
-                    width: (context.mode.allocatedWidth && context.mode.allocatedWidth > 0) ? context.mode.allocatedWidth : '100%',
-                    height: (context.mode.allocatedHeight && context.mode.allocatedHeight > 0) ? context.mode.allocatedHeight : 400,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: 'var(--neutralLighterAlt, #faf9f8)',
-                    border: '1px solid var(--neutralQuaternaryAlt, #e1dfdd)',
-                    borderRadius: '2px'
-                }
-            }, React.createElement(LoadingOverlay, {
-                message: this.loadingMessage,
-                isVisible: true,
-                theme: context.parameters.Theme?.raw === 'dark' ? 'dark' : 'light'
-            }));
+            // Only show full-screen loading if we have NO cached data yet (first load)
+            if (this.records === undefined) {
+                return React.createElement('div', {
+                    style: {
+                        position: 'relative',
+                        width: (context.mode.allocatedWidth && context.mode.allocatedWidth > 0) ? context.mode.allocatedWidth : '100%',
+                        height: (context.mode.allocatedHeight && context.mode.allocatedHeight > 0) ? context.mode.allocatedHeight : 400,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: 'var(--neutralLighterAlt, #faf9f8)',
+                        border: '1px solid var(--neutralQuaternaryAlt, #e1dfdd)',
+                        borderRadius: '2px'
+                    }
+                }, React.createElement(LoadingOverlay, {
+                    message: this.loadingMessage,
+                    isVisible: true,
+                    theme: context.parameters.Theme?.raw === 'dark' ? 'dark' : 'light'
+                }));
+            }
+            // Otherwise fall through — render the grid with cached data + isLoading=true
         } else {
             // Stop loading when data is ready
             this.stopLoading();
@@ -1153,6 +1160,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         const grid = React.createElement(UltimateEnterpriseGrid, {
             items,
             columns: gridColumns,
+            isLoading: isDatasetLoading,
             height: (context.mode.allocatedHeight && context.mode.allocatedHeight > 0) ? context.mode.allocatedHeight : 400,
             width: (context.mode.allocatedWidth && context.mode.allocatedWidth > 0) ? context.mode.allocatedWidth : '100%', // Always provide a valid width
             enableVirtualization: true,
