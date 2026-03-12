@@ -536,6 +536,17 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             // Continue processing - this is not a critical error
         }
 
+        // Set page size for editorConfig dataset so all rows are loaded (default is 25)
+        try {
+            const editorConfigDataset = (context.parameters as any).editorConfig;
+            if (editorConfigDataset?.paging && editorConfigDataset.paging.pageSize < FilteredDetailsListV2.COLUMN_LIMIT) {
+                editorConfigDataset.paging.setPageSize(FilteredDetailsListV2.COLUMN_LIMIT);
+                editorConfigDataset.refresh();
+            }
+        } catch (editorConfigError) {
+            console.warn('⚠️ Error setting editorConfig page size:', editorConfigError);
+        }
+
         // Clear error state if we reach this point successfully
         if (this.isInErrorState) {
             this.isInErrorState = false;
@@ -543,28 +554,35 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             this.clearErrorRecoveryTimer();
         }
 
-        // Handle loading state - show loading overlay instead of error messages
-        if (dataset.loading || columns.loading) {
+        // Handle loading state
+        // On initial load (no cached data), show a loading overlay that replaces the grid.
+        // On subsequent refreshes (cached data exists), keep the grid mounted to preserve
+        // filters, frozen columns, scroll position, and all other UI state.
+        const isDatasetLoading = dataset.loading || columns.loading;
+        if (isDatasetLoading) {
             this.startLoading('Loading data...');
             
-            // Return basic grid structure with loading overlay
-            return React.createElement('div', {
-                style: {
-                    position: 'relative',
-                    width: (context.mode.allocatedWidth && context.mode.allocatedWidth > 0) ? context.mode.allocatedWidth : '100%',
-                    height: (context.mode.allocatedHeight && context.mode.allocatedHeight > 0) ? context.mode.allocatedHeight : 400,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: 'var(--neutralLighterAlt, #faf9f8)',
-                    border: '1px solid var(--neutralQuaternaryAlt, #e1dfdd)',
-                    borderRadius: '2px'
-                }
-            }, React.createElement(LoadingOverlay, {
-                message: this.loadingMessage,
-                isVisible: true,
-                theme: context.parameters.Theme?.raw === 'dark' ? 'dark' : 'light'
-            }));
+            // Only show full-screen loading if we have NO cached data yet (first load)
+            if (this.records === undefined) {
+                return React.createElement('div', {
+                    style: {
+                        position: 'relative',
+                        width: (context.mode.allocatedWidth && context.mode.allocatedWidth > 0) ? context.mode.allocatedWidth : '100%',
+                        height: (context.mode.allocatedHeight && context.mode.allocatedHeight > 0) ? context.mode.allocatedHeight : 400,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: 'var(--neutralLighterAlt, #faf9f8)',
+                        border: '1px solid var(--neutralQuaternaryAlt, #e1dfdd)',
+                        borderRadius: '2px'
+                    }
+                }, React.createElement(LoadingOverlay, {
+                    message: this.loadingMessage,
+                    isVisible: true,
+                    theme: context.parameters.Theme?.raw === 'dark' ? 'dark' : 'light'
+                }));
+            }
+            // Otherwise fall through — render the grid with cached data + isLoading=true
         } else {
             // Stop loading when data is ready
             this.stopLoading();
@@ -691,6 +709,9 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                             // Get header color for per-column header background
                             const headerColor = String(columnRecord.getValue('ColHeaderColor') || '');
                             
+                            // Get header font color for per-column header text color
+                            const headerFontColor = String(columnRecord.getValue('ColHeaderFontColor') || '');
+                            
                             // Check if this is the jump-to column
                             const isJumpToColumn = columnRecord.getValue('JumptoColumn') === true;
                             if (isJumpToColumn) {
@@ -715,7 +736,8 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                                 isVisible: isVisible, // Store visibility for grid component to handle
                                 isFrozen: isFrozen, // Store frozen state for freeze columns feature
                                 accessibilityText: accessibilityText, // Store accessibility text for header tooltip
-                                headerColor: headerColor // Store header background color
+                                headerColor: headerColor, // Store header background color
+                                headerFontColor: headerFontColor // Store header font color
                             });
                             
                             if (!isVisible) {
@@ -871,6 +893,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 const isFrozen = (columnConfig as any)?.isFrozen === true; // Default to not frozen
                 const accessibilityText = (columnConfig as any)?.accessibilityText || '';
                 const headerColor = (columnConfig as any)?.headerColor || '';
+                const headerFontColor = (columnConfig as any)?.headerFontColor || '';
                 
                 // Priority 2: Use PCF dataset visualSizeFactor
                 const pcfVisualSizeFactor = typeof col.visualSizeFactor === 'number' && !isNaN(col.visualSizeFactor) ? col.visualSizeFactor : 0;
@@ -931,6 +954,8 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                     accessibilityText: accessibilityText,
                     // Add header background color
                     headerColor: headerColor,
+                    // Add header font color
+                    headerFontColor: headerFontColor,
                     // Add PCF-specific properties for proper data access
                     pcfDataType: col.dataType,
                     pcfColumnName: col.name
@@ -968,7 +993,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                             
                             // Map table columns to configuration properties
                             const isRequired = record.getValue('IsRequired');
-                            const isReadOnly = record.getValue('IsReadOnly');
+                            const editLock = record.getValue('EditLock');
                             const placeholder = record.getValue('Placeholder');
                             const minValue = record.getValue('MinValue');
                             const maxValue = record.getValue('MaxValue');
@@ -1003,7 +1028,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                             
                             // Apply common properties
                             if (isRequired !== null && isRequired !== undefined) config.isRequired = isRequired;
-                            if (isReadOnly !== null && isReadOnly !== undefined) config.isReadOnly = isReadOnly;
+                            if (editLock !== null && editLock !== undefined) config.editLock = editLock;
                             if (placeholder) config.placeholder = placeholder;
                             if (allowDirectTextInput !== null && allowDirectTextInput !== undefined) config.allowDirectTextInput = allowDirectTextInput;
                             if (requiresAutoFillConfirmation !== null && requiresAutoFillConfirmation !== undefined) config.RequiresAutoFillConfirmation = requiresAutoFillConfirmation;
@@ -1135,6 +1160,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         const grid = React.createElement(UltimateEnterpriseGrid, {
             items,
             columns: gridColumns,
+            isLoading: isDatasetLoading,
             height: (context.mode.allocatedHeight && context.mode.allocatedHeight > 0) ? context.mode.allocatedHeight : 400,
             width: (context.mode.allocatedWidth && context.mode.allocatedWidth > 0) ? context.mode.allocatedWidth : '100%', // Always provide a valid width
             enableVirtualization: true,
@@ -2487,7 +2513,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             }
             
             // Then try global template
-            const newRowTemplateParam = this.context?.parameters?.NewRowTemplate?.raw;
+            const newRowTemplateParam = (this.context?.parameters as any)?.NewRowTemplate?.raw;
             if (newRowTemplateParam) {
                 try {
                     newRowTemplate = JSON.parse(newRowTemplateParam);

@@ -262,15 +262,13 @@
     left: 0;
     width: 100%;
     display: flex;
-    align-items: center;
+    align-items: stretch;
     border-bottom: 1px solid #e1dfdd;
-    transition: background-color 0.1s ease;
     cursor: pointer;
 }
 
 .virtualized-row:hover {
     background-color: #f3f2f1 !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .virtualized-row.even {
@@ -283,15 +281,13 @@
 
 /* Cell Styles */
 .virtualized-cell {
-    height: 100%;
-    padding: 0 8px;
+    padding: 4px 8px;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: normal;
+    word-break: break-word;
     position: relative;
-    transition: all 0.15s ease;
 }
 
 .virtualized-cell:last-child {
@@ -304,9 +300,6 @@
 
 .virtualized-cell.editable:hover {
     background-color: rgba(0, 120, 212, 0.08);
-    border-radius: 3px;
-    margin: 2px;
-    padding: 0 6px; /* Adjust padding to account for margin */
 }
 
 .virtualized-cell.read-only {

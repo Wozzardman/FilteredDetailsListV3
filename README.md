@@ -197,7 +197,7 @@ All editor types support these common properties:
     ColumnKey: "fieldName",           // Required: Column to edit
     EditorType: "Text",              // Required: Type of editor
     IsRequired: true,                // Mark field as required
-    IsReadOnly: false,               // Make field read-only
+    EditLock: false,               // Lock field from inline editing
     Placeholder: "Enter value...",   // Placeholder text
     DefaultValue: "Initial value",   // Default value for new records
     ValueType` - Type for default value conversion (text, number, boolean, date)
@@ -308,20 +308,20 @@ Table(
     {ColumnKey: "unitPrice", EditorType: "Currency", CurrencySymbol: "$"},
     
     // Total automatically calculated from quantity × unitPrice
-    {ColumnKey: "total", EditorType: "Currency", CurrencySymbol: "$", IsReadOnly: true,
+    {ColumnKey: "total", EditorType: "Currency", CurrencySymbol: "$", EditLock: true,
      ConditionalConfig: ConditionalHelpers.multiFieldCalculation(
          ["quantity", "unitPrice"],
          (values) => (values.quantity || 0) * (values.unitPrice || 0)
      )},
      
     // Tax calculation (7.5% of total)
-    {ColumnKey: "tax", EditorType: "Currency", CurrencySymbol: "$", IsReadOnly: true,
+    {ColumnKey: "tax", EditorType: "Currency", CurrencySymbol: "$", EditLock: true,
      ConditionalConfig: ConditionalHelpers.calculate("total", 
          (totalValue) => (totalValue || 0) * 0.075
      )},
      
     // Final amount with tax
-    {ColumnKey: "finalAmount", EditorType: "Currency", CurrencySymbol: "$", IsReadOnly: true,
+    {ColumnKey: "finalAmount", EditorType: "Currency", CurrencySymbol: "$", EditLock: true,
      ConditionalConfig: ConditionalHelpers.multiFieldCalculation(
          ["total", "tax"],
          (values) => (values.total || 0) + (values.tax || 0)
@@ -338,7 +338,7 @@ Table(
     {ColumnKey: "productId", EditorType: "Text", Placeholder: "Enter product ID..."},
     
     // Product name looked up from API
-    {ColumnKey: "productName", EditorType: "Text", IsReadOnly: true,
+    {ColumnKey: "productName", EditorType: "Text", EditLock: true,
      ConditionalConfig: ConditionalHelpers.lookup("productId",
          LookupBuilder.fromApi("https://api.company.com/products/{sourceValue}")
              .withMethod("GET")
@@ -350,7 +350,7 @@ Table(
      )},
      
     // Category looked up and cached
-    {ColumnKey: "category", EditorType: "Text", IsReadOnly: true,
+    {ColumnKey: "category", EditorType: "Text", EditLock: true,
      ConditionalConfig: ConditionalHelpers.lookup("productId",
          LookupBuilder.fromApi("https://api.company.com/products/{sourceValue}/category")
              .withCache(600000) // 10 minute cache
@@ -370,7 +370,7 @@ Table(
     {ColumnKey: "weight", EditorType: "Number", MinValue: 0, Placeholder: "Weight in lbs"},
     
     // Shipping cost with complex calculation
-    {ColumnKey: "shippingCost", EditorType: "Currency", CurrencySymbol: "$", IsReadOnly: true,
+    {ColumnKey: "shippingCost", EditorType: "Currency", CurrencySymbol: "$", EditLock: true,
      ConditionalConfig: {
          rules: [
              // Rule 1: Base shipping calculation on order type and weight
@@ -442,7 +442,7 @@ Table(
          ]
      }},
      
-    {ColumnKey: "duration", EditorType: "Number", IsReadOnly: true,
+    {ColumnKey: "duration", EditorType: "Number", EditLock: true,
      ConditionalConfig: ConditionalHelpers.multiFieldCalculation(
          ["startDate", "endDate"],
          (values) => {
@@ -476,7 +476,7 @@ Table(
     // Price calculation pattern
     {ColumnKey: "quantity", EditorType: "Number"},
     {ColumnKey: "unitPrice", EditorType: "Currency"},
-    {ColumnKey: "total", EditorType: "Currency", IsReadOnly: true,
+    {ColumnKey: "total", EditorType: "Currency", EditLock: true,
      ConditionalConfig: CommonConditionalPatterns.calculateTotal()},
      
     // Geographic dependency pattern
@@ -490,7 +490,7 @@ Table(
      
     // Customer discount pattern
     {ColumnKey: "customerType", EditorType: "Dropdown", DropdownOptions: "VIP,Premium,Standard,Basic"},
-    {ColumnKey: "discount", EditorType: "Percentage", IsReadOnly: true,
+    {ColumnKey: "discount", EditorType: "Percentage", EditLock: true,
      ConditionalConfig: CommonConditionalPatterns.discountByCustomerType()}
 )
 ```

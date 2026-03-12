@@ -13,6 +13,7 @@ import { EnterpriseChangeManager } from '../services/EnterpriseChangeManager';
 import { DataExportService } from '../services/DataExportService';
 import { IExportOptions } from '../types/Advanced.types';
 import { VirtualizedEditableGrid, VirtualizedEditableGridRef } from './VirtualizedEditableGrid';
+import { LoadingOverlay } from './LoadingOverlay';
 import { ColumnEditorMapping } from '../types/ColumnEditor.types';
 import { HeaderSelectionCheckbox, RowSelectionCheckbox } from './SelectionCheckbox';
 import '../css/SelectionMode.css';
@@ -99,6 +100,10 @@ export interface IUltimateEnterpriseGridProps {
     formulaFieldText?: string;
     formulaFieldExpression?: string;
     
+    // Loading state - when true, shows a loading overlay on top of the grid
+    // without unmounting it (preserves filters, scroll position, frozen columns, etc.)
+    isLoading?: boolean;
+    
     className?: string;
     theme?: 'light' | 'dark' | 'high-contrast';
     locale?: string;
@@ -182,7 +187,10 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     enableHeaderTextWrapping = false, // Default to no wrapping for backward compatibility
     
     // Row styling props
-    alternateRowColor
+    alternateRowColor,
+    
+    // Loading state
+    isLoading = false
 }) => {
     // Ref for grid imperative methods
     const gridRef = React.useRef<VirtualizedEditableGridRef>(null);
@@ -192,6 +200,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     const [globalFilter, setGlobalFilter] = useState<string>('');
     const [columnFilters, setColumnFilters] = useState<Record<string, any[]>>({});
     const [pendingChangesCount, setPendingChangesCount] = useState<number>(0);
+    const [pendingEditItemIds, setPendingEditItemIds] = useState<Set<string>>(new Set());
     const [changeManager] = useState(() => new EnterpriseChangeManager());
     const [exportService] = useState(() => DataExportService.getInstance());
     
@@ -251,6 +260,10 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                 Object.entries(columnFilters).forEach(([columnKey, selectedValues]) => {
             if (selectedValues && selectedValues.length > 0) {
                 result = result.filter(item => {
+                    // Keep items with pending edits visible regardless of filter
+                    const itemId = item.key || item.id || item.getRecordId?.();
+                    if (itemId && pendingEditItemIds.has(itemId)) return true;
+
                     let value: any;
                     if (item && typeof item.getValue === 'function') {
                         try {
@@ -294,7 +307,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                 });
             }
         });        setFilteredItems(result);
-    }, [items, globalFilter, columnFilters, columns]);
+    }, [items, globalFilter, columnFilters, columns, pendingEditItemIds]);
 
     // Handle cell edit
     const handleCellEdit = useCallback((item: any, column: IUltimateEnterpriseGridColumn, newValue: any) => {
@@ -831,6 +844,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
             data-theme={theme}
             style={{
                 ...rowStyleVars,
+                position: 'relative',
                 width: (typeof width === 'number' && width > 0) ? `${width}px` : (typeof width === 'string' ? width : '100%'),
                 height: (typeof height === 'number' && height > 0) ? `${height}px` : (typeof height === 'string' ? height : '400px'),
                 maxWidth: (typeof width === 'number' && width > 0) ? `${width}px` : (typeof width === 'string' ? width : '100%'),
@@ -843,6 +857,9 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                 padding: 0
             }}
         >
+            {/* Loading overlay - renders on top of grid without unmounting it */}
+            {isLoading && <LoadingOverlay message="Refreshing data..." isVisible={true} />}
+
             {/* Control Bar - Conditionally rendered */}
             {showControlBar && (
                 <Stack horizontal tokens={{ childrenGap: 8, padding: 0 }} className="control-bar" verticalAlign="center" wrap>
@@ -986,7 +1003,10 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                     // Row styling props
                     alternateRowColor={alternateRowColor}
                     
-
+                    // Loading state for reconciliation
+                    isLoading={isLoading}
+                    allItems={items}
+                    onPendingItemsChange={setPendingEditItemIds}
                 />
             </div>
             

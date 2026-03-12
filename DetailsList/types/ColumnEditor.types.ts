@@ -197,7 +197,7 @@ export interface ColumnEditorConfig {
     type: ColumnEditorType;
     
     // Common properties
-    isReadOnly?: boolean;
+    editLock?: boolean;
     isRequired?: boolean;
     placeholder?: string;
     allowDirectTextInput?: boolean; // Universal: Allow typing values directly instead of using specialized controls

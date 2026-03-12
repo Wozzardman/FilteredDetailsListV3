@@ -5,21 +5,20 @@
 }
 
 .enhanced-editor-dropdown .ms-TextField-field {
-    border: 1px solid #d1d1d1 !important;
-    background: white !important;
-    border-radius: 4px !important;
-    padding-right: 32px !important; /* Space for arrow */
-    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    border: none !important;
+    background: transparent !important;
+    padding-right: 24px !important; /* Space for arrow */
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+    overflow: hidden !important;
 }
 
 .enhanced-editor-dropdown .ms-TextField-field:focus {
-    border-color: #0078d4 !important;
-    box-shadow: 0 0 0 1px #0078d4 !important;
     outline: none !important;
 }
 
 .enhanced-editor-dropdown .ms-TextField-field:hover {
-    border-color: #0078d4 !important;
+    /* No border change */
 }
 
 /* Dropdown List Styling */
@@ -51,7 +50,7 @@
     padding: 8px 12px;
     cursor: pointer;
     background-color: white;
-    font-size: 13px;
+    font-size: inherit;
     transition: background-color 0.1s ease;
     border-bottom: 1px solid #f0f0f0;
 }
@@ -116,16 +115,16 @@
 
 /* Narrow Column Adaptations */
 .enhanced-editor-dropdown.narrow-column {
-    font-size: 12px; /* Slightly smaller font for narrow columns */
+    font-size: inherit; /* Inherit from parent which has dynamic columnTextSize */
 }
 
 .enhanced-editor-dropdown.narrow-column .ms-TextField-field {
-    font-size: 12px !important;
+    font-size: inherit !important;
     padding: 4px 24px 4px 8px !important; /* Reduced padding for narrow columns */
-    white-space: nowrap !important;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
     overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    min-height: 28px !important; /* Ensure minimum height */
+    min-height: 0 !important;
 }
 
 .enhanced-editor-dropdown.narrow-column .enhanced-dropdown-arrow {
@@ -140,7 +139,7 @@
     white-space: normal !important; /* Allow text wrapping in dropdown */
     word-wrap: break-word !important;
     padding: 6px 8px !important; /* Reduced padding */
-    font-size: 12px !important;
+    font-size: inherit !important;
     line-height: 1.3 !important;
     min-height: 20px !important; /* Explicit minimum height instead of auto */
 }
@@ -154,7 +153,7 @@
 /* Extra-narrow columns (less than 80px) */
 .enhanced-editor-dropdown.narrow-column .ms-TextField-field[style*="max-width"] {
     padding: 2px 20px 2px 4px !important; /* Even more compact padding */
-    font-size: 11px !important;
+    font-size: inherit !important;
 }
 
 .enhanced-editor-dropdown.narrow-column .enhanced-dropdown-arrow[style*="narrow"] {

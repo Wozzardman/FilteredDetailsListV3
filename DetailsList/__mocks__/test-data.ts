@@ -53,8 +53,6 @@ export function createTestColumnRecords() {
                 RecordSelected: false,
                 ...config,
                 ColMultiLine: false,
-                ColResizable: true,
-                ColSortable: true,
                 ColVerticalAlign: 'Top',
             }),
     );

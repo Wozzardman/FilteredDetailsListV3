@@ -154,6 +154,15 @@ export interface VirtualizedEditableGridProps {
     
     // New row management
     onDeleteNewRow?: (itemId: string) => void; // Callback to delete individual new rows
+    
+    // Loading state from the PCF dataset refresh
+    isLoading?: boolean;
+    
+    // All items (unfiltered) - used to reconcile pending changes for rows that may be filtered out
+    allItems?: any[];
+    
+    // Callback to notify parent of item IDs with pending edits (keeps them visible through filters)
+    onPendingItemsChange?: (itemIds: Set<string>) => void;
 }
 
 export interface VirtualizedEditableGridRef {
@@ -224,6 +233,15 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     // New row management
     onDeleteNewRow,
     
+    // Loading state
+    isLoading = false,
+    
+    // All items (unfiltered) for reconciliation
+    allItems,
+    
+    // Pending items callback
+    onPendingItemsChange,
+    
     // Excel Clipboard props
     enableExcelClipboard = false,
     clipboardService,
@@ -285,7 +303,59 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     const [columnFilters, setColumnFilters] = React.useState<IFilterState>({});
     const [activeFilterColumn, setActiveFilterColumn] = React.useState<string | null>(null);
     const [filterTargets, setFilterTargets] = React.useState<Record<string, HTMLElement | null>>({});
-    const [originalItems] = React.useState<any[]>(items);
+    const [originalItems, setOriginalItems] = React.useState<any[]>(items);
+
+    // Keep originalItems in sync when the dataset refreshes
+    React.useEffect(() => {
+        setOriginalItems(items);
+    }, [items]);
+
+    // Track loading state transitions to reconcile pending changes after a real server refresh
+    const prevIsLoadingRef = React.useRef(isLoading);
+    React.useEffect(() => {
+        const wasLoading = prevIsLoadingRef.current;
+        prevIsLoadingRef.current = isLoading;
+
+        // Only reconcile when loading transitions from true → false (refresh completed)
+        if (!wasLoading || isLoading) return;
+        if (pendingChanges.size === 0) return;
+
+        const keysToRemove: string[] = [];
+        // Use allItems (unfiltered) when available, so we can reconcile rows that were filtered out of view
+        const reconcileItems = allItems || items;
+        pendingChanges.forEach((change, key) => {
+            const refreshedItem = reconcileItems.find((item: any) => {
+                const id = item.key || item.id || item.getRecordId?.();
+                return id === change.itemId;
+            });
+            if (!refreshedItem) return;
+
+            const currentValue = getPCFValue(refreshedItem, change.columnKey);
+            const currentStr = currentValue == null ? '' : String(currentValue);
+            const pendingStr = change.newValue == null ? '' : String(change.newValue);
+            if (currentStr === pendingStr) {
+                keysToRemove.push(key);
+            }
+        });
+
+        if (keysToRemove.length > 0) {
+            setPendingChanges(prev => {
+                const next = new Map(prev);
+                keysToRemove.forEach(k => next.delete(k));
+                return next;
+            });
+        }
+    }, [isLoading, items]);
+
+    // Notify parent of which item IDs have pending edits (so parent-level filters can keep them visible)
+    React.useEffect(() => {
+        if (!onPendingItemsChange) return;
+        const ids = new Set<string>();
+        pendingChanges.forEach(change => {
+            if (change.itemId) ids.add(change.itemId);
+        });
+        onPendingItemsChange(ids);
+    }, [pendingChanges, onPendingItemsChange]);
 
     // Column resizing state
     const [columnWidthOverrides, setColumnWidthOverrides] = React.useState<Record<string, number>>({});
@@ -414,7 +484,19 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     const filteredItems = React.useMemo(() => {
         if (Object.keys(columnFilters).length === 0) return items;
 
+        // Build set of item IDs with pending changes so we can exempt them from filtering
+        const pendingItemIds = new Set<string>();
+        pendingChanges.forEach(change => {
+            if (change.itemId) pendingItemIds.add(change.itemId);
+        });
+
         return items.filter(item => {
+            // Keep items with pending edits visible regardless of filter
+            if (pendingItemIds.size > 0) {
+                const itemId = item.key || item.id || item.getRecordId?.();
+                if (itemId && pendingItemIds.has(itemId)) return true;
+            }
+
             return Object.entries(columnFilters).every(([columnKey, filter]) => {
                 if (!filter || !filter.isActive) return true;
                 
@@ -428,7 +510,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 }
             });
         });
-    }, [items, columnFilters, evaluateCondition]);
+    }, [items, columnFilters, evaluateCondition, pendingChanges]);
 
     // Filter handlers
     const handleColumnFilterChange = React.useCallback((columnKey: string, selectedValues: any[]) => {
@@ -818,8 +900,8 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         getScrollElement: () => parentRef.current,
         estimateSize: () => rowHeight,
         overscan: overscan,
-        // Ultimate performance features for enterprise competition
-        measureElement: enableMemoryPooling ? undefined : (element: any) => {
+        // Always measure rows for dynamic/variable row height based on content
+        measureElement: (element: any) => {
             return element?.getBoundingClientRect().height || rowHeight;
         },
         scrollToFn: (offset: any, canSmooth: any, instance: any) => {
@@ -1459,11 +1541,13 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     // Start inline editing
     const startEdit = React.useCallback((itemIndex: number, columnKey: string) => {
         if (!enableInlineEditing || readOnlyColumns.includes(columnKey)) return;
+        // Enforce editLock: when not in selection mode, columns with editLock cannot be edited
+        if (!enableSelectionMode && columnEditorMapping[columnKey]?.editLock) return;
 
         const item = filteredItems[itemIndex];
         const originalValue = getPCFValue(item, columnKey);
         setEditingState({ itemIndex, columnKey, originalValue });
-    }, [enableInlineEditing, readOnlyColumns, filteredItems]);
+    }, [enableInlineEditing, readOnlyColumns, filteredItems, enableSelectionMode, columnEditorMapping]);
 
     // Handle conditional item changes
     const handleItemChange = React.useCallback((targetColumnKey: string, newValue: any) => {
@@ -1720,10 +1804,10 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
             left: 0,
             width: '100%',
             minWidth: `${totalGridWidth}px`, // Ensure minimum width for horizontal scrolling
-            height: `${virtualRow.size}px`,
+            minHeight: `${rowHeight}px`,
             transform: `translateY(${virtualRow.start}px)`,
             display: 'flex',
-            alignItems: 'center',
+            alignItems: 'stretch',
             borderBottom: '1px solid #e1dfdd',
         };
         
@@ -1735,6 +1819,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         return (
             <div
                 key={index}
+                ref={virtualizer.measureElement}
                 className={rowClassName}
                 data-index={index}
                 style={rowStyle}
@@ -1875,7 +1960,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                     const cellKey = getCellKey(index, columnKey);
                     const isEditing = editingState?.itemIndex === index && editingState?.columnKey === columnKey;
                     const hasChanges = pendingChanges.has(cellKey);
-                    const isReadOnly = readOnlyColumns.includes(columnKey);
+                    const isReadOnly = readOnlyColumns.includes(columnKey) || (!enableSelectionMode && !!columnEditorMapping[columnKey]?.editLock);
 
                     const cellValue = pendingChanges.get(cellKey)?.newValue ?? getPCFValue(item, columnKey);
                     const dataType = column.data?.dataType || 'string';
@@ -1889,13 +1974,15 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                         width: memoizedColumnWidths[columnIndex],
                         minWidth: memoizedColumnWidths[columnIndex],
                         maxWidth: memoizedColumnWidths[columnIndex],
-                        height: '100%',
-                        padding: '0 8px',
+                        minHeight: `${rowHeight}px`,
+                        alignSelf: 'stretch',
+                        padding: '4px 8px',
                         display: 'flex',
                         ...alignmentStyles, // Apply column-specific alignment
+                        alignItems: 'flex-start',
                         overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: column.isMultiline ? 'normal' : 'nowrap', // Support multiline display
+                        whiteSpace: 'normal',
+                        wordBreak: 'break-word',
                         cursor: isReadOnly ? 'default' : 'pointer',
                         backgroundColor: hasChanges ? '#fff4ce' : rowBg, // Always use opaque bg so frozen/unfrozen look identical
                         borderLeft: hasChanges ? '3px solid #ffb900' : 'none',
@@ -1908,6 +1995,31 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
 
                     if (isEditing && enableInlineEditing) {
                         const editorConfig = columnEditorMapping[columnKey];
+                        const editorType = editorConfig?.type || (dataType === 'date' ? 'date' : dataType === 'number' ? 'number' : 'text');
+                        
+                        // For date pickers, expand the cell horizontally only if the date text doesn't fit
+                        if (editorType === 'date' && !editorConfig?.allowDirectTextInput) {
+                            // Measure actual date text width to determine if expansion is needed
+                            const dateText = cellValue instanceof Date ? cellValue.toLocaleDateString() :
+                                typeof cellValue === 'string' && !isNaN(Date.parse(cellValue)) ? new Date(cellValue).toLocaleDateString() :
+                                String(cellValue || '');
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            // Text width + clear button (20px) + padding (16px) + calendar icon area (24px)
+                            const extraSpace = 60;
+                            let neededWidth = memoizedColumnWidths[columnIndex];
+                            if (ctx) {
+                                ctx.font = `${columnTextSize}px "Segoe UI", sans-serif`;
+                                neededWidth = Math.ceil(ctx.measureText(dateText).width) + extraSpace;
+                            }
+                            if (neededWidth > memoizedColumnWidths[columnIndex]) {
+                                cellStyle.minWidth = neededWidth;
+                                cellStyle.width = neededWidth;
+                                delete cellStyle.maxWidth;
+                                cellStyle.overflow = 'visible';
+                                cellStyle.zIndex = 1; // Sit above adjacent cells
+                            }
+                        }
                         
                         // Create enhanced column object with current width from resizing
                         const enhancedColumn = {
@@ -1941,7 +2053,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                             type: dataType === 'date' ? 'date' : 
                                                   dataType === 'number' ? 'number' : 
                                                   dataType === 'boolean' ? 'boolean' : 'text',
-                                            isReadOnly: isReadOnly,
+                                            editLock: isReadOnly,
                                             dropdownOptions: availableValues?.map(val => {
                                                 // Handle both string arrays and key-value object arrays
                                                 if (typeof val === 'string') {
@@ -2424,7 +2536,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 })}
             </div>
         );
-    }, [filteredItems, columns, memoizedColumnWidths, editingState, pendingChanges, readOnlyColumns, enableInlineEditing, enableDragFill, startEdit, commitEdit, cancelEdit, memoizedAvailableValues, onItemClick, onItemDoubleClick, refreshTrigger, effectiveColumns, enableSelectionMode, onCellEdit, rowDragFillTargets, rowDragFillSource, selectedCells, selectionBounds, isCellSelected, isBottomRightOfSelection, handleCellMouseDown, handleCellMouseEnter, isSelecting, setSelectedCells, setSelectionAnchor, frozenColumnInfo, hasFrozenColumns, getFrozenCellStyle, getFrozenCellClassName]);
+    }, [filteredItems, columns, memoizedColumnWidths, editingState, pendingChanges, readOnlyColumns, enableInlineEditing, enableDragFill, startEdit, commitEdit, cancelEdit, memoizedAvailableValues, onItemClick, onItemDoubleClick, refreshTrigger, effectiveColumns, enableSelectionMode, onCellEdit, rowDragFillTargets, rowDragFillSource, selectedCells, selectionBounds, isCellSelected, isBottomRightOfSelection, handleCellMouseDown, handleCellMouseEnter, isSelecting, setSelectedCells, setSelectionAnchor, frozenColumnInfo, hasFrozenColumns, getFrozenCellStyle, getFrozenCellClassName, virtualizer, rowHeight]);
 
     // PERFORMANCE OPTIMIZATION: Create stable render function to prevent unnecessary re-renders
     const renderRow = React.useCallback((virtualRow: any) => {
@@ -2630,6 +2742,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 
                 // Determine header background color: per-column headerColor or default
                 const headerBg = column.headerColor || '#faf9f8';
+                const headerFontColor = (column as any).headerFontColor || undefined;
                 
                 return (
                     <div
@@ -2669,6 +2782,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                 flex: 1, 
                                 fontWeight: 600,
                                 fontSize: `${headerTextSize}px`, // Apply custom header text size
+                                color: headerFontColor, // Apply per-column header font color
                                 overflow: 'hidden',
                                 textOverflow: enableHeaderTextWrapping ? 'clip' : 'ellipsis',
                                 whiteSpace: enableHeaderTextWrapping ? 'normal' : 'nowrap',
