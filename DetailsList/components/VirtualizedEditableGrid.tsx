@@ -853,6 +853,9 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
 
     // Header horizontal scroll synchronization - SYNCHRONOUS APPROACH
     // Synchronously sync scrollLeft for zero-lag header alignment
+    // Also compute scrollbar width to compensate header for body's vertical scrollbar
+    const [scrollbarWidth, setScrollbarWidth] = React.useState(0);
+    
     React.useEffect(() => {
         const scrollContainer = parentRef.current;
         const headerContainer = headerRef.current;
@@ -862,15 +865,29 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         const syncHeaderScroll = () => {
             headerContainer.scrollLeft = scrollContainer.scrollLeft;
         };
+        
+        // Measure the vertical scrollbar width of the body container
+        const measureScrollbar = () => {
+            const sbWidth = scrollContainer.offsetWidth - scrollContainer.clientWidth;
+            setScrollbarWidth(sbWidth);
+        };
 
         // Add scroll event listener for horizontal sync
         scrollContainer.addEventListener('scroll', syncHeaderScroll, { passive: true });
+        
+        // Measure scrollbar after layout settles
+        measureScrollbar();
+        
+        // Re-measure on resize (scrollbar may appear/disappear)
+        const resizeObserver = new ResizeObserver(measureScrollbar);
+        resizeObserver.observe(scrollContainer);
         
         // Initial sync
         syncHeaderScroll();
 
         return () => {
             scrollContainer.removeEventListener('scroll', syncHeaderScroll);
+            resizeObserver.disconnect();
         };
     }, []);
 
@@ -1102,6 +1119,9 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     }, [getAvailableValues, columnFilters, items, columns, getColumnDataType]);
 
     // Create effective columns array including selection column if needed
+    // Performance: compute hasNewRows from items (not filteredItems) to avoid cascade
+    const hasNewRows = React.useMemo(() => items.some(item => item.isNewRow), [items]);
+    
     const effectiveColumns = React.useMemo(() => {
         // ⚡ LIGHTNING-FAST COLUMN VISIBILITY - Use high-performance manager for 0ms overhead
         const visibilityManager = ColumnVisibilityManager.getInstance();
@@ -1122,7 +1142,6 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         }
         
         // Add auto-fill confirmation column and/or delete column after selection column
-        const hasNewRows = filteredItems.some(item => item.isNewRow);
         const hasRowsNeedingAutoFill = pendingAutoFillRows.size > 0;
         let insertIndex = enableSelectionMode ? 1 : 0;
         
@@ -1152,7 +1171,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         }
         
         return result;
-    }, [columns, enableSelectionMode, onDeleteNewRow, filteredItems, pendingAutoFillRows]);
+    }, [columns, enableSelectionMode, onDeleteNewRow, hasNewRows, pendingAutoFillRows]);
 
     // PERFORMANCE OPTIMIZATION: Memoize column widths to prevent recalculation
     const memoizedColumnWidths = React.useMemo(() => {
@@ -2614,7 +2633,8 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
             style={{
                 display: 'flex',
                 width: '100%',
-                minWidth: `${totalGridWidth}px`, // Ensure header matches grid width for horizontal scrolling
+                minWidth: `${totalGridWidth + scrollbarWidth}px`, // Include scrollbar compensation so max scrollLeft matches body
+                boxSizing: 'content-box', // Ensure minWidth is not reduced by padding/border
                 backgroundColor: '#faf9f8',
                 borderBottom: '1px solid #e1dfdd',
                 position: 'relative',

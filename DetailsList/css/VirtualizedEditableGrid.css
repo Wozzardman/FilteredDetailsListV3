@@ -201,14 +201,13 @@
     cursor: col-resize;
     background: transparent;
     z-index: 10;
-    transition: all 0.2s ease;
+    transition: background-color 0.2s ease, width 0.2s ease;
     border-radius: 2px;
 }
 
 .column-resize-handle:hover {
     background: linear-gradient(180deg, #0969da 0%, #0550ae 100%);
     width: 3px;
-    box-shadow: 0 0 8px rgba(9, 105, 218, 0.4);
 }
 
 .virtualized-header-cell.resizing {
@@ -334,7 +333,7 @@
     border-radius: 50%;
     cursor: crosshair;
     opacity: 0;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 10;
     box-shadow: 
         0 2px 6px rgba(9, 105, 218, 0.3),
@@ -360,13 +359,8 @@
     background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%) !important;
     border: 2px solid #0969da;
     border-radius: 6px;
-    box-shadow: 
-        0 0 0 3px rgba(9, 105, 218, 0.1),
-        0 4px 16px rgba(9, 105, 218, 0.15),
-        0 1px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1);
     z-index: 1000;
-    transform: scale(1.02);
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: visible;
 }
@@ -390,7 +384,7 @@
     text-overflow: ellipsis;
 }
 
-/* Subtle pulsing animation for active editing */
+/* Static editing indicator (no animation for performance) */
 .virtualized-cell.editing::before {
     content: '';
     position: absolute;
@@ -398,22 +392,10 @@
     left: -2px;
     right: -2px;
     bottom: -2px;
-    border: 1px solid #0969da;
+    border: 1px solid rgba(9, 105, 218, 0.2);
     border-radius: 8px;
-    opacity: 0;
-    animation: editingPulse 2s ease-in-out infinite;
+    opacity: 1;
     pointer-events: none;
-}
-
-@keyframes editingPulse {
-    0%, 100% { 
-        opacity: 0; 
-        transform: scale(1);
-    }
-    50% { 
-        opacity: 0.3; 
-        transform: scale(1.02);
-    }
 }
 
 .virtualized-cell .inline-editor {
@@ -426,7 +408,7 @@
     color: #24292f;
     padding: 6px 8px;
     border-radius: 4px;
-    transition: all 0.15s ease;
+    transition: background-color 0.15s ease, color 0.15s ease;
     line-height: 1.4;
 }
 
@@ -442,7 +424,7 @@
     border: 1px solid rgba(9, 105, 218, 0.2);
     border-radius: 4px;
     cursor: text;
-    transition: all 0.15s ease;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
     position: relative;
 }
 
@@ -508,7 +490,7 @@
     z-index: 1001;
     opacity: 0;
     transform: translateY(-10px);
-    transition: all 0.2s ease;
+    transition: opacity 0.2s ease, transform 0.2s ease;
     box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
 }
 
@@ -790,7 +772,7 @@
     right: 3px;
     bottom: 2px;
     opacity: 0;
-    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1);
     border-radius: 3px;
     padding: 1px;
     background: transparent;
@@ -847,7 +829,7 @@
     border-radius: 2px;
     cursor: crosshair;
     opacity: 0;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 10;
     box-shadow: 
         0 2px 6px rgba(16, 124, 16, 0.3),
@@ -907,7 +889,7 @@
     box-shadow: 
         0 2px 6px rgba(16, 124, 16, 0.4),
         0 0 0 1px rgba(16, 124, 16, 0.2);
-    transition: all 0.15s ease;
+    transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
 .multi-cell-drag-fill-handle:hover {
@@ -921,7 +903,7 @@
 /* Enhanced Filter Icon Styling - bottom-right absolute positioning */
 .virtualized-header-filter-icon {
     border-radius: 3px;
-    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1), transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -951,7 +933,7 @@
 
 /* Enhanced Column Resize Handle */
 .column-resize-handle {
-    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1), transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 5; /* Lower than filter icon */
 }
 
@@ -969,7 +951,7 @@
 
 /* Row Animation and Styling */
 .virtualized-row {
-    transition: all 0.2s ease;
+    transition: background-color 0.2s ease;
 }
 
 .virtualized-row.even {
@@ -1007,7 +989,7 @@
     background: linear-gradient(135deg, #ffffff 0%, #f6f8fa 100%);
     font-weight: 500;
     font-size: 14px;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     height: 36px;
     min-width: 100px;
@@ -1050,7 +1032,7 @@
     background: #ffffff;
     font-size: 14px;
     padding: 10px 12px;
-    transition: all 0.2s ease;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
