@@ -153,7 +153,7 @@
 .virtualized-header-cell {
     height: 100%;
     /* Padding controlled by inline styles when text wrapping enabled */
-    padding: 2px 12px;
+    padding: 2px 8px;
     display: flex;
     align-items: center;
     font-weight: 600;
@@ -162,9 +162,9 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     color: #24292f;
     position: relative;
+    box-sizing: border-box;
 }
 
 .virtualized-header-cell::before {
@@ -181,7 +181,6 @@
 .virtualized-header-cell:hover {
     background-color: rgba(9, 105, 218, 0.06);
     color: #0969da;
-    transform: translateY(-1px);
 }
 
 .virtualized-header-cell:hover::before {
@@ -215,7 +214,6 @@
 .virtualized-header-cell.resizing {
     background: linear-gradient(135deg, rgba(9, 105, 218, 0.1) 0%, rgba(5, 80, 174, 0.1) 100%);
     box-shadow: 0 2px 8px rgba(9, 105, 218, 0.2);
-    transform: translateY(-1px);
 }
 
 .virtualized-header-cell.resizing .column-resize-handle {

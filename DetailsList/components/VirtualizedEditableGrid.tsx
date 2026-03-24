@@ -851,32 +851,16 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         });
     }, [columnEditorMapping, filteredItems]);
 
-    // Header horizontal scroll synchronization - SCROLLLEFT APPROACH
-    // Uses scrollLeft sync instead of transform so that position:sticky works on frozen header cells
+    // Header horizontal scroll synchronization - SYNCHRONOUS APPROACH
+    // Synchronously sync scrollLeft for zero-lag header alignment
     React.useEffect(() => {
         const scrollContainer = parentRef.current;
         const headerContainer = headerRef.current;
 
         if (!scrollContainer || !headerContainer) return;
 
-        let lastScrollLeft = 0;
-        let animationId: number | null = null;
-
         const syncHeaderScroll = () => {
-            if (animationId) {
-                cancelAnimationFrame(animationId);
-            }
-            
-            animationId = requestAnimationFrame(() => {
-                if (scrollContainer && headerContainer) {
-                    const currentScrollLeft = scrollContainer.scrollLeft;
-                    if (Math.abs(currentScrollLeft - lastScrollLeft) > 0.5) {
-                        headerContainer.scrollLeft = currentScrollLeft;
-                        lastScrollLeft = currentScrollLeft;
-                    }
-                }
-                animationId = null;
-            });
+            headerContainer.scrollLeft = scrollContainer.scrollLeft;
         };
 
         // Add scroll event listener for horizontal sync
@@ -887,9 +871,6 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
 
         return () => {
             scrollContainer.removeEventListener('scroll', syncHeaderScroll);
-            if (animationId) {
-                cancelAnimationFrame(animationId);
-            }
         };
     }, []);
 
