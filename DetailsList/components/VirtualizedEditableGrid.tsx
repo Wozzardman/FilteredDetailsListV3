@@ -1277,13 +1277,33 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     );
 
     // Toggle freeze on a column (used by the context menu)
+    // Freezing a column also freezes all columns to its left.
+    // Unfreezing a column also unfreezes all columns to its right.
     const toggleFreezeColumn = React.useCallback((columnKey: string) => {
         setFrozenColumnKeys(prev => {
             const next = new Set(prev);
             if (next.has(columnKey)) {
-                next.delete(columnKey);
+                // Unfreeze: remove this column and all columns to its right
+                const colIndex = effectiveColumns.findIndex(c => (c.fieldName || c.key) === columnKey || c.key === columnKey);
+                if (colIndex >= 0) {
+                    for (let i = colIndex; i < effectiveColumns.length; i++) {
+                        next.delete(effectiveColumns[i].key);
+                        if (effectiveColumns[i].fieldName) next.delete(effectiveColumns[i].fieldName!);
+                    }
+                } else {
+                    next.delete(columnKey);
+                }
             } else {
-                next.add(columnKey);
+                // Freeze: add this column and all columns to its left
+                const colIndex = effectiveColumns.findIndex(c => (c.fieldName || c.key) === columnKey || c.key === columnKey);
+                if (colIndex >= 0) {
+                    for (let i = 0; i <= colIndex; i++) {
+                        const key = effectiveColumns[i].fieldName || effectiveColumns[i].key;
+                        next.add(key);
+                    }
+                } else {
+                    next.add(columnKey);
+                }
             }
             onFrozenColumnsChange?.(Array.from(next));
             return next;
@@ -1299,7 +1319,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 });
             }
         });
-    }, [onFrozenColumnsChange]);
+    }, [onFrozenColumnsChange, effectiveColumns]);
 
     // Unfreeze all columns
     const unfreezeAllColumns = React.useCallback(() => {
@@ -1682,14 +1702,16 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
 
     // Commit all changes
     const commitAllChanges = React.useCallback(async () => {
-        if (pendingChanges.size === 0 || !onCommitChanges) return;
+        if (pendingChanges.size === 0) return;
 
         setIsCommitting(true);
         setErrorMessage('');
 
         try {
-            const changesArray = Array.from(pendingChanges.values());
-            await onCommitChanges(changesArray);
+            if (onCommitChanges) {
+                const changesArray = Array.from(pendingChanges.values());
+                await onCommitChanges(changesArray);
+            }
             setPendingChanges(new Map());
 
             if (changeManager) {
