@@ -139,6 +139,7 @@ export interface EnhancedInlineEditorProps {
     item: any;
     editorConfig?: ColumnEditorConfig;
     onCommit: (value: any) => void;
+    onCommitAndAdvance?: (value: any) => void; // New: Commit and move focus to next editable cell on the same row
     onCancel: () => void;
     onValueChange?: (value: any) => void;
     onItemChange?: (columnKey: string, value: any) => void; // New: For conditional updates
@@ -156,6 +157,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
     item,
     editorConfig,
     onCommit,
+    onCommitAndAdvance,
     onCancel,
     onValueChange,
     onItemChange,
@@ -518,7 +520,11 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                     const formattedValue = config.valueFormatter ? 
                         config.valueFormatter(currentValue, item, column) : 
                         currentValue;
-                    onCommit(formattedValue);
+                    if (onCommitAndAdvance) {
+                        onCommitAndAdvance(formattedValue);
+                    } else {
+                        onCommit(formattedValue);
+                    }
                 }
                 break;
             case 'Escape':
@@ -527,7 +533,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                 onCancel();
                 break;
         }
-    }, [hasError, currentValue, onCommit, onCancel, config, item, column]);
+    }, [hasError, currentValue, onCommit, onCommitAndAdvance, onCancel, config, item, column]);
 
     const handleValueChange = React.useCallback((newValue: any) => {
         setCurrentValue(newValue);
@@ -1097,7 +1103,11 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                                         const formattedValue = config.valueFormatter ? 
                                             config.valueFormatter(valueToCommit, item, column) : 
                                             valueToCommit;
-                                        onCommit(formattedValue);
+                                        if (onCommitAndAdvance) {
+                                            onCommitAndAdvance(formattedValue);
+                                        } else {
+                                            onCommit(formattedValue);
+                                        }
                                     }
                                     break;
                                 case 'Escape':

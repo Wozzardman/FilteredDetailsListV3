@@ -1695,6 +1695,72 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         setEditingState(null);
     }, [editingState, filteredItems, onCellEdit, changeManager, pendingChanges]);
 
+    // Commit cell edit and advance focus to the next editable cell on the same row.
+    // If no editable cell follows on the row, editing is cleared (same as commitEdit).
+    const commitEditAndAdvance = React.useCallback((newValue: any) => {
+        if (!editingState) return;
+
+        const { itemIndex, columnKey, originalValue } = editingState;
+        const item = filteredItems[itemIndex];
+        const itemId = item.key || item.id || item.getRecordId?.() || itemIndex.toString();
+
+        const changeKey = getCellKey(itemIndex, columnKey);
+        const existingChange = pendingChanges.get(changeKey);
+        const actualOldValue = existingChange ? existingChange.oldValue : originalValue;
+
+        if (newValue !== actualOldValue) {
+            const change = {
+                itemId,
+                itemIndex,
+                columnKey,
+                newValue,
+                oldValue: actualOldValue
+            };
+            setPendingChanges(prev => new Map(prev.set(changeKey, change)));
+            setPCFValue(item, columnKey, newValue);
+            onCellEdit?.(itemId, columnKey, newValue);
+            if (changeManager) {
+                changeManager.addChange(itemId, columnKey, actualOldValue, newValue);
+            }
+        } else if (existingChange) {
+            setPendingChanges(prev => {
+                const newMap = new Map(prev);
+                newMap.delete(changeKey);
+                return newMap;
+            });
+            setPCFValue(item, columnKey, actualOldValue);
+        }
+
+        // Find the next editable column on the same row
+        const isSpecialColumn = (key?: string) =>
+            key === '__selection__' || key === '__delete__' || key === '__autofill__';
+        const isColumnEditable = (key?: string) => {
+            if (!key || isSpecialColumn(key)) return false;
+            if (readOnlyColumns.includes(key)) return false;
+            // Mirrors startEdit's editLock check
+            if (!enableSelectionMode && columnEditorMapping[key]?.editLock) return false;
+            return true;
+        };
+
+        const currentIndex = effectiveColumns.findIndex(c => (c.key || c.fieldName) === columnKey);
+        let nextEditingState: EditingState | null = null;
+        if (currentIndex !== -1) {
+            for (let i = currentIndex + 1; i < effectiveColumns.length; i++) {
+                const nextKey = effectiveColumns[i].key || effectiveColumns[i].fieldName;
+                if (isColumnEditable(nextKey)) {
+                    nextEditingState = {
+                        itemIndex,
+                        columnKey: nextKey as string,
+                        originalValue: getPCFValue(item, nextKey as string)
+                    };
+                    break;
+                }
+            }
+        }
+
+        setEditingState(nextEditingState);
+    }, [editingState, filteredItems, onCellEdit, changeManager, pendingChanges, effectiveColumns, readOnlyColumns, enableSelectionMode, columnEditorMapping]);
+
     // Cancel edit
     const cancelEdit = React.useCallback(() => {
         setEditingState(null);
@@ -2058,6 +2124,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                         item={item}
                                         editorConfig={editorConfig}
                                         onCommit={commitEdit}
+                                        onCommitAndAdvance={commitEditAndAdvance}
                                         onCancel={cancelEdit}
                                         onItemChange={handleItemChange}
                                         onTriggerAutoFillConfirmation={triggerAutoFillConfirmation}
@@ -2092,6 +2159,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                             })
                                         }}
                                         onCommit={commitEdit}
+                                        onCommitAndAdvance={commitEditAndAdvance}
                                         onCancel={cancelEdit}
                                         onTriggerAutoFillConfirmation={triggerAutoFillConfirmation}
                                         columnTextSize={columnTextSize}
@@ -2558,7 +2626,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 })}
             </div>
         );
-    }, [filteredItems, columns, memoizedColumnWidths, editingState, pendingChanges, readOnlyColumns, enableInlineEditing, enableDragFill, startEdit, commitEdit, cancelEdit, memoizedAvailableValues, onItemClick, onItemDoubleClick, refreshTrigger, effectiveColumns, enableSelectionMode, onCellEdit, rowDragFillTargets, rowDragFillSource, selectedCells, selectionBounds, isCellSelected, isBottomRightOfSelection, handleCellMouseDown, handleCellMouseEnter, isSelecting, setSelectedCells, setSelectionAnchor, frozenColumnInfo, hasFrozenColumns, getFrozenCellStyle, getFrozenCellClassName, virtualizer, rowHeight]);
+    }, [filteredItems, columns, memoizedColumnWidths, editingState, pendingChanges, readOnlyColumns, enableInlineEditing, enableDragFill, startEdit, commitEdit, commitEditAndAdvance, cancelEdit, memoizedAvailableValues, onItemClick, onItemDoubleClick, refreshTrigger, effectiveColumns, enableSelectionMode, onCellEdit, rowDragFillTargets, rowDragFillSource, selectedCells, selectionBounds, isCellSelected, isBottomRightOfSelection, handleCellMouseDown, handleCellMouseEnter, isSelecting, setSelectedCells, setSelectionAnchor, frozenColumnInfo, hasFrozenColumns, getFrozenCellStyle, getFrozenCellClassName, virtualizer, rowHeight]);
 
     // PERFORMANCE OPTIMIZATION: Create stable render function to prevent unnecessary re-renders
     const renderRow = React.useCallback((virtualRow: any) => {
