@@ -611,7 +611,9 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
         onBlur: handleBlur,
         className: `enhanced-editor ${className} ${hasError ? 'has-error' : ''}`,
         autoFocus: true,
-        placeholder: config.placeholder
+        placeholder: config.placeholder,
+        autoComplete: 'off',
+        spellCheck: false,
     };
 
     // commonProps includes Fluent UI field styles for components that support it (TextField, DatePicker, etc.)

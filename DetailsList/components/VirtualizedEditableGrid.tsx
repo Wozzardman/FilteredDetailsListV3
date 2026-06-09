@@ -1838,17 +1838,58 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         cancelAllChanges,
         getPendingChangesCount: () => pendingChanges.size,
         scrollToIndex: (index: number) => {
-            // ENTERPRISE-GRADE LIGHTNING-FAST SCROLLING - Google/Meta competitive
-            // Zero-overhead virtualized scrolling with performance optimizations
-            if (virtualizer && index >= 0 && index < filteredItems.length) {
-                // Performance optimization: Use requestAnimationFrame for smooth 60fps scrolling
-                requestAnimationFrame(() => {
-                    virtualizer.scrollToIndex(index, { 
-                        align: 'start',  // Optimal alignment for record visibility
-                        behavior: 'smooth'  // Smooth scrolling for premium UX
-                    });
-                });
+            if (!virtualizer || index < 0 || index >= filteredItems.length) {
+                return;
             }
+
+            const scrollContainer = parentRef.current;
+            if (!scrollContainer) return;
+
+            // Step 1: Jump directly via scrollTop to bypass the virtualizer's estimated-offset
+            // problem. The virtualizer uses estimateSize() for unrendered rows, so scrollToIndex
+            // alone only advances ~overscan rows at a time when jumping far. Setting scrollTop
+            // directly lands us in the right ballpark immediately, which causes the virtualizer
+            // to render rows near the target on the next frame.
+            scrollContainer.scrollTop = index * rowHeight;
+
+            // Step 2: After the direct jump, refine with scrollToIndex (now rows near the
+            // target are rendered and measured). A handful of retries handles variable-height
+            // rows where the direct jump may still be slightly off.
+            const MAX_ATTEMPTS = 20;
+
+            const refine = (attempt = 0) => {
+                const sc = parentRef.current;
+                if (!sc) return;
+
+                virtualizer.scrollToIndex(index, { align: 'start', behavior: 'auto' });
+
+                requestAnimationFrame(() => {
+                    const rowElement = sc.querySelector(`[data-index="${index}"]`) as HTMLElement | null;
+
+                    if (!rowElement) {
+                        if (attempt < MAX_ATTEMPTS) {
+                            refine(attempt + 1);
+                        }
+                        return;
+                    }
+
+                    // Fine-grained pixel correction if the row isn't fully in view
+                    const containerRect = sc.getBoundingClientRect();
+                    const rowRect = rowElement.getBoundingClientRect();
+                    const isAbove = rowRect.top < containerRect.top;
+                    const isBelow = rowRect.bottom > containerRect.bottom;
+
+                    if (isAbove || isBelow) {
+                        const delta = isAbove
+                            ? rowRect.top - containerRect.top
+                            : rowRect.bottom - containerRect.bottom;
+                        sc.scrollTop += delta;
+                    }
+                });
+            };
+
+            // One rAF delay lets the direct scrollTop render before we start refining
+            requestAnimationFrame(() => refine());
         }
     }), [commitAllChanges, cancelAllChanges, pendingChanges.size, virtualizer, filteredItems.length]);
 
