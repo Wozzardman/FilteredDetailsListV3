@@ -182,6 +182,22 @@
     <value>Selection type</value>
     <comment/>
   </data>
+  <data name="SelectionMode" xml:space="preserve">
+    <value>Selection mode</value>
+    <comment/>
+  </data>
+  <data name="Off" xml:space="preserve">
+    <value>Off</value>
+    <comment/>
+  </data>
+  <data name="EnabledWithEditing" xml:space="preserve">
+    <value>Enabled (with editing)</value>
+    <comment/>
+  </data>
+  <data name="EnabledLockEditing" xml:space="preserve">
+    <value>Enabled (lock editing)</value>
+    <comment/>
+  </data>
   <data name="InputEvent" xml:space="preserve">
     <value>Input event</value>
     <comment/>

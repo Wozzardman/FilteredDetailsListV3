@@ -135,7 +135,7 @@ export interface VirtualizedEditableGridProps {
     selectedItems?: Set<string>;
     selectAllState?: 'none' | 'some' | 'all';
     onItemSelection?: (itemId: string) => void;
-    onSelectAll?: () => void;
+    onSelectAll?: (visibleItemIds?: string[]) => void;
     onClearAllSelections?: () => void;
     
     // Text sizing properties
@@ -2786,11 +2786,10 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                     selectedCount={selectedItems.size}
                                     totalCount={filteredItems.length}
                                     onToggleSelectAll={() => {
-                                        if (selectAllState === 'all') {
-                                            onClearAllSelections?.();
-                                        } else {
-                                            onSelectAll?.();
-                                        }
+                                        const visibleItemIds = filteredItems
+                                            .map((item, idx) => item.recordId || item.key || item.id || idx.toString())
+                                            .filter((id): id is string => !!id);
+                                        onSelectAll?.(visibleItemIds);
                                     }}
                                 />
                             )}

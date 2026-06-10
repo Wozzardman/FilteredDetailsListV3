@@ -1192,6 +1192,10 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         // Configure add new row functionality
         this.enableAddNewRow = context.parameters.EnableAddNewRow?.raw ?? false;
 
+        const resolvedSelectionMode = context.parameters.SelectionMode?.raw || '1';
+        const isSelectionModeActive = resolvedSelectionMode !== '0' && context.parameters.SelectionType?.raw !== '0';
+        const isSelectionLockEditingMode = resolvedSelectionMode === '2' && isSelectionModeActive;
+
         const grid = React.createElement(UltimateEnterpriseGrid, {
             items,
             columns: gridColumns,
@@ -1200,14 +1204,16 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             width: (context.mode.allocatedWidth && context.mode.allocatedWidth > 0) ? context.mode.allocatedWidth : '100%', // Always provide a valid width
             enableVirtualization: true,
             virtualizationThreshold: 100,
-            // Mode configuration - Selection mode disables inline editing
-            enableInlineEditing: this.isSelectionMode ? false : this.enableInlineEditing,
+            // Mode configuration
+            // Off or EnabledWithEditing keeps inline editing available.
+            // EnabledLockEditing preserves legacy locked selection behavior.
+            enableInlineEditing: isSelectionLockEditingMode ? false : this.enableInlineEditing,
             enableFiltering: true,
             enableExport: true,
             enableAddNewRow: this.enableAddNewRow,
             enablePerformanceMonitoring: this.enablePerformanceMonitoring,
-            enableChangeTracking: !this.isSelectionMode, // Disable change tracking in selection mode
-            useEnhancedEditors: this.isSelectionMode ? false : useEnhancedEditors,
+            enableChangeTracking: !isSelectionLockEditingMode,
+            useEnhancedEditors: isSelectionLockEditingMode ? false : useEnhancedEditors,
             columnEditorMapping: columnEditorMapping,
             
             // Text size configuration from Power Apps properties
@@ -1219,10 +1225,10 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             alternateRowColor: context.parameters.AlternateRowColor?.raw || undefined,
             
             // Selection mode props - using performance-optimized SelectionManager
-            enableSelectionMode: this.isSelectionMode,
+            enableSelectionMode: isSelectionModeActive,
             selectionType: context.parameters.SelectionType?.raw || '2',
-            selectedItems: this.isSelectionMode ? this.selectionManager.getSelectionState().selectedItems : this.nativeSelectionState.selectedItems,
-            selectAllState: this.isSelectionMode ? this.selectionManager.getSelectionState().selectAllState : this.nativeSelectionState.selectAllState,
+            selectedItems: isSelectionModeActive ? this.selectionManager.getSelectionState().selectedItems : this.nativeSelectionState.selectedItems,
+            selectAllState: isSelectionModeActive ? this.selectionManager.getSelectionState().selectAllState : this.nativeSelectionState.selectAllState,
             onItemSelection: this.handleItemSelection,
             onSelectAll: this.handleSelectAll,
             onClearAllSelections: this.handleClearAllSelections,
@@ -2117,8 +2123,11 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         this.currentNewValue = newValue ? newValue.toString() : '';
 
         
-        // Auto-select the edited record for Power Apps .Selected integration
-        this.autoSelectEditedRecord(recordId);
+        // In selection mode, editing should not mutate row selection state.
+        // Keep legacy auto-select behavior only when selection mode is off.
+        if (!this.isSelectionMode) {
+            this.autoSelectEditedRecord(recordId);
+        }
         
         // Notify PowerApps of the change
         this.notifyOutputChanged();
@@ -2995,11 +3004,11 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
      * Handle mode switching between Grid Edit Mode and Selection Mode
      */
     private handleSelectionModeToggle = (context: ComponentFramework.Context<IInputs>): void => {
-        const enableSelectionMode = context.parameters.EnableSelectionMode?.raw;
+        const resolvedSelectionMode = context.parameters.SelectionMode?.raw || '1';
         const selectionType = context.parameters.SelectionType?.raw;
         
-        // Selection mode is enabled when EnableSelectionMode is true AND SelectionType is not None
-        const isSelectionModeActive = !!enableSelectionMode && selectionType !== '0';
+        // Selection UI is active when mode is not Off and SelectionType is not None
+        const isSelectionModeActive = resolvedSelectionMode !== '0' && selectionType !== '0';
         
         if (isSelectionModeActive !== this.isSelectionMode) {
             this.isSelectionMode = isSelectionModeActive;
@@ -3065,22 +3074,33 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         }
     };
 
-    private handleSelectAll = (): void => {
+    private handleSelectAll = (visibleItemIds?: string[]): void => {
         try {
             if (!this.isSelectionMode) {
                 return;
             }
 
-            // Performance optimization: Use SelectionManager's optimized batch operations
-            const safeNow = () => typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
-            const performanceStart = safeNow();
-            
-            const stats = this.selectionManager.getSelectionStats();
-            
-            // Use SelectionManager's built-in performance optimization for large datasets
+            // If visible IDs are provided, toggle select-all only within the filtered/visible set.
+            if (visibleItemIds && visibleItemIds.length > 0) {
+                const currentSelected = new Set(this.selectionManager.getSelectedItems());
+                const allVisibleSelected = visibleItemIds.every(id => currentSelected.has(id));
+
+                if (allVisibleSelected) {
+                    // Deselect only currently visible/filtered rows.
+                    visibleItemIds.forEach(id => currentSelected.delete(id));
+                } else {
+                    // Select all currently visible/filtered rows.
+                    visibleItemIds.forEach(id => currentSelected.add(id));
+                }
+
+                this.setSelectedRecords(Array.from(currentSelected));
+                this.updateNativeSelectionState();
+                this.notifyOutputChanged();
+                return;
+            }
+
+            // Backward-compatible fallback: toggle across the full known selection set.
             this.selectionManager.toggleSelectAll();
-            
-            const performanceEnd = safeNow();
         } catch (error) {
             console.error('❌ Error in handleSelectAll:', error);
         }

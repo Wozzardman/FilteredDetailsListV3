@@ -69,7 +69,7 @@ export interface IUltimateEnterpriseGridProps {
     // Row styling configuration
     alternateRowColor?: string;
     onItemSelection?: (itemId: string) => void;
-    onSelectAll?: () => void;
+    onSelectAll?: (visibleItemIds?: string[]) => void;
     onClearAllSelections?: () => void;
     
     // Excel Clipboard properties

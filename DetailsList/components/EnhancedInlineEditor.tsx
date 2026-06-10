@@ -548,6 +548,26 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
         handleConditionalTrigger('onFocus');
     }, [handleConditionalTrigger]);
 
+    const handleTextInputFocus = React.useCallback((event?: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        handleFocus();
+
+        // Place caret at end of existing text so users can immediately backspace/delete.
+        const target = event?.target;
+        if (!target) return;
+
+        requestAnimationFrame(() => {
+            try {
+                const input = target as HTMLInputElement | HTMLTextAreaElement;
+                const valueLength = input.value?.length ?? 0;
+                if (typeof input.setSelectionRange === 'function') {
+                    input.setSelectionRange(valueLength, valueLength);
+                }
+            } catch {
+                // Some input types do not support selection ranges.
+            }
+        });
+    }, [handleFocus]);
+
     const handleBlur = React.useCallback(() => {
         handleConditionalTrigger('onBlur');
         
@@ -619,6 +639,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
     // commonProps includes Fluent UI field styles for components that support it (TextField, DatePicker, etc.)
     const commonProps = {
         ...commonPropsBase,
+        onFocus: handleTextInputFocus,
         styles: fluentFieldStyles,
     };
 
@@ -1078,6 +1099,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                             setIsDropdownOpen(true); // Show dropdown when typing
                         }}
                         onFocus={(e) => {
+                            handleTextInputFocus(e);
                             setIsDropdownOpen(true); // Show dropdown on focus
                             setDropdownTarget(e.target as HTMLElement); // Set target for Callout positioning
                         }}
