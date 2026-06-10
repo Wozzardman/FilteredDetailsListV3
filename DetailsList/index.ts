@@ -1226,6 +1226,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             
             // Selection mode props - using performance-optimized SelectionManager
             enableSelectionMode: isSelectionModeActive,
+            selectionLockEditingMode: isSelectionLockEditingMode,
             selectionType: context.parameters.SelectionType?.raw || '2',
             selectedItems: isSelectionModeActive ? this.selectionManager.getSelectionState().selectedItems : this.nativeSelectionState.selectedItems,
             selectAllState: isSelectionModeActive ? this.selectionManager.getSelectionState().selectAllState : this.nativeSelectionState.selectAllState,

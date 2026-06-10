@@ -131,6 +131,7 @@ export interface VirtualizedEditableGridProps {
     
     // Selection mode props
     enableSelectionMode?: boolean;
+    selectionLockEditingMode?: boolean;
     selectionType?: '0' | '1' | '2'; // 0=None, 1=Single, 2=Multiple
     selectedItems?: Set<string>;
     selectAllState?: 'none' | 'some' | 'all';
@@ -209,6 +210,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     
     // Selection mode props
     enableSelectionMode = false,
+    selectionLockEditingMode = false,
     selectionType = '2', // Default to Multiple for backward compatibility
     selectedItems = new Set(),
     selectAllState = 'none',
@@ -2211,11 +2213,11 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                         );
                     }
 
-                    // Check if this cell is selected and if it's the bottom-right of a multi-cell selection
-                    // Disable cell selection visuals when selection mode is enabled (row checkboxes take precedence)
-                    const isCellInSelection = !enableSelectionMode && isCellSelected(index, columnKey);
-                    const showGreenHandle = !enableSelectionMode && isBottomRightOfSelection(index, columnKey);
-                    const showBlueHandle = !enableSelectionMode && !showGreenHandle && (!isCellInSelection || selectedCells.size === 1);
+                    // Check if this cell is selected and if it's the bottom-right of a multi-cell selection.
+                    // Only disable these visuals in lock-editing selection mode.
+                    const isCellInSelection = !selectionLockEditingMode && isCellSelected(index, columnKey);
+                    const showGreenHandle = !selectionLockEditingMode && isBottomRightOfSelection(index, columnKey);
+                    const showBlueHandle = !selectionLockEditingMode && !showGreenHandle && (!isCellInSelection || selectedCells.size === 1);
 
                     return (
                         <div
@@ -2236,14 +2238,14 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                 }
                             }}
                             onMouseDown={(e) => {
-                                // Don't handle cell selection when selection mode is enabled (row checkboxes take precedence)
-                                if (!isReadOnly && !enableSelectionMode) {
+                                // Don't handle cell selection in lock-editing selection mode.
+                                if (!isReadOnly && !selectionLockEditingMode) {
                                     handleCellMouseDown(e, index, columnKey);
                                 }
                             }}
                             onMouseEnter={() => {
-                                // Don't handle cell selection when selection mode is enabled
-                                if (!isReadOnly && !enableSelectionMode && isSelecting) {
+                                // Don't handle cell selection in lock-editing selection mode.
+                                if (!isReadOnly && !selectionLockEditingMode && isSelecting) {
                                     handleCellMouseEnter(index, columnKey);
                                 }
                             }}
@@ -2254,7 +2256,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                 formatCellValue(cellValue, column.dataType, getColumnDataType, columnKey, columnEditorMapping)
                             }
                             {/* Blue handle - single cell drag fill */}
-                            {!isReadOnly && enableDragFill && !enableSelectionMode && showBlueHandle && (
+                            {!isReadOnly && enableDragFill && !selectionLockEditingMode && showBlueHandle && (
                                 <div 
                                     className="drag-fill-handle"
                                     style={{
@@ -2430,7 +2432,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                 />
                             )}
                             {/* Green handle - multi-cell selection drag fill (appears at bottom-right of selection) */}
-                            {!isReadOnly && enableDragFill && !enableSelectionMode && showGreenHandle && (
+                            {!isReadOnly && enableDragFill && !selectionLockEditingMode && showGreenHandle && (
                                 <div 
                                     className="multi-cell-drag-fill-handle"
                                     style={{

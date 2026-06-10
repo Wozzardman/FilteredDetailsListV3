@@ -55,6 +55,7 @@ export interface IUltimateEnterpriseGridProps {
     
     // Selection mode properties
     enableSelectionMode?: boolean;
+    selectionLockEditingMode?: boolean;
     selectionType?: '0' | '1' | '2'; // 0=None, 1=Single, 2=Multiple
     selectedItems?: Set<string>;
     selectAllState?: 'none' | 'some' | 'all';
@@ -140,6 +141,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     
     // Selection mode props
     enableSelectionMode = false,
+    selectionLockEditingMode = false,
     selectionType = '2', // Default to Multiple for backward compatibility
     selectedItems = new Set(),
     selectAllState = 'none',
@@ -983,7 +985,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                     height="100%" // Let the grid flex with its container
                     width={(typeof width === 'number' && width > 0) ? width : '100%'}
                     enableInlineEditing={enableInlineEditing}
-                    enableDragFill={!enableSelectionMode}
+                    enableDragFill={!selectionLockEditingMode}
                     useEnhancedEditors={useEnhancedEditors}
                     columnEditorMapping={columnEditorMapping}
                     getAvailableValues={getAvailableValues}
@@ -993,6 +995,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                     
                     // Selection mode props
                     enableSelectionMode={enableSelectionMode}
+                    selectionLockEditingMode={selectionLockEditingMode}
                     selectionType={selectionType}
                     selectedItems={selectedItems}
                     selectAllState={selectAllState}
