@@ -517,9 +517,21 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                 event.preventDefault();
                 event.stopPropagation();
                 if (!hasError) {
+                    // For date fields (both date+allowDirectTextInput and text fields with date values),
+                    // parse the raw string before committing.
+                    let resolvedValue = currentValue;
+                    if (typeof currentValue === 'string') {
+                        const isDirectDateInput = config.type === 'date' && config.allowDirectTextInput;
+                        const isTextFieldWithDateValue = config.type === 'text' &&
+                            (value instanceof Date || (typeof value === 'string' && !isNaN(Date.parse(value))));
+                        if (isDirectDateInput || isTextFieldWithDateValue) {
+                            const parsed = tryParseUserDateInput(currentValue);
+                            if (parsed) resolvedValue = parsed;
+                        }
+                    }
                     const formattedValue = config.valueFormatter ? 
-                        config.valueFormatter(currentValue, item, column) : 
-                        currentValue;
+                        config.valueFormatter(resolvedValue, item, column) : 
+                        resolvedValue;
                     if (onCommitAndAdvance) {
                         onCommitAndAdvance(formattedValue);
                     } else {
@@ -533,7 +545,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                 onCancel();
                 break;
         }
-    }, [hasError, currentValue, onCommit, onCommitAndAdvance, onCancel, config, item, column]);
+    }, [hasError, currentValue, value, onCommit, onCommitAndAdvance, onCancel, config, item, column]);
 
     const handleValueChange = React.useCallback((newValue: any) => {
         setCurrentValue(newValue);
@@ -578,12 +590,24 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
         }
         
         if (!hasError) {
+            // For date fields (both date+allowDirectTextInput and text fields with date values),
+            // parse the raw string before committing.
+            let resolvedValue = currentValue;
+            if (typeof currentValue === 'string') {
+                const isDirectDateInput = config.type === 'date' && config.allowDirectTextInput;
+                const isTextFieldWithDateValue = config.type === 'text' &&
+                    (value instanceof Date || (typeof value === 'string' && !isNaN(Date.parse(value))));
+                if (isDirectDateInput || isTextFieldWithDateValue) {
+                    const parsed = tryParseUserDateInput(currentValue);
+                    if (parsed) resolvedValue = parsed;
+                }
+            }
             const formattedValue = config.valueFormatter ? 
-                config.valueFormatter(currentValue, item, column) : 
-                currentValue;
+                config.valueFormatter(resolvedValue, item, column) : 
+                resolvedValue;
             onCommit(formattedValue);
         }
-    }, [hasError, currentValue, onCommit, config, item, column, handleConditionalTrigger]);
+    }, [hasError, currentValue, value, onCommit, config, item, column, handleConditionalTrigger]);
 
     if (config.editLock) {
         const displayValue = config.displayFormatter ? 
@@ -666,16 +690,8 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                     {...commonProps}
                     value={displayValue}
                     onChange={(_, newValue) => {
-                        // Check if this looks like a date input and the original value was a date
-                        if ((value instanceof Date || (typeof value === 'string' && !isNaN(Date.parse(value)))) && 
-                            newValue && isDateLikeString(newValue)) {
-                            // Try to parse as date
-                            const parsedDate = tryParseUserDateInput(newValue);
-                            if (parsedDate) {
-                                handleValueChange(parsedDate);
-                                return;
-                            }
-                        }
+                        // Store raw text only — no eager Date parsing while typing.
+                        // The final parse happens on blur/Enter in handleBlur/handleKeyDown.
                         handleValueChange(newValue);
                     }}
                     errorMessage={errorMessage}
@@ -829,29 +845,20 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
         case 'date':
             // If allowDirectTextInput is enabled, use a text field instead of date picker
             if (config.allowDirectTextInput) {
-                const dateDisplayValue = (() => {
-                    if (currentValue instanceof Date) {
-                        return currentValue.toLocaleDateString();
-                    } else if (typeof currentValue === 'string' && !isNaN(Date.parse(currentValue))) {
-                        const parsedDate = new Date(currentValue);
-                        return parsedDate.toLocaleDateString();
-                    }
-                    return String(currentValue || '');
-                })();
+                // Show the raw string while typing. Only format Date objects (existing values).
+                // Do NOT re-parse parseable strings back to a full date — that prevents backspacing.
+                const dateDisplayValue = currentValue instanceof Date
+                    ? currentValue.toLocaleDateString()
+                    : String(currentValue || '');
 
                 return (
                     <TextField
                         {...commonProps}
                         value={dateDisplayValue}
                         onChange={(_, newValue) => {
-                            if (newValue && isDateLikeString(newValue)) {
-                                const parsedDate = tryParseUserDateInput(newValue);
-                                if (parsedDate) {
-                                    handleValueChange(parsedDate);
-                                    return;
-                                }
-                            }
-                            handleValueChange(newValue);
+                            // Store raw text only — no eager Date parsing while typing.
+                            // The final parse happens on blur/Enter in handleBlur/handleKeyDown.
+                            handleValueChange(newValue ?? '');
                         }}
                         onBlur={handleBlur}
                         errorMessage={errorMessage}
