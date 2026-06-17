@@ -1093,7 +1093,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                     <TextField
                         {...commonProps}
                         value={filterText}
-                        placeholder={config.placeholder || "Type to search or select..."}
+                        placeholder={undefined}
                         autoFocus={true}
                         multiline={true}
                         autoAdjustHeight={true}
