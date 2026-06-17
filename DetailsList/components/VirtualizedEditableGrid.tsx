@@ -131,11 +131,12 @@ export interface VirtualizedEditableGridProps {
     
     // Selection mode props
     enableSelectionMode?: boolean;
+    selectionLockEditingMode?: boolean;
     selectionType?: '0' | '1' | '2'; // 0=None, 1=Single, 2=Multiple
     selectedItems?: Set<string>;
     selectAllState?: 'none' | 'some' | 'all';
     onItemSelection?: (itemId: string) => void;
-    onSelectAll?: () => void;
+    onSelectAll?: (visibleItemIds?: string[]) => void;
     onClearAllSelections?: () => void;
     
     // Text sizing properties
@@ -209,6 +210,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     
     // Selection mode props
     enableSelectionMode = false,
+    selectionLockEditingMode = false,
     selectionType = '2', // Default to Multiple for backward compatibility
     selectedItems = new Set(),
     selectAllState = 'none',
@@ -851,45 +853,43 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         });
     }, [columnEditorMapping, filteredItems]);
 
-    // Header horizontal scroll synchronization - SCROLLLEFT APPROACH
-    // Uses scrollLeft sync instead of transform so that position:sticky works on frozen header cells
+    // Header horizontal scroll synchronization - SYNCHRONOUS APPROACH
+    // Synchronously sync scrollLeft for zero-lag header alignment
+    // Also compute scrollbar width to compensate header for body's vertical scrollbar
+    const [scrollbarWidth, setScrollbarWidth] = React.useState(0);
+    
     React.useEffect(() => {
         const scrollContainer = parentRef.current;
         const headerContainer = headerRef.current;
 
         if (!scrollContainer || !headerContainer) return;
 
-        let lastScrollLeft = 0;
-        let animationId: number | null = null;
-
         const syncHeaderScroll = () => {
-            if (animationId) {
-                cancelAnimationFrame(animationId);
-            }
-            
-            animationId = requestAnimationFrame(() => {
-                if (scrollContainer && headerContainer) {
-                    const currentScrollLeft = scrollContainer.scrollLeft;
-                    if (Math.abs(currentScrollLeft - lastScrollLeft) > 0.5) {
-                        headerContainer.scrollLeft = currentScrollLeft;
-                        lastScrollLeft = currentScrollLeft;
-                    }
-                }
-                animationId = null;
-            });
+            headerContainer.scrollLeft = scrollContainer.scrollLeft;
+        };
+        
+        // Measure the vertical scrollbar width of the body container
+        const measureScrollbar = () => {
+            const sbWidth = scrollContainer.offsetWidth - scrollContainer.clientWidth;
+            setScrollbarWidth(sbWidth);
         };
 
         // Add scroll event listener for horizontal sync
         scrollContainer.addEventListener('scroll', syncHeaderScroll, { passive: true });
+        
+        // Measure scrollbar after layout settles
+        measureScrollbar();
+        
+        // Re-measure on resize (scrollbar may appear/disappear)
+        const resizeObserver = new ResizeObserver(measureScrollbar);
+        resizeObserver.observe(scrollContainer);
         
         // Initial sync
         syncHeaderScroll();
 
         return () => {
             scrollContainer.removeEventListener('scroll', syncHeaderScroll);
-            if (animationId) {
-                cancelAnimationFrame(animationId);
-            }
+            resizeObserver.disconnect();
         };
     }, []);
 
@@ -1121,6 +1121,9 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     }, [getAvailableValues, columnFilters, items, columns, getColumnDataType]);
 
     // Create effective columns array including selection column if needed
+    // Performance: compute hasNewRows from items (not filteredItems) to avoid cascade
+    const hasNewRows = React.useMemo(() => items.some(item => item.isNewRow), [items]);
+    
     const effectiveColumns = React.useMemo(() => {
         // ⚡ LIGHTNING-FAST COLUMN VISIBILITY - Use high-performance manager for 0ms overhead
         const visibilityManager = ColumnVisibilityManager.getInstance();
@@ -1141,7 +1144,6 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         }
         
         // Add auto-fill confirmation column and/or delete column after selection column
-        const hasNewRows = filteredItems.some(item => item.isNewRow);
         const hasRowsNeedingAutoFill = pendingAutoFillRows.size > 0;
         let insertIndex = enableSelectionMode ? 1 : 0;
         
@@ -1171,7 +1173,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         }
         
         return result;
-    }, [columns, enableSelectionMode, onDeleteNewRow, filteredItems, pendingAutoFillRows]);
+    }, [columns, enableSelectionMode, onDeleteNewRow, hasNewRows, pendingAutoFillRows]);
 
     // PERFORMANCE OPTIMIZATION: Memoize column widths to prevent recalculation
     const memoizedColumnWidths = React.useMemo(() => {
@@ -1277,13 +1279,33 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     );
 
     // Toggle freeze on a column (used by the context menu)
+    // Freezing a column also freezes all columns to its left.
+    // Unfreezing a column also unfreezes all columns to its right.
     const toggleFreezeColumn = React.useCallback((columnKey: string) => {
         setFrozenColumnKeys(prev => {
             const next = new Set(prev);
             if (next.has(columnKey)) {
-                next.delete(columnKey);
+                // Unfreeze: remove this column and all columns to its right
+                const colIndex = effectiveColumns.findIndex(c => (c.fieldName || c.key) === columnKey || c.key === columnKey);
+                if (colIndex >= 0) {
+                    for (let i = colIndex; i < effectiveColumns.length; i++) {
+                        next.delete(effectiveColumns[i].key);
+                        if (effectiveColumns[i].fieldName) next.delete(effectiveColumns[i].fieldName!);
+                    }
+                } else {
+                    next.delete(columnKey);
+                }
             } else {
-                next.add(columnKey);
+                // Freeze: add this column and all columns to its left
+                const colIndex = effectiveColumns.findIndex(c => (c.fieldName || c.key) === columnKey || c.key === columnKey);
+                if (colIndex >= 0) {
+                    for (let i = 0; i <= colIndex; i++) {
+                        const key = effectiveColumns[i].fieldName || effectiveColumns[i].key;
+                        next.add(key);
+                    }
+                } else {
+                    next.add(columnKey);
+                }
             }
             onFrozenColumnsChange?.(Array.from(next));
             return next;
@@ -1299,7 +1321,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 });
             }
         });
-    }, [onFrozenColumnsChange]);
+    }, [onFrozenColumnsChange, effectiveColumns]);
 
     // Unfreeze all columns
     const unfreezeAllColumns = React.useCallback(() => {
@@ -1675,6 +1697,72 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         setEditingState(null);
     }, [editingState, filteredItems, onCellEdit, changeManager, pendingChanges]);
 
+    // Commit cell edit and advance focus to the next editable cell on the same row.
+    // If no editable cell follows on the row, editing is cleared (same as commitEdit).
+    const commitEditAndAdvance = React.useCallback((newValue: any) => {
+        if (!editingState) return;
+
+        const { itemIndex, columnKey, originalValue } = editingState;
+        const item = filteredItems[itemIndex];
+        const itemId = item.key || item.id || item.getRecordId?.() || itemIndex.toString();
+
+        const changeKey = getCellKey(itemIndex, columnKey);
+        const existingChange = pendingChanges.get(changeKey);
+        const actualOldValue = existingChange ? existingChange.oldValue : originalValue;
+
+        if (newValue !== actualOldValue) {
+            const change = {
+                itemId,
+                itemIndex,
+                columnKey,
+                newValue,
+                oldValue: actualOldValue
+            };
+            setPendingChanges(prev => new Map(prev.set(changeKey, change)));
+            setPCFValue(item, columnKey, newValue);
+            onCellEdit?.(itemId, columnKey, newValue);
+            if (changeManager) {
+                changeManager.addChange(itemId, columnKey, actualOldValue, newValue);
+            }
+        } else if (existingChange) {
+            setPendingChanges(prev => {
+                const newMap = new Map(prev);
+                newMap.delete(changeKey);
+                return newMap;
+            });
+            setPCFValue(item, columnKey, actualOldValue);
+        }
+
+        // Find the next editable column on the same row
+        const isSpecialColumn = (key?: string) =>
+            key === '__selection__' || key === '__delete__' || key === '__autofill__';
+        const isColumnEditable = (key?: string) => {
+            if (!key || isSpecialColumn(key)) return false;
+            if (readOnlyColumns.includes(key)) return false;
+            // Mirrors startEdit's editLock check
+            if (!enableSelectionMode && columnEditorMapping[key]?.editLock) return false;
+            return true;
+        };
+
+        const currentIndex = effectiveColumns.findIndex(c => (c.key || c.fieldName) === columnKey);
+        let nextEditingState: EditingState | null = null;
+        if (currentIndex !== -1) {
+            for (let i = currentIndex + 1; i < effectiveColumns.length; i++) {
+                const nextKey = effectiveColumns[i].key || effectiveColumns[i].fieldName;
+                if (isColumnEditable(nextKey)) {
+                    nextEditingState = {
+                        itemIndex,
+                        columnKey: nextKey as string,
+                        originalValue: getPCFValue(item, nextKey as string)
+                    };
+                    break;
+                }
+            }
+        }
+
+        setEditingState(nextEditingState);
+    }, [editingState, filteredItems, onCellEdit, changeManager, pendingChanges, effectiveColumns, readOnlyColumns, enableSelectionMode, columnEditorMapping]);
+
     // Cancel edit
     const cancelEdit = React.useCallback(() => {
         setEditingState(null);
@@ -1682,14 +1770,16 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
 
     // Commit all changes
     const commitAllChanges = React.useCallback(async () => {
-        if (pendingChanges.size === 0 || !onCommitChanges) return;
+        if (pendingChanges.size === 0) return;
 
         setIsCommitting(true);
         setErrorMessage('');
 
         try {
-            const changesArray = Array.from(pendingChanges.values());
-            await onCommitChanges(changesArray);
+            if (onCommitChanges) {
+                const changesArray = Array.from(pendingChanges.values());
+                await onCommitChanges(changesArray);
+            }
             setPendingChanges(new Map());
 
             if (changeManager) {
@@ -1750,17 +1840,58 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         cancelAllChanges,
         getPendingChangesCount: () => pendingChanges.size,
         scrollToIndex: (index: number) => {
-            // ENTERPRISE-GRADE LIGHTNING-FAST SCROLLING - Google/Meta competitive
-            // Zero-overhead virtualized scrolling with performance optimizations
-            if (virtualizer && index >= 0 && index < filteredItems.length) {
-                // Performance optimization: Use requestAnimationFrame for smooth 60fps scrolling
-                requestAnimationFrame(() => {
-                    virtualizer.scrollToIndex(index, { 
-                        align: 'start',  // Optimal alignment for record visibility
-                        behavior: 'smooth'  // Smooth scrolling for premium UX
-                    });
-                });
+            if (!virtualizer || index < 0 || index >= filteredItems.length) {
+                return;
             }
+
+            const scrollContainer = parentRef.current;
+            if (!scrollContainer) return;
+
+            // Step 1: Jump directly via scrollTop to bypass the virtualizer's estimated-offset
+            // problem. The virtualizer uses estimateSize() for unrendered rows, so scrollToIndex
+            // alone only advances ~overscan rows at a time when jumping far. Setting scrollTop
+            // directly lands us in the right ballpark immediately, which causes the virtualizer
+            // to render rows near the target on the next frame.
+            scrollContainer.scrollTop = index * rowHeight;
+
+            // Step 2: After the direct jump, refine with scrollToIndex (now rows near the
+            // target are rendered and measured). A handful of retries handles variable-height
+            // rows where the direct jump may still be slightly off.
+            const MAX_ATTEMPTS = 20;
+
+            const refine = (attempt = 0) => {
+                const sc = parentRef.current;
+                if (!sc) return;
+
+                virtualizer.scrollToIndex(index, { align: 'start', behavior: 'auto' });
+
+                requestAnimationFrame(() => {
+                    const rowElement = sc.querySelector(`[data-index="${index}"]`) as HTMLElement | null;
+
+                    if (!rowElement) {
+                        if (attempt < MAX_ATTEMPTS) {
+                            refine(attempt + 1);
+                        }
+                        return;
+                    }
+
+                    // Fine-grained pixel correction if the row isn't fully in view
+                    const containerRect = sc.getBoundingClientRect();
+                    const rowRect = rowElement.getBoundingClientRect();
+                    const isAbove = rowRect.top < containerRect.top;
+                    const isBelow = rowRect.bottom > containerRect.bottom;
+
+                    if (isAbove || isBelow) {
+                        const delta = isAbove
+                            ? rowRect.top - containerRect.top
+                            : rowRect.bottom - containerRect.bottom;
+                        sc.scrollTop += delta;
+                    }
+                });
+            };
+
+            // One rAF delay lets the direct scrollTop render before we start refining
+            requestAnimationFrame(() => refine());
         }
     }), [commitAllChanges, cancelAllChanges, pendingChanges.size, virtualizer, filteredItems.length]);
 
@@ -2036,6 +2167,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                         item={item}
                                         editorConfig={editorConfig}
                                         onCommit={commitEdit}
+                                        onCommitAndAdvance={commitEditAndAdvance}
                                         onCancel={cancelEdit}
                                         onItemChange={handleItemChange}
                                         onTriggerAutoFillConfirmation={triggerAutoFillConfirmation}
@@ -2070,6 +2202,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                             })
                                         }}
                                         onCommit={commitEdit}
+                                        onCommitAndAdvance={commitEditAndAdvance}
                                         onCancel={cancelEdit}
                                         onTriggerAutoFillConfirmation={triggerAutoFillConfirmation}
                                         columnTextSize={columnTextSize}
@@ -2080,11 +2213,11 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                         );
                     }
 
-                    // Check if this cell is selected and if it's the bottom-right of a multi-cell selection
-                    // Disable cell selection visuals when selection mode is enabled (row checkboxes take precedence)
-                    const isCellInSelection = !enableSelectionMode && isCellSelected(index, columnKey);
-                    const showGreenHandle = !enableSelectionMode && isBottomRightOfSelection(index, columnKey);
-                    const showBlueHandle = !enableSelectionMode && !showGreenHandle && (!isCellInSelection || selectedCells.size === 1);
+                    // Check if this cell is selected and if it's the bottom-right of a multi-cell selection.
+                    // Only disable these visuals in lock-editing selection mode.
+                    const isCellInSelection = !selectionLockEditingMode && isCellSelected(index, columnKey);
+                    const showGreenHandle = !selectionLockEditingMode && isBottomRightOfSelection(index, columnKey);
+                    const showBlueHandle = !selectionLockEditingMode && !showGreenHandle && (!isCellInSelection || selectedCells.size === 1);
 
                     return (
                         <div
@@ -2105,14 +2238,14 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                 }
                             }}
                             onMouseDown={(e) => {
-                                // Don't handle cell selection when selection mode is enabled (row checkboxes take precedence)
-                                if (!isReadOnly && !enableSelectionMode) {
+                                // Don't handle cell selection in lock-editing selection mode.
+                                if (!isReadOnly && !selectionLockEditingMode) {
                                     handleCellMouseDown(e, index, columnKey);
                                 }
                             }}
                             onMouseEnter={() => {
-                                // Don't handle cell selection when selection mode is enabled
-                                if (!isReadOnly && !enableSelectionMode && isSelecting) {
+                                // Don't handle cell selection in lock-editing selection mode.
+                                if (!isReadOnly && !selectionLockEditingMode && isSelecting) {
                                     handleCellMouseEnter(index, columnKey);
                                 }
                             }}
@@ -2123,7 +2256,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                 formatCellValue(cellValue, column.dataType, getColumnDataType, columnKey, columnEditorMapping)
                             }
                             {/* Blue handle - single cell drag fill */}
-                            {!isReadOnly && enableDragFill && !enableSelectionMode && showBlueHandle && (
+                            {!isReadOnly && enableDragFill && !selectionLockEditingMode && showBlueHandle && (
                                 <div 
                                     className="drag-fill-handle"
                                     style={{
@@ -2299,7 +2432,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                 />
                             )}
                             {/* Green handle - multi-cell selection drag fill (appears at bottom-right of selection) */}
-                            {!isReadOnly && enableDragFill && !enableSelectionMode && showGreenHandle && (
+                            {!isReadOnly && enableDragFill && !selectionLockEditingMode && showGreenHandle && (
                                 <div 
                                     className="multi-cell-drag-fill-handle"
                                     style={{
@@ -2536,7 +2669,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 })}
             </div>
         );
-    }, [filteredItems, columns, memoizedColumnWidths, editingState, pendingChanges, readOnlyColumns, enableInlineEditing, enableDragFill, startEdit, commitEdit, cancelEdit, memoizedAvailableValues, onItemClick, onItemDoubleClick, refreshTrigger, effectiveColumns, enableSelectionMode, onCellEdit, rowDragFillTargets, rowDragFillSource, selectedCells, selectionBounds, isCellSelected, isBottomRightOfSelection, handleCellMouseDown, handleCellMouseEnter, isSelecting, setSelectedCells, setSelectionAnchor, frozenColumnInfo, hasFrozenColumns, getFrozenCellStyle, getFrozenCellClassName, virtualizer, rowHeight]);
+    }, [filteredItems, columns, memoizedColumnWidths, editingState, pendingChanges, readOnlyColumns, enableInlineEditing, enableDragFill, startEdit, commitEdit, commitEditAndAdvance, cancelEdit, memoizedAvailableValues, onItemClick, onItemDoubleClick, refreshTrigger, effectiveColumns, enableSelectionMode, onCellEdit, rowDragFillTargets, rowDragFillSource, selectedCells, selectionBounds, isCellSelected, isBottomRightOfSelection, handleCellMouseDown, handleCellMouseEnter, isSelecting, setSelectedCells, setSelectionAnchor, frozenColumnInfo, hasFrozenColumns, getFrozenCellStyle, getFrozenCellClassName, virtualizer, rowHeight]);
 
     // PERFORMANCE OPTIMIZATION: Create stable render function to prevent unnecessary re-renders
     const renderRow = React.useCallback((virtualRow: any) => {
@@ -2611,7 +2744,8 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
             style={{
                 display: 'flex',
                 width: '100%',
-                minWidth: `${totalGridWidth}px`, // Ensure header matches grid width for horizontal scrolling
+                minWidth: `${totalGridWidth + scrollbarWidth}px`, // Include scrollbar compensation so max scrollLeft matches body
+                boxSizing: 'content-box', // Ensure minWidth is not reduced by padding/border
                 backgroundColor: '#faf9f8',
                 borderBottom: '1px solid #e1dfdd',
                 position: 'relative',
@@ -2654,11 +2788,10 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                     selectedCount={selectedItems.size}
                                     totalCount={filteredItems.length}
                                     onToggleSelectAll={() => {
-                                        if (selectAllState === 'all') {
-                                            onClearAllSelections?.();
-                                        } else {
-                                            onSelectAll?.();
-                                        }
+                                        const visibleItemIds = filteredItems
+                                            .map((item, idx) => item.recordId || item.key || item.id || idx.toString())
+                                            .filter((id): id is string => !!id);
+                                        onSelectAll?.(visibleItemIds);
                                     }}
                                 />
                             )}

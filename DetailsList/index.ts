@@ -164,6 +164,13 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     private consecutiveLoadingCalls = 0;
     private maxConsecutiveLoading = 5;
 
+    // Performance: cached gridColumns and columnEditorMapping
+    private _cachedGridColumns: any[] | null = null;
+    private _cachedGridColumnsKey: string = '';
+    private _cachedColumnEditorMapping: any = null;
+    private _cachedEditorConfigKey: string = '';
+    private _columnDataTypeMap: Map<string, string> = new Map();
+
     public init(context: ComponentFramework.Context<IInputs>, notifyOutputChanged: () => void): void {
         const endMeasurement = performanceMonitor.startMeasure('component-init');
 
@@ -876,91 +883,96 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             ItemsColumns.ItemSelected
         ];
         
-        const gridColumns = actualDataColumns
-            .filter(col => !metadataColumns.includes(col.name as any))
-            .map(col => {
-                // Priority 1: Check if we have column configuration from columns dataset
-                const columnConfig = this.datasetColumns?.find(c => c.name === col.name);
-                const configuredWidth = columnConfig?.visualSizeFactor;
-                
-                // Get alignment from column config (if available)
-                const horizontalAlign = (columnConfig as any)?.horizontalAlign || 'start';
-                const verticalAlign = (columnConfig as any)?.verticalAlign || 'center';
-                const headerHorizontalAlign = (columnConfig as any)?.headerHorizontalAlign || horizontalAlign;
-                const headerVerticalAlign = (columnConfig as any)?.headerVerticalAlign || verticalAlign;
-                const isMultiLine = (columnConfig as any)?.isMultiLine || false;
-                const isVisible = (columnConfig as any)?.isVisible !== false; // Default to visible for backward compatibility
-                const isFrozen = (columnConfig as any)?.isFrozen === true; // Default to not frozen
-                const accessibilityText = (columnConfig as any)?.accessibilityText || '';
-                const headerColor = (columnConfig as any)?.headerColor || '';
-                const headerFontColor = (columnConfig as any)?.headerFontColor || '';
-                
-                // Priority 2: Use PCF dataset visualSizeFactor
-                const pcfVisualSizeFactor = typeof col.visualSizeFactor === 'number' && !isNaN(col.visualSizeFactor) ? col.visualSizeFactor : 0;
-                
-                // Priority 3: Use DefaultColumnWidth from manifest
-                const defaultWidth = context.parameters.DefaultColumnWidth?.raw || 150;
-                
-                // Determine final column width with priority order
-                let columnWidth = defaultWidth;
-                
-                // Use configured width from columns dataset if available and reasonable
-                if (configuredWidth && configuredWidth > 50 && configuredWidth <= 1000) {
-                    columnWidth = configuredWidth;
-                }
-                // Fall back to PCF visualSizeFactor if DefaultColumnWidth wasn't explicitly set
-                else if (context.parameters.DefaultColumnWidth?.raw === undefined || context.parameters.DefaultColumnWidth?.raw === null) {
-                    if (pcfVisualSizeFactor > 50 && pcfVisualSizeFactor <= 500) {
-                        columnWidth = pcfVisualSizeFactor;
+        // Performance: Build cache key from inputs that affect gridColumns
+        const defaultWidth = context.parameters.DefaultColumnWidth?.raw || 150;
+        const globalResizeEnabled = context.parameters.EnableColumnResizing?.raw ?? true;
+        const dataColNames = actualDataColumns.map(c => c.name).join(',');
+        const configKey = this.datasetColumns?.map(c => 
+            `${(c as any).name}:${(c as any).visualSizeFactor}:${(c as any).horizontalAlign}:${(c as any).verticalAlign}:${(c as any).headerHorizontalAlign}:${(c as any).headerVerticalAlign}:${(c as any).isMultiLine}:${(c as any).isVisible}:${(c as any).isFrozen}:${(c as any).headerColor}:${(c as any).headerFontColor}`
+        ).join('|') || '';
+        const gridColumnsKey = `${dataColNames}|${configKey}|${defaultWidth}|${globalResizeEnabled}|${this.enableInlineEditing}`;
+        
+        let gridColumns: any[];
+        if (this._cachedGridColumnsKey === gridColumnsKey && this._cachedGridColumns) {
+            gridColumns = this._cachedGridColumns;
+        } else {
+            gridColumns = actualDataColumns
+                .filter(col => !metadataColumns.includes(col.name as any))
+                .map(col => {
+                    // Priority 1: Check if we have column configuration from columns dataset
+                    const columnConfig = this.datasetColumns?.find(c => c.name === col.name);
+                    const configuredWidth = columnConfig?.visualSizeFactor;
+                    
+                    // Get alignment from column config (if available)
+                    const horizontalAlign = (columnConfig as any)?.horizontalAlign || 'start';
+                    const verticalAlign = (columnConfig as any)?.verticalAlign || 'center';
+                    const headerHorizontalAlign = (columnConfig as any)?.headerHorizontalAlign || horizontalAlign;
+                    const headerVerticalAlign = (columnConfig as any)?.headerVerticalAlign || verticalAlign;
+                    const isMultiLine = (columnConfig as any)?.isMultiLine || false;
+                    const isVisible = (columnConfig as any)?.isVisible !== false; // Default to visible for backward compatibility
+                    const isFrozen = (columnConfig as any)?.isFrozen === true; // Default to not frozen
+                    const accessibilityText = (columnConfig as any)?.accessibilityText || '';
+                    const headerColor = (columnConfig as any)?.headerColor || '';
+                    const headerFontColor = (columnConfig as any)?.headerFontColor || '';
+                    
+                    // Priority 2: Use PCF dataset visualSizeFactor
+                    const pcfVisualSizeFactor = typeof col.visualSizeFactor === 'number' && !isNaN(col.visualSizeFactor) ? col.visualSizeFactor : 0;
+                    
+                    // Determine final column width with priority order
+                    let columnWidth = defaultWidth;
+                    
+                    // Use configured width from columns dataset if available and reasonable
+                    if (configuredWidth && configuredWidth > 50 && configuredWidth <= 1000) {
+                        columnWidth = configuredWidth;
                     }
-                }
-                else {
-                }
-                
-                
-                // Check if column resizing is enabled globally and per-column
-                const globalResizeEnabled = context.parameters.EnableColumnResizing?.raw ?? true;
-                const columnResizable = globalResizeEnabled; // Could be extended to check per-column settings from columns dataset
-                
-                return {
-                    key: col.name,
-                    name: col.displayName,
-                    fieldName: col.name,
-                    minWidth: 50, // Reasonable minimum width for resizing
-                    defaultWidth: columnWidth, // Custom property for the intended column width
-                    maxWidth: Math.max(columnWidth * 3, 300), // Maximum 3x the default width or 300px minimum
-                    isResizable: columnResizable,
-                    filterable: true,
-                    sortable: true,
-                    editable: this.enableInlineEditing,
-                    dataType: (col.dataType === 'DateAndTime.DateOnly' ? 'date' : 
-                              col.dataType === 'DateAndTime.DateAndTime' ? 'date' : // Map datetime to date for now
-                              col.dataType === 'Whole.None' ? 'number' : 
-                              col.dataType === 'Decimal' ? 'number' :
-                              col.dataType === 'Currency' ? 'number' : // Map currency to number for now
-                              col.dataType === 'TwoOptions' ? 'boolean' : 'string') as 'string' | 'number' | 'date' | 'boolean',
-                    // Add alignment properties
-                    horizontalAligned: horizontalAlign,
-                    verticalAligned: verticalAlign,
-                    headerHorizontalAligned: headerHorizontalAlign,
-                    headerVerticalAligned: headerVerticalAlign,
-                    // Add multiline property
-                    isMultiline: isMultiLine,
-                    // Add visibility property for column show/hide functionality
-                    isVisible: isVisible,
-                    // Add frozen column property for Excel-like freeze panes
-                    isFrozen: isFrozen,
-                    // Add accessibility text for column header tooltip
-                    accessibilityText: accessibilityText,
-                    // Add header background color
-                    headerColor: headerColor,
-                    // Add header font color
-                    headerFontColor: headerFontColor,
-                    // Add PCF-specific properties for proper data access
-                    pcfDataType: col.dataType,
-                    pcfColumnName: col.name
-                };
-            });
+                    // Fall back to PCF visualSizeFactor if DefaultColumnWidth wasn't explicitly set
+                    else if (context.parameters.DefaultColumnWidth?.raw === undefined || context.parameters.DefaultColumnWidth?.raw === null) {
+                        if (pcfVisualSizeFactor > 50 && pcfVisualSizeFactor <= 500) {
+                            columnWidth = pcfVisualSizeFactor;
+                        }
+                    }
+                    else {
+                    }
+                    
+                    const columnResizable = globalResizeEnabled;
+                    
+                    return {
+                        key: col.name,
+                        name: col.displayName,
+                        fieldName: col.name,
+                        minWidth: 50,
+                        defaultWidth: columnWidth,
+                        maxWidth: Math.max(columnWidth * 3, 300),
+                        isResizable: columnResizable,
+                        filterable: true,
+                        sortable: true,
+                        editable: this.enableInlineEditing,
+                        dataType: (col.dataType === 'DateAndTime.DateOnly' ? 'date' : 
+                                  col.dataType === 'DateAndTime.DateAndTime' ? 'date' :
+                                  col.dataType === 'Whole.None' ? 'number' : 
+                                  col.dataType === 'Decimal' ? 'number' :
+                                  col.dataType === 'Currency' ? 'number' :
+                                  col.dataType === 'TwoOptions' ? 'boolean' : 'string') as 'string' | 'number' | 'date' | 'boolean',
+                        horizontalAligned: horizontalAlign,
+                        verticalAligned: verticalAlign,
+                        headerHorizontalAligned: headerHorizontalAlign,
+                        headerVerticalAligned: headerVerticalAlign,
+                        isMultiline: isMultiLine,
+                        isVisible: isVisible,
+                        isFrozen: isFrozen,
+                        accessibilityText: accessibilityText,
+                        headerColor: headerColor,
+                        headerFontColor: headerFontColor,
+                        pcfDataType: col.dataType,
+                        pcfColumnName: col.name
+                    };
+                });
+            
+            // Cache result and build lookup map for getColumnDataType
+            this._cachedGridColumns = gridColumns;
+            this._cachedGridColumnsKey = gridColumnsKey;
+            this._columnDataTypeMap = new Map(gridColumns.map(col => [col.key, col.dataType]));
+        }
             
 
         // Create a wrapper for handleCellEdit to match the expected signature
@@ -969,9 +981,28 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             this.handleCellEdit(recordId, column.fieldName, newValue);
         };
 
-        // Parse column editor configuration from app
+        // Parse column editor configuration from app (with caching)
         const useEnhancedEditors = context.parameters.UseEnhancedEditors?.raw ?? false;
         let columnEditorMapping: any = {};
+        
+        // Build cache key for editor config
+        let editorConfigKey = String(useEnhancedEditors);
+        if (useEnhancedEditors) {
+            const editorConfigDataset = (context.parameters as any).editorConfig;
+            const formulasRaw = (context.parameters as any).ColumnEditorFormulas?.raw;
+            const jsonRaw = (context.parameters as any).ColumnEditorConfig?.raw;
+            if (editorConfigDataset?.records) {
+                editorConfigKey += '|table:' + Object.keys(editorConfigDataset.records).sort().join(',');
+            } else if (formulasRaw) {
+                editorConfigKey += '|fx:' + formulasRaw;
+            } else if (jsonRaw) {
+                editorConfigKey += '|json:' + jsonRaw;
+            }
+        }
+        
+        if (this._cachedEditorConfigKey === editorConfigKey && this._cachedColumnEditorMapping) {
+            columnEditorMapping = this._cachedColumnEditorMapping;
+        } else {
         
         if (useEnhancedEditors) {
             // Priority 1: Table-based configuration (new Power Apps native approach)
@@ -1153,9 +1184,17 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 }
             }
         }
+            
+            this._cachedColumnEditorMapping = columnEditorMapping;
+            this._cachedEditorConfigKey = editorConfigKey;
+        } // end else (cache miss for editor config)
 
         // Configure add new row functionality
         this.enableAddNewRow = context.parameters.EnableAddNewRow?.raw ?? false;
+
+        const resolvedSelectionMode = context.parameters.SelectionMode?.raw || '1';
+        const isSelectionModeActive = resolvedSelectionMode !== '0' && context.parameters.SelectionType?.raw !== '0';
+        const isSelectionLockEditingMode = resolvedSelectionMode === '2' && isSelectionModeActive;
 
         const grid = React.createElement(UltimateEnterpriseGrid, {
             items,
@@ -1165,14 +1204,16 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             width: (context.mode.allocatedWidth && context.mode.allocatedWidth > 0) ? context.mode.allocatedWidth : '100%', // Always provide a valid width
             enableVirtualization: true,
             virtualizationThreshold: 100,
-            // Mode configuration - Selection mode disables inline editing
-            enableInlineEditing: this.isSelectionMode ? false : this.enableInlineEditing,
+            // Mode configuration
+            // Off or EnabledWithEditing keeps inline editing available.
+            // EnabledLockEditing preserves legacy locked selection behavior.
+            enableInlineEditing: isSelectionLockEditingMode ? false : this.enableInlineEditing,
             enableFiltering: true,
             enableExport: true,
             enableAddNewRow: this.enableAddNewRow,
             enablePerformanceMonitoring: this.enablePerformanceMonitoring,
-            enableChangeTracking: !this.isSelectionMode, // Disable change tracking in selection mode
-            useEnhancedEditors: this.isSelectionMode ? false : useEnhancedEditors,
+            enableChangeTracking: !isSelectionLockEditingMode,
+            useEnhancedEditors: isSelectionLockEditingMode ? false : useEnhancedEditors,
             columnEditorMapping: columnEditorMapping,
             
             // Text size configuration from Power Apps properties
@@ -1184,10 +1225,11 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             alternateRowColor: context.parameters.AlternateRowColor?.raw || undefined,
             
             // Selection mode props - using performance-optimized SelectionManager
-            enableSelectionMode: this.isSelectionMode,
+            enableSelectionMode: isSelectionModeActive,
+            selectionLockEditingMode: isSelectionLockEditingMode,
             selectionType: context.parameters.SelectionType?.raw || '2',
-            selectedItems: this.isSelectionMode ? this.selectionManager.getSelectionState().selectedItems : this.nativeSelectionState.selectedItems,
-            selectAllState: this.isSelectionMode ? this.selectionManager.getSelectionState().selectAllState : this.nativeSelectionState.selectAllState,
+            selectedItems: isSelectionModeActive ? this.selectionManager.getSelectionState().selectedItems : this.nativeSelectionState.selectedItems,
+            selectAllState: isSelectionModeActive ? this.selectionManager.getSelectionState().selectAllState : this.nativeSelectionState.selectAllState,
             onItemSelection: this.handleItemSelection,
             onSelectAll: this.handleSelectAll,
             onClearAllSelections: this.handleClearAllSelections,
@@ -1223,9 +1265,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             formulaFieldExpression: context.parameters.FormulaFieldExpression?.raw || '',
             
             getColumnDataType: (columnKey: string) => {
-                const column = gridColumns.find(col => col.key === columnKey);
-                const dataType = column?.dataType || 'string';
-                // Map the data types to match the expected return types
+                const dataType = this._columnDataTypeMap.get(columnKey) || 'string';
                 if (dataType === 'string') return 'text';
                 if (dataType === 'number') return 'number';
                 if (dataType === 'date') return 'date';
@@ -2084,8 +2124,11 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         this.currentNewValue = newValue ? newValue.toString() : '';
 
         
-        // Auto-select the edited record for Power Apps .Selected integration
-        this.autoSelectEditedRecord(recordId);
+        // In selection mode, editing should not mutate row selection state.
+        // Keep legacy auto-select behavior only when selection mode is off.
+        if (!this.isSelectionMode) {
+            this.autoSelectEditedRecord(recordId);
+        }
         
         // Notify PowerApps of the change
         this.notifyOutputChanged();
@@ -2962,11 +3005,11 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
      * Handle mode switching between Grid Edit Mode and Selection Mode
      */
     private handleSelectionModeToggle = (context: ComponentFramework.Context<IInputs>): void => {
-        const enableSelectionMode = context.parameters.EnableSelectionMode?.raw;
+        const resolvedSelectionMode = context.parameters.SelectionMode?.raw || '1';
         const selectionType = context.parameters.SelectionType?.raw;
         
-        // Selection mode is enabled when EnableSelectionMode is true AND SelectionType is not None
-        const isSelectionModeActive = !!enableSelectionMode && selectionType !== '0';
+        // Selection UI is active when mode is not Off and SelectionType is not None
+        const isSelectionModeActive = resolvedSelectionMode !== '0' && selectionType !== '0';
         
         if (isSelectionModeActive !== this.isSelectionMode) {
             this.isSelectionMode = isSelectionModeActive;
@@ -3032,22 +3075,33 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         }
     };
 
-    private handleSelectAll = (): void => {
+    private handleSelectAll = (visibleItemIds?: string[]): void => {
         try {
             if (!this.isSelectionMode) {
                 return;
             }
 
-            // Performance optimization: Use SelectionManager's optimized batch operations
-            const safeNow = () => typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
-            const performanceStart = safeNow();
-            
-            const stats = this.selectionManager.getSelectionStats();
-            
-            // Use SelectionManager's built-in performance optimization for large datasets
+            // If visible IDs are provided, toggle select-all only within the filtered/visible set.
+            if (visibleItemIds && visibleItemIds.length > 0) {
+                const currentSelected = new Set(this.selectionManager.getSelectedItems());
+                const allVisibleSelected = visibleItemIds.every(id => currentSelected.has(id));
+
+                if (allVisibleSelected) {
+                    // Deselect only currently visible/filtered rows.
+                    visibleItemIds.forEach(id => currentSelected.delete(id));
+                } else {
+                    // Select all currently visible/filtered rows.
+                    visibleItemIds.forEach(id => currentSelected.add(id));
+                }
+
+                this.setSelectedRecords(Array.from(currentSelected));
+                this.updateNativeSelectionState();
+                this.notifyOutputChanged();
+                return;
+            }
+
+            // Backward-compatible fallback: toggle across the full known selection set.
             this.selectionManager.toggleSelectAll();
-            
-            const performanceEnd = safeNow();
         } catch (error) {
             console.error('❌ Error in handleSelectAll:', error);
         }

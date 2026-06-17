@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<manifest>                               <!-- version in sandbox is 17.6.31. Today's date is 3/12/2026 -JVT -->
-  <control namespace="JVT" constructor="FilteredDetailsListV2" version="17.6.14" display-name-key="FilteredDetailsListV2" description-key="FilteredDetailsListV2_Desc" control-type="virtual">
+<manifest>                               <!-- version in sandbox is 17.6.49. Today's date is 6/10/2026 -JVT -->
+  <control namespace="JVT" constructor="FilteredDetailsListV2" version="17.6.49" display-name-key="FilteredDetailsListV2" description-key="FilteredDetailsListV2_Desc" control-type="virtual">
     <external-service-usage enabled="false">
       <!-- Explicitly declare no external services to avoid CORS issues -->
     </external-service-usage>
@@ -164,8 +164,12 @@
     <property name="UseEnhancedEditors" display-name-key="UseEnhancedEditors" of-type="TwoOptions" usage="input" required="false" default-value="false" />
     <property name="ColumnEditorFormulas" display-name-key="ColumnEditorFormulas" of-type="SingleLine.TextArea" usage="input" required="false" />
     
-    <!-- Grid Mode Toggle: Grid Edit vs Selection Mode -->
-    <property name="EnableSelectionMode" display-name-key="EnableSelectionMode" of-type="TwoOptions" usage="input" required="false" default-value="false" />
+    <!-- SelectionMode: 0=Off, 1=EnabledWithEditing, 2=EnabledLockEditing -->
+    <property name="SelectionMode" display-name-key="SelectionMode" of-type="Enum" usage="input" required="false" default-value="1">
+      <value name="Off" display-name-key="Off">0</value>
+      <value name="EnabledWithEditing" display-name-key="EnabledWithEditing">1</value>
+      <value name="EnabledLockEditing" display-name-key="EnabledLockEditing">2</value>
+    </property>
     
     <!-- Selection Mode Configuration - Enhanced for Multiple Selection -->
     <!-- Remove custom Selected and SelectedItems properties - let Power Apps handle them natively through dataset selection -->

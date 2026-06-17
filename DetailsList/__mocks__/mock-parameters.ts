@@ -33,7 +33,7 @@ export function getMockParameters(): IInputs {
         newRowTemplateConfig: new MockDataSet([]),
         
         // Selection Mode Properties
-        EnableSelectionMode: new MockTwoOptionsProperty(false),
+        SelectionMode: new MockEnumProperty('1'),
         
         // Add New Row Properties
         EnableAddNewRow: new MockTwoOptionsProperty(false),

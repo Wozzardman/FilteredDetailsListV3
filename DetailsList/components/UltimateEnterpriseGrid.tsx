@@ -55,6 +55,7 @@ export interface IUltimateEnterpriseGridProps {
     
     // Selection mode properties
     enableSelectionMode?: boolean;
+    selectionLockEditingMode?: boolean;
     selectionType?: '0' | '1' | '2'; // 0=None, 1=Single, 2=Multiple
     selectedItems?: Set<string>;
     selectAllState?: 'none' | 'some' | 'all';
@@ -69,7 +70,7 @@ export interface IUltimateEnterpriseGridProps {
     // Row styling configuration
     alternateRowColor?: string;
     onItemSelection?: (itemId: string) => void;
-    onSelectAll?: () => void;
+    onSelectAll?: (visibleItemIds?: string[]) => void;
     onClearAllSelections?: () => void;
     
     // Excel Clipboard properties
@@ -140,6 +141,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     
     // Selection mode props
     enableSelectionMode = false,
+    selectionLockEditingMode = false,
     selectionType = '2', // Default to Multiple for backward compatibility
     selectedItems = new Set(),
     selectAllState = 'none',
@@ -207,6 +209,8 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     // Add New Row dialog state
     const [showAddRowDialog, setShowAddRowDialog] = useState<boolean>(false);
     const [newRowCount, setNewRowCount] = useState<string>('1');
+    // Ref-based tracking: item count before rows were added (ref avoids stale-closure / batching issues)
+    const pendingNewRowScrollBaseRef = React.useRef<number | null>(null);
     
     // Jump To navigation state
     const [jumpToSearchValue, setJumpToSearchValue] = useState<string>('');
@@ -606,19 +610,40 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     const handleCloseAddRowDialog = useCallback(() => {
         setShowAddRowDialog(false);
         setNewRowCount('1');
+        pendingNewRowScrollBaseRef.current = null;
     }, []);
 
     const handleAddNewRows = useCallback(() => {
         const count = parseInt(newRowCount, 10);
         if (count > 0 && count <= 1000 && onAddNewRow) { // Limit to 1000 rows max
+            const baseCount = items.length;
             onAddNewRow(count);
-            handleCloseAddRowDialog();
+            handleCloseAddRowDialog(); // nulls the ref (correct for cancel path)
+            // Re-set AFTER close so cancel correctly clears but confirm correctly sets
+            pendingNewRowScrollBaseRef.current = baseCount;
         }
-    }, [newRowCount, onAddNewRow, handleCloseAddRowDialog]);
+    }, [newRowCount, onAddNewRow, handleCloseAddRowDialog, items.length]);
 
     const handleRowCountChange = useCallback((event: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>, newValue?: string) => {
         setNewRowCount(newValue || '1');
     }, []);
+
+    // Auto-scroll to the first newly added row once items prop grows
+    useEffect(() => {
+        const base = pendingNewRowScrollBaseRef.current;
+        if (base === null) return;
+        if (items.length > base) {
+            pendingNewRowScrollBaseRef.current = null;
+            // filteredItems may not reflect the new item yet (it updates in its own useEffect),
+            // so delay one tick to let the filter effect run before scrolling.
+            const targetIndex = base;
+            setTimeout(() => {
+                if (gridRef.current?.scrollToIndex) {
+                    gridRef.current.scrollToIndex(targetIndex);
+                }
+            }, 0);
+        }
+    }, [items.length]);
 
     // Handle column filter changes
     const handleColumnFilterChange = useCallback((columnKey: string, selectedValues: any[]) => {
@@ -960,7 +985,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                     height="100%" // Let the grid flex with its container
                     width={(typeof width === 'number' && width > 0) ? width : '100%'}
                     enableInlineEditing={enableInlineEditing}
-                    enableDragFill={!enableSelectionMode}
+                    enableDragFill={!selectionLockEditingMode}
                     useEnhancedEditors={useEnhancedEditors}
                     columnEditorMapping={columnEditorMapping}
                     getAvailableValues={getAvailableValues}
@@ -970,6 +995,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                     
                     // Selection mode props
                     enableSelectionMode={enableSelectionMode}
+                    selectionLockEditingMode={selectionLockEditingMode}
                     selectionType={selectionType}
                     selectedItems={selectedItems}
                     selectAllState={selectAllState}
