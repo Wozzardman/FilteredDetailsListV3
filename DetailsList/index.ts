@@ -1083,14 +1083,31 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                                 if (maxValue !== null && maxValue !== undefined) config.currencyConfig = { ...config.currencyConfig, max: maxValue };
                             }
                             else if (editorType.toLowerCase() === 'dropdown') {
-                                if (dropdownOptions) {
+                                // Data-driven options: when DropdownOptions is left blank or set to a
+                                // sentinel (@data / @auto / @grid), derive the distinct option list from
+                                // the grid's in-memory records at edit time instead of receiving a
+                                // precomputed string from Power Apps. This removes the redundant server
+                                // queries that rebuilt lists already present in the loaded data, and keeps
+                                // the options in sync as rows are added or edited.
+                                const optionsRaw = (dropdownOptions ?? '').toString().trim();
+                                const deriveFromData =
+                                    optionsRaw === '' ||
+                                    optionsRaw.toLowerCase() === '@data' ||
+                                    optionsRaw.toLowerCase() === '@auto' ||
+                                    optionsRaw.toLowerCase() === '@grid';
+
+                                if (deriveFromData) {
+                                    config.optionsFromData = true;
+                                    config.dataColumnKey = columnKey;
+                                    config.getDropdownOptions = this.createDataDrivenOptionsProvider(columnKey);
+                                } else {
                                     try {
                                         // Support both JSON array and comma-separated values
                                         let options: any[];
-                                        if (dropdownOptions.startsWith('[') && dropdownOptions.endsWith(']')) {
-                                            options = JSON.parse(dropdownOptions);
+                                        if (optionsRaw.startsWith('[') && optionsRaw.endsWith(']')) {
+                                            options = JSON.parse(optionsRaw);
                                         } else {
-                                            options = dropdownOptions.split(',').map((opt: string) => opt.trim());
+                                            options = optionsRaw.split(',').map((opt: string) => opt.trim());
                                         }
                                         
                                         // Convert to the expected format
@@ -1681,6 +1698,33 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
      */
     private isCurrentlyLoading(): boolean {
         return this.isLoading;
+    }
+
+    /**
+     * Build a dropdown options provider that derives the distinct value list for a
+     * column from the grid's in-memory records. Used for editor dropdowns flagged as
+     * data-driven (editorConfig DropdownOptions blank or "@data"/"@auto"/"@grid").
+     *
+     * The list is computed lazily each time the editor opens, so it always reflects the
+     * records currently loaded (including newly added or edited rows) with zero extra
+     * server queries. It reuses the same distinct-value logic the column filters use,
+     * so editor options and filter options stay consistent.
+     */
+    private createDataDrivenOptionsProvider(
+        columnKey: string,
+    ): () => Array<{ key: string; text: string; value: any }> {
+        return () => {
+            if (!this.records || !this.sortedRecordsIds || this.sortedRecordsIds.length === 0) {
+                return [];
+            }
+            return FilterUtils.getUniqueValues(this.records, this.sortedRecordsIds, columnKey).map(
+                (entry) => ({
+                    key: String(entry.value),
+                    text: String(entry.value),
+                    value: entry.value,
+                }),
+            );
+        };
     }
 
     private setPageSize(context: ComponentFramework.Context<IInputs>) {

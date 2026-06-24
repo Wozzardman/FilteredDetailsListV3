@@ -207,6 +207,12 @@ export interface ColumnEditorConfig {
     
     // Type-specific configurations
     dropdownOptions?: DropdownOption[];
+    // Data-driven dropdown options: when true, the option list is derived from the
+    // grid's in-memory records for `dataColumnKey` (set when the editorConfig table's
+    // DropdownOptions is blank or "@data"/"@auto"/"@grid"). Avoids redundant server
+    // queries and keeps options in sync with the data already loaded in the grid.
+    optionsFromData?: boolean;
+    dataColumnKey?: string;
     autocompleteOptions?: AutocompleteOption[];
     sliderConfig?: SliderConfig;
     ratingConfig?: RatingConfig;
