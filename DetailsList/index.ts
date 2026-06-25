@@ -171,6 +171,9 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     private _cachedEditorConfigKey: string = '';
     private _columnDataTypeMap: Map<string, string> = new Map();
 
+    // Name under which this instance published its records to the cross-grid shared registry.
+    private publishedDataSourceName: string | undefined = undefined;
+
     public init(context: ComponentFramework.Context<IInputs>, notifyOutputChanged: () => void): void {
         const endMeasurement = performanceMonitor.startMeasure('component-init');
 
@@ -662,6 +665,11 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             this.records = dataset.records;
             this.sortedRecordsIds = dataset.sortedRecordIds;
 
+            // Publish this grid's loaded records to the shared registry so sibling control
+            // instances can derive dropdown options from data already in memory (best-effort,
+            // guarded against redundant work, no cloning, no network).
+            this.publishSharedDataSource();
+
             // Initialize SelectionManager with current dataset items for performance optimization
             if (this.isSelectionMode && this.sortedRecordsIds?.length > 0) {
                 this.selectionManager.initialize(this.sortedRecordsIds);
@@ -1083,23 +1091,42 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                                 if (maxValue !== null && maxValue !== undefined) config.currencyConfig = { ...config.currencyConfig, max: maxValue };
                             }
                             else if (editorType.toLowerCase() === 'dropdown') {
-                                // Data-driven options: when DropdownOptions is left blank or set to a
-                                // sentinel (@data / @auto / @grid), derive the distinct option list from
-                                // the grid's in-memory records at edit time instead of receiving a
-                                // precomputed string from Power Apps. This removes the redundant server
-                                // queries that rebuilt lists already present in the loaded data, and keeps
-                                // the options in sync as rows are added or edited.
+                                // Data-driven options. The DropdownOptions value can be:
+                                //   blank / "@data" / "@odata" / "@grid" / "@auto"
+                                //        -> derive distinct values from THIS grid's matching column
+                                //   "@data:SourceName"        -> derive from another control instance
+                                //        (identified by its DataSourceName), using the same column key
+                                //   "@data:SourceName.Column" -> derive from another instance, explicit column
+                                // Cross-grid reads a sibling control's in-memory cache from the shared
+                                // registry, so no extra server query is made (helpful in low-connectivity
+                                // scenarios). It falls back to an empty list - typing is still allowed when
+                                // AllowDirectTextInput is on - if the sibling has not loaded yet. Any other
+                                // value is parsed as a static option list exactly as before.
                                 const optionsRaw = (dropdownOptions ?? '').toString().trim();
-                                const deriveFromData =
+                                const lower = optionsRaw.toLowerCase();
+                                const dataPrefixes = ['@data', '@odata', '@grid', '@auto'];
+                                const isDataToken =
                                     optionsRaw === '' ||
-                                    optionsRaw.toLowerCase() === '@data' ||
-                                    optionsRaw.toLowerCase() === '@auto' ||
-                                    optionsRaw.toLowerCase() === '@grid';
+                                    dataPrefixes.some((p) => lower === p || lower.startsWith(p + ':'));
 
-                                if (deriveFromData) {
+                                if (isDataToken) {
                                     config.optionsFromData = true;
-                                    config.dataColumnKey = columnKey;
-                                    config.getDropdownOptions = this.createDataDrivenOptionsProvider(columnKey);
+                                    const colonIdx = optionsRaw.indexOf(':');
+                                    if (colonIdx >= 0) {
+                                        // Cross-grid reference: "@data:Source" or "@data:Source.Column"
+                                        const ref = optionsRaw.substring(colonIdx + 1).trim();
+                                        const dotIdx = ref.indexOf('.');
+                                        const sourceName = (dotIdx >= 0 ? ref.substring(0, dotIdx) : ref).trim();
+                                        const sourceColumn = dotIdx >= 0 ? ref.substring(dotIdx + 1).trim() : columnKey;
+                                        if (sourceName) {
+                                            config.dataColumnKey = sourceColumn;
+                                            config.getDropdownOptions = this.createSharedDataOptionsProvider(sourceName, sourceColumn);
+                                        }
+                                    } else {
+                                        // This grid's own column
+                                        config.dataColumnKey = columnKey;
+                                        config.getDropdownOptions = this.createDataDrivenOptionsProvider(columnKey);
+                                    }
                                 } else {
                                     try {
                                         // Support both JSON array and comma-separated values
@@ -1540,7 +1567,21 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     public destroy(): void {
         // Clean up auto-recovery timer
         this.clearErrorRecoveryTimer();
-        
+
+        // Remove this instance's entry from the cross-grid shared registry so unmounting a grid
+        // does not leak references to its records.
+        try {
+            if (typeof window !== 'undefined' && window !== null && this.publishedDataSourceName) {
+                const registry = (window as any).__FDLSharedData;
+                if (registry && registry[this.publishedDataSourceName]) {
+                    delete registry[this.publishedDataSourceName];
+                }
+            }
+        } catch (error) {
+            // Non-critical cleanup
+        }
+        this.publishedDataSourceName = undefined;
+
         // Flush any pending SelectionManager updates to ensure Power Apps compatibility
         if (this.selectionManager) {
             this.selectionManager.flushPendingUpdates();
@@ -1725,6 +1766,107 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                 }),
             );
         };
+    }
+
+    /**
+     * Build a dropdown options provider that reads distinct values for a column from ANOTHER
+     * control instance's published cache (cross-grid sharing). The source instance publishes its
+     * loaded records to a shared, in-memory registry keyed by its DataSourceName (see
+     * publishSharedDataSource). This lets a grid reuse data already loaded elsewhere in the app
+     * instead of issuing its own query - valuable in low-connectivity scenarios.
+     *
+     * Best-effort: if the named source has not been rendered/loaded yet, returns an empty list so
+     * the editor still works (typing remains available when AllowDirectTextInput is on).
+     */
+    private createSharedDataOptionsProvider(
+        sourceName: string,
+        columnKey: string,
+    ): () => Array<{ key: string; text: string; value: any }> {
+        return () => {
+            try {
+                if (typeof window === 'undefined' || window === null) {
+                    return [];
+                }
+                const registry = (window as any).__FDLSharedData;
+                const entry = registry && registry[sourceName];
+                if (!entry || typeof entry.getDistinct !== 'function') {
+                    return [];
+                }
+                return entry.getDistinct(columnKey).map(
+                    (e: { value: string | number; count: number }) => ({
+                        key: String(e.value),
+                        text: String(e.value),
+                        value: e.value,
+                    }),
+                );
+            } catch (error) {
+                return [];
+            }
+        };
+    }
+
+    /**
+     * Publish this control instance's loaded records to a shared, window-level registry so that
+     * OTHER FilteredDetailsList instances in the same app session can derive dropdown options from
+     * data this grid already has in memory (see createSharedDataOptionsProvider).
+     *
+     * Performance notes (important for low-connectivity / low-end devices):
+     *  - Stores REFERENCES to the existing records (no cloning, no network, negligible memory).
+     *  - Guarded by a lightweight signature so it only rebuilds when the record set changes,
+     *    rather than on every updateView (which fires on scroll / resize / selection).
+     *  - Distinct values are computed lazily and memoized per column, so large datasets cost
+     *    O(n) once per column on first dropdown open, not on every render.
+     *  - The entry is removed in destroy() so unmounted grids do not leak memory.
+     */
+    private publishSharedDataSource(): void {
+        try {
+            if (typeof window === 'undefined' || window === null) {
+                return;
+            }
+            if (!this.records || !this.sortedRecordsIds) {
+                return;
+            }
+            const name = this.getPatchDataSourceName();
+            if (!name) {
+                return;
+            }
+
+            const w = window as any;
+            w.__FDLSharedData = w.__FDLSharedData || {};
+
+            // Lightweight change signature (count + first/last id) avoids rebuilding the distinct
+            // cache when the record set is unchanged across frequent updateView calls.
+            const ids = this.sortedRecordsIds;
+            const signature = `${ids.length}:${ids[0] ?? ''}:${ids[ids.length - 1] ?? ''}`;
+
+            this.publishedDataSourceName = name;
+            const existing = w.__FDLSharedData[name];
+            if (existing && existing.signature === signature) {
+                // Record set unchanged - refresh references cheaply and keep the memoized cache.
+                existing.records = this.records;
+                existing.recordIds = ids;
+                return;
+            }
+
+            // Build a fresh entry. Distinct values are computed lazily and memoized per column.
+            const entry: any = {
+                signature,
+                records: this.records,
+                recordIds: ids,
+                distinctCache: new Map<string, Array<{ value: string | number; count: number }>>(),
+            };
+            entry.getDistinct = (col: string): Array<{ value: string | number; count: number }> => {
+                let cached = entry.distinctCache.get(col);
+                if (!cached) {
+                    cached = FilterUtils.getUniqueValues(entry.records, entry.recordIds, col);
+                    entry.distinctCache.set(col, cached);
+                }
+                return cached;
+            };
+            w.__FDLSharedData[name] = entry;
+        } catch (error) {
+            // Sharing is best-effort; never let it disrupt rendering.
+        }
     }
 
     private setPageSize(context: ComponentFramework.Context<IInputs>) {
