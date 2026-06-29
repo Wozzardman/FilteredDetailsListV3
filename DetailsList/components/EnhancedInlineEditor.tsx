@@ -445,8 +445,10 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                     setErrorMessage(`Maximum ${config.textConfig.maxLength} characters allowed`);
                     return false;
                 }
-                // Special validation for date-like values in text fields
-                if (val && (value instanceof Date || (typeof value === 'string' && !isNaN(Date.parse(value))))) {
+                // Special validation for date-like values in text fields. Gate strictly on the
+                // underlying value being an actual Date (a date-typed datasource column) - a
+                // Date.parse-able string like a plain number must NOT be treated as a date.
+                if (val && value instanceof Date) {
                     // If original value was a date, validate that text input can be parsed as a date
                     if (isDateLikeString(val) && !tryParseUserDateInput(val)) {
                         setHasError(true);
@@ -522,8 +524,11 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                     let resolvedValue = currentValue;
                     if (typeof currentValue === 'string') {
                         const isDirectDateInput = config.type === 'date' && config.allowDirectTextInput;
-                        const isTextFieldWithDateValue = config.type === 'text' &&
-                            (value instanceof Date || (typeof value === 'string' && !isNaN(Date.parse(value))));
+                        // Only treat a text field as date-bearing when the underlying datasource
+                        // value is an actual Date (i.e. a date-typed column). Do NOT infer "date"
+                        // from a Date.parse-able string: Date.parse accepts plain numbers
+                        // (e.g. "1" -> Jan 1 2001), which corrupted numeric/text values on commit.
+                        const isTextFieldWithDateValue = config.type === 'text' && value instanceof Date;
                         if (isDirectDateInput || isTextFieldWithDateValue) {
                             const parsed = tryParseUserDateInput(currentValue);
                             if (parsed) resolvedValue = parsed;
@@ -595,8 +600,11 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
             let resolvedValue = currentValue;
             if (typeof currentValue === 'string') {
                 const isDirectDateInput = config.type === 'date' && config.allowDirectTextInput;
-                const isTextFieldWithDateValue = config.type === 'text' &&
-                    (value instanceof Date || (typeof value === 'string' && !isNaN(Date.parse(value))));
+                // Only treat a text field as date-bearing when the underlying datasource value
+                // is an actual Date (i.e. a date-typed column). Do NOT infer "date" from a
+                // Date.parse-able string: Date.parse accepts plain numbers (e.g. "1" -> Jan 1
+                // 2001), which corrupted numeric/text values on commit.
+                const isTextFieldWithDateValue = config.type === 'text' && value instanceof Date;
                 if (isDirectDateInput || isTextFieldWithDateValue) {
                     const parsed = tryParseUserDateInput(currentValue);
                     if (parsed) resolvedValue = parsed;
