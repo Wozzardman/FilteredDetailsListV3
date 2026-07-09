@@ -201,6 +201,9 @@ export interface ColumnEditorConfig {
     isRequired?: boolean;
     placeholder?: string;
     allowDirectTextInput?: boolean; // Universal: Allow typing values directly instead of using specialized controls
+    // When a dropdown sets allowDirectTextInput=false, values not in the option list are rejected on commit
+    // and cleared. This message is shown on rejection; a default message is used when omitted.
+    restrictedValueMessage?: string;
     
     // Auto-fill confirmation
     RequiresAutoFillConfirmation?: boolean;

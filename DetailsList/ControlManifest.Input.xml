@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<manifest>                               <!-- version in sandbox is 17.6.56. Today's date is 6/29/2026 -JVT -->
-  <control namespace="JVT" constructor="FilteredDetailsListV2" version="17.6.55" display-name-key="FilteredDetailsListV2" description-key="FilteredDetailsListV2_Desc" control-type="virtual">
+<manifest>                               <!-- version in sandbox is 17.6.69 | Prod is 17.6.56. Today's date is 07/09/2026 -JVT -->
+  <control namespace="JVT" constructor="FilteredDetailsListV2" version="17.6.56" display-name-key="FilteredDetailsListV2" description-key="FilteredDetailsListV2_Desc" control-type="virtual">
     <external-service-usage enabled="false">
       <!-- Explicitly declare no external services to avoid CORS issues -->
     </external-service-usage>
@@ -130,6 +130,7 @@
       <property-set name="PatternErrorMessage" display-name-key="PatternErrorMessage" of-type="SingleLine.Text" usage="bound" required="false" />
       <property-set name="DropdownOptions" display-name-key="DropdownOptions" of-type="SingleLine.Text" usage="bound" required="false" />
       <property-set name="AllowDirectTextInput" display-name-key="AllowDirectTextInput" of-type="TwoOptions" usage="bound" required="false" />
+      <property-set name="RestrictedValueMessage" display-name-key="RestrictedValueMessage" of-type="SingleLine.Text" usage="bound" required="false" />
       <property-set name="CurrencySymbol" display-name-key="CurrencySymbol" of-type="SingleLine.Text" usage="bound" required="false" />
       <property-set name="DecimalPlaces" display-name-key="DecimalPlaces" of-type="Whole.None" usage="bound" required="false" />
       <property-set name="StepValue" display-name-key="StepValue" of-type="Decimal" usage="bound" required="false" />

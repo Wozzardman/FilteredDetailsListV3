@@ -4,6 +4,7 @@
  */
 
 import * as React from 'react';
+import * as ReactDOM from 'react-dom';
 import { TextField } from '@fluentui/react/lib/TextField';
 import { DatePicker } from '@fluentui/react/lib/DatePicker';
 import { Dropdown, IDropdownOption } from '@fluentui/react/lib/Dropdown';
@@ -15,7 +16,6 @@ import { ComboBox, IComboBoxOption } from '@fluentui/react/lib/ComboBox';
 import { SpinButton } from '@fluentui/react/lib/SpinButton';
 import { IconButton } from '@fluentui/react/lib/Button';
 import { Stack } from '@fluentui/react/lib/Stack';
-import { Callout, DirectionalHint } from '@fluentui/react/lib/Callout';
 import { IColumn } from '@fluentui/react/lib/DetailsList';
 import '../css/EnhancedDropdown.css';
 import { 
@@ -177,6 +177,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
     const [filterText, setFilterText] = React.useState<string>(typeof value === 'string' ? value : '');
     const [isDropdownOpen, setIsDropdownOpen] = React.useState<boolean>(false);
     const dropdownContainerRef = React.useRef<HTMLDivElement>(null);
+    const dropdownListRef = React.useRef<HTMLDivElement>(null);
     const [dropdownTarget, setDropdownTarget] = React.useState<HTMLElement | null>(null);
     const [isDatePickerActive, setIsDatePickerActive] = React.useState<boolean>(false);
     // Ref-based tracking for date picker to avoid stale closures in blur handlers
@@ -396,8 +397,10 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
     // Handle click outside to close dropdown
     React.useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (isDropdownOpen && dropdownContainerRef.current && 
-                !dropdownContainerRef.current.contains(event.target as Node)) {
+            const targetNode = event.target as Node;
+            if (isDropdownOpen &&
+                dropdownContainerRef.current && !dropdownContainerRef.current.contains(targetNode) &&
+                (!dropdownListRef.current || !dropdownListRef.current.contains(targetNode))) {
                 setIsDropdownOpen(false);
             }
         };
@@ -1086,6 +1089,80 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                 dropdownMaxWidth = Math.max(columnWidth * 1.2, 400); // Allow dropdown to be 20% wider than column
             }
 
+            // Restricted dropdown enforcement: when AllowDirectTextInput is explicitly false, only
+            // values present in the option list (or blank) may be committed. Typed values that are not
+            // in the list are rejected and cleared. When AllowDirectTextInput is true or omitted, free
+            // text is allowed (default behavior, unchanged).
+            const isRestrictedDropdown = config.allowDirectTextInput === false;
+            const resolveRestrictedDropdownValue = (val: any): { allowed: boolean; value: any } => {
+                const raw = (val ?? '').toString().trim();
+                if (raw === '') return { allowed: true, value: '' }; // clearing is always allowed
+                // Don't enforce until options are available (avoids clearing during async option load)
+                if (!dropdownOptions || dropdownOptions.length === 0) return { allowed: true, value: raw };
+                const match = dropdownOptions.find(o =>
+                    String(o.text ?? '').trim().toLowerCase() === raw.toLowerCase() ||
+                    String(o.value ?? o.key ?? '').trim().toLowerCase() === raw.toLowerCase()
+                );
+                return match ? { allowed: true, value: (match.value ?? match.key) } : { allowed: false, value: '' };
+            };
+            const restrictedRejectMessage = (typed: any): string =>
+                config.restrictedValueMessage || `"${(typed ?? '').toString().trim()}" is not a valid option`;
+
+            // Geometric placement, positioned manually via a portal. Fluent's Callout mis-positions inside
+            // Power Apps (its offsetParent-based math breaks under the host's CSS transforms), so we place the
+            // list ourselves using on-screen pixel coordinates from getBoundingClientRect. We compare the cell
+            // against the VISIBLE grid viewport (.virtualized-grid-body): if the list would extend past the
+            // viewport bottom, anchor it to the cell TOP and grow upward; otherwise anchor to the cell BOTTOM
+            // and grow downward. Works at any scroll position, not just the last row.
+            let shouldFlipUp = false;
+            let dropdownMenuStyle: React.CSSProperties = { position: 'fixed', visibility: 'hidden' };
+            if (dropdownTarget) {
+                const cellRect = dropdownTarget.getBoundingClientRect();
+                const viewportEl = dropdownTarget.closest('.virtualized-grid-body') as HTMLElement | null;
+                const winH = window.innerHeight || document.documentElement.clientHeight || 0;
+                const winW = window.innerWidth || document.documentElement.clientWidth || 0;
+                const viewRect: { top: number; bottom: number } = viewportEl
+                    ? { top: viewportEl.getBoundingClientRect().top, bottom: viewportEl.getBoundingClientRect().bottom }
+                    : { top: 0, bottom: winH };
+                const itemHeight = isNarrowColumn ? 28 : 32;
+                const estimatedListHeight = Math.min(300, Math.max(1, filteredOptions.length) * itemHeight + 8);
+                // Vertical room measured from where the list is anchored: downward it starts at the cell's
+                // TOP; upward it ends at the cell's BOTTOM.
+                const spaceBelow = Math.max(0, viewRect.bottom - cellRect.top);
+                const spaceAbove = Math.max(0, cellRect.bottom - viewRect.top);
+                shouldFlipUp = (cellRect.top + estimatedListHeight > viewRect.bottom) && spaceAbove > spaceBelow;
+
+                // Size the list to its content (with a small readable floor and a sensible cap) so it is
+                // not forced as wide as the column when the options are short.
+                const menuWidth = Math.max(120, Math.min(dropdownMaxWidth, dynamicWidth));
+                // Anchor the list's LEFT edge to the cell's RIGHT edge so it opens to the right, covering the
+                // columns to the right and never its own column (keeps the input text and error message clear).
+                // Clamp to the viewport so a far-right cell's list still stays on-screen.
+                const menuLeft = Math.max(4, Math.min(cellRect.right, winW - menuWidth - 4));
+                const availableForMenu = shouldFlipUp ? spaceAbove : spaceBelow;
+                const menuMaxHeight = Math.min(300, Math.max(80, availableForMenu - 8));
+
+                dropdownMenuStyle = {
+                    position: 'fixed',
+                    left: Math.round(menuLeft),
+                    width: Math.round(menuWidth),
+                    maxHeight: Math.round(menuMaxHeight),
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
+                    zIndex: 9999999,
+                    background: '#ffffff',
+                    border: '1px solid #d1d1d1',
+                    borderRadius: 4,
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+                    fontSize: isNarrowColumn ? `${Math.max(columnTextSize - 1, 10)}px` : `${columnTextSize}px`,
+                    // Open beside the cell: top-aligned growing down, or bottom-aligned growing up near the
+                    // bottom of the viewport. Fixed viewport coordinates.
+                    ...(shouldFlipUp
+                        ? { bottom: Math.round(winH - cellRect.bottom) }
+                        : { top: Math.round(cellRect.top) }),
+                };
+            }
+
             // Custom dropdown implementation for reliable filtering
             return (
                 <div 
@@ -1107,6 +1184,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                         autoAdjustHeight={true}
                         rows={1}
                         resizable={false}
+                        errorMessage={hasError ? errorMessage : undefined}
                         onChange={(_, newValue) => {
                             const searchText = newValue || '';
                             setFilterText(searchText);
@@ -1124,6 +1202,25 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                                 setIsDropdownOpen(false);
                                 // Commit the current filter text as the value
                                 const valueToCommit = filterText;
+                                if (isRestrictedDropdown) {
+                                    const result = resolveRestrictedDropdownValue(valueToCommit);
+                                    if (!result.allowed) {
+                                        // Reject: clear the invalid value and surface the message
+                                        setFilterText('');
+                                        setCurrentValue('');
+                                        setHasError(true);
+                                        setErrorMessage(restrictedRejectMessage(valueToCommit));
+                                        onCommit('');
+                                        return;
+                                    }
+                                    setHasError(false);
+                                    setErrorMessage('');
+                                    const formattedValue = config.valueFormatter ?
+                                        config.valueFormatter(result.value, item, column) :
+                                        result.value;
+                                    onCommit(formattedValue);
+                                    return;
+                                }
                                 if (validateValue(valueToCommit)) {
                                     const formattedValue = config.valueFormatter ? 
                                         config.valueFormatter(valueToCommit, item, column) : 
@@ -1136,8 +1233,33 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                             switch (e.key) {
                                 case 'Enter':
                                     e.preventDefault();
-                                    setIsDropdownOpen(false);
                                     const valueToCommit = filterText;
+                                    if (isRestrictedDropdown) {
+                                        const result = resolveRestrictedDropdownValue(valueToCommit);
+                                        if (!result.allowed) {
+                                            // Reject: clear the typed value, show the message, and keep the
+                                            // editor open with the list so the user can pick a valid option.
+                                            setFilterText('');
+                                            setCurrentValue('');
+                                            setHasError(true);
+                                            setErrorMessage(restrictedRejectMessage(valueToCommit));
+                                            setIsDropdownOpen(true);
+                                            break;
+                                        }
+                                        setIsDropdownOpen(false);
+                                        setHasError(false);
+                                        setErrorMessage('');
+                                        const restrictedFormatted = config.valueFormatter ?
+                                            config.valueFormatter(result.value, item, column) :
+                                            result.value;
+                                        if (onCommitAndAdvance) {
+                                            onCommitAndAdvance(restrictedFormatted);
+                                        } else {
+                                            onCommit(restrictedFormatted);
+                                        }
+                                        break;
+                                    }
+                                    setIsDropdownOpen(false);
                                     if (validateValue(valueToCommit)) {
                                         const formattedValue = config.valueFormatter ? 
                                             config.valueFormatter(valueToCommit, item, column) : 
@@ -1170,61 +1292,53 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                         ▼
                     </div>
                     
-                    {/* Searchable Dropdown using Callout for proper positioning */}
-                    {isDropdownOpen && filteredOptions.length > 0 && dropdownTarget && (
-                        <Callout
-                            target={dropdownTarget}
-                            onDismiss={() => setIsDropdownOpen(false)}
-                            directionalHint={DirectionalHint.rightTopEdge}
-                            isBeakVisible={false}
-                            styles={{
-                                root: { zIndex: 999999 },
-                                calloutMain: { 
-                                    minWidth: dropdownMinWidth,
-                                    maxWidth: dropdownMaxWidth,
-                                    maxHeight: 300,
-                                    border: '1px solid #d1d1d1',
-                                    borderRadius: '4px',
-                                    boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
-                                    fontSize: isNarrowColumn ? `${Math.max(columnTextSize - 1, 10)}px` : `${columnTextSize}px` // Use dynamic font size, slightly smaller for narrow columns
-                                }
-                            }}
+                    {/* Searchable dropdown list, portaled to <body> and positioned manually with fixed
+                        on-screen coordinates so Power Apps' CSS transforms cannot clip or mis-place it. */}
+                    {isDropdownOpen && filteredOptions.length > 0 && dropdownTarget && ReactDOM.createPortal(
+                        <div
+                            ref={dropdownListRef}
+                            className={`enhanced-dropdown-list ${isNarrowColumn ? 'narrow-column-dropdown' : ''}`}
+                            style={dropdownMenuStyle}
                         >
-                            <div className={`enhanced-dropdown-list ${isNarrowColumn ? 'narrow-column-dropdown' : ''}`} style={{ border: 'none', boxShadow: 'none' }}>
-                                {filteredOptions.map((option, index) => (
-                                    <div
-                                        key={option.key}
-                                        className={`enhanced-dropdown-item ${isNarrowColumn ? 'narrow-column-item' : ''}`}
-                                        style={{
-                                            fontSize: isNarrowColumn ? `${Math.max(columnTextSize - 1, 10)}px` : `${columnTextSize}px`, // Use dynamic font size
-                                            whiteSpace: isNarrowColumn ? 'normal' : 'nowrap',
-                                            wordWrap: isNarrowColumn ? 'break-word' : 'normal',
-                                            lineHeight: isNarrowColumn ? '1.3' : '1.5'
-                                        }}
-                                        onMouseDown={(e) => {
-                                            e.preventDefault(); // Prevent blur
-                                            const selectedValue = option.value || option.key;
-                                            setFilterText(option.text);
-                                            setCurrentValue(selectedValue);
-                                            setIsDropdownOpen(false);
-                                            
-                                            // Commit immediately
-                                            const formattedValue = config.valueFormatter ? 
-                                                config.valueFormatter(selectedValue, item, column) : 
-                                                selectedValue;
+                            {filteredOptions.map((option, index) => (
+                                <div
+                                    key={option.key}
+                                    className={`enhanced-dropdown-item ${isNarrowColumn ? 'narrow-column-item' : ''}`}
+                                    style={{
+                                        fontSize: isNarrowColumn ? `${Math.max(columnTextSize - 1, 10)}px` : `${columnTextSize}px`,
+                                        whiteSpace: isNarrowColumn ? 'normal' : 'nowrap',
+                                        wordWrap: isNarrowColumn ? 'break-word' : 'normal',
+                                        lineHeight: isNarrowColumn ? '1.3' : '1.5'
+                                    }}
+                                    onMouseDown={(e) => {
+                                        e.preventDefault(); // Prevent blur
+                                        const selectedValue = option.value || option.key;
+                                        setFilterText(option.text);
+                                        setCurrentValue(selectedValue);
+                                        setIsDropdownOpen(false);
+
+                                        // Commit and advance focus to the next editable cell to the
+                                        // right (same behavior as pressing Enter).
+                                        const formattedValue = config.valueFormatter ? 
+                                            config.valueFormatter(selectedValue, item, column) : 
+                                            selectedValue;
+                                        if (onCommitAndAdvance) {
+                                            onCommitAndAdvance(formattedValue);
+                                        } else {
                                             onCommit(formattedValue);
-                                            
-                                            // Trigger conditional logic AFTER commit with a delay to ensure state is updated
-                                            setTimeout(() => {
-                                                handleConditionalTrigger('onChange', selectedValue);
-                                            }, 100);
-                                        }}
-                                    >
-                                        {option.text}
-                                    </div>
-                                ))}
-                            </div>
-                        </Callout>
+                                        }
+
+                                        // Trigger conditional logic AFTER commit with a delay to ensure state is updated
+                                        setTimeout(() => {
+                                            handleConditionalTrigger('onChange', selectedValue);
+                                        }, 100);
+                                    }}
+                                >
+                                    {option.text}
+                                </div>
+                            ))}
+                        </div>,
+                        document.body
                     )}
                 </div>
             );

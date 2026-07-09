@@ -1040,6 +1040,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                             const isMultiline = record.getValue('IsMultiline');
                             const validationPattern = record.getValue('ValidationPattern');
                             const patternErrorMessage = record.getValue('PatternErrorMessage');
+                            const restrictedValueMessage = record.getValue('RestrictedValueMessage');
                             const dropdownOptions = record.getValue('DropdownOptions');
                             const allowDirectTextInput = record.getValue('AllowDirectTextInput');
                             const currencySymbol = record.getValue('CurrencySymbol');
@@ -1070,6 +1071,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
                             if (editLock !== null && editLock !== undefined) config.editLock = editLock;
                             if (placeholder) config.placeholder = placeholder;
                             if (allowDirectTextInput !== null && allowDirectTextInput !== undefined) config.allowDirectTextInput = allowDirectTextInput;
+                            if (restrictedValueMessage) config.restrictedValueMessage = restrictedValueMessage;
                             if (requiresAutoFillConfirmation !== null && requiresAutoFillConfirmation !== undefined) config.RequiresAutoFillConfirmation = requiresAutoFillConfirmation;
                             
                             // Apply type-specific configurations
