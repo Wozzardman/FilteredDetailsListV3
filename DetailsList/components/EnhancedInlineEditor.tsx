@@ -139,7 +139,7 @@ export interface EnhancedInlineEditorProps {
     item: any;
     editorConfig?: ColumnEditorConfig;
     onCommit: (value: any) => void;
-    onCommitAndAdvance?: (value: any) => void; // New: Commit and move focus to next editable cell on the same row
+    onCommitAndAdvance?: (value: any, direction?: 1 | -1) => void; // Commit and move right (1, default) or left (-1) on the same row
     onCancel: () => void;
     onValueChange?: (value: any) => void;
     onItemChange?: (columnKey: string, value: any) => void; // New: For conditional updates
@@ -519,6 +519,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
     const handleKeyDown = React.useCallback((event: React.KeyboardEvent) => {
         switch (event.key) {
             case 'Enter':
+            case 'Tab':
                 event.preventDefault();
                 event.stopPropagation();
                 if (!hasError) {
@@ -541,7 +542,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                         config.valueFormatter(resolvedValue, item, column) : 
                         resolvedValue;
                     if (onCommitAndAdvance) {
-                        onCommitAndAdvance(formattedValue);
+                        onCommitAndAdvance(formattedValue, event.key === 'Tab' && event.shiftKey ? -1 : 1);
                     } else {
                         onCommit(formattedValue);
                     }
@@ -1232,7 +1233,9 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                         onKeyDown={(e) => {
                             switch (e.key) {
                                 case 'Enter':
+                                case 'Tab':
                                     e.preventDefault();
+                                    e.stopPropagation();
                                     const valueToCommit = filterText;
                                     if (isRestrictedDropdown) {
                                         const result = resolveRestrictedDropdownValue(valueToCommit);
@@ -1253,7 +1256,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                                             config.valueFormatter(result.value, item, column) :
                                             result.value;
                                         if (onCommitAndAdvance) {
-                                            onCommitAndAdvance(restrictedFormatted);
+                                            onCommitAndAdvance(restrictedFormatted, e.key === 'Tab' && e.shiftKey ? -1 : 1);
                                         } else {
                                             onCommit(restrictedFormatted);
                                         }
@@ -1265,7 +1268,7 @@ export const EnhancedInlineEditor: React.FC<EnhancedInlineEditorProps> = ({
                                             config.valueFormatter(valueToCommit, item, column) : 
                                             valueToCommit;
                                         if (onCommitAndAdvance) {
-                                            onCommitAndAdvance(formattedValue);
+                                            onCommitAndAdvance(formattedValue, e.key === 'Tab' && e.shiftKey ? -1 : 1);
                                         } else {
                                             onCommit(formattedValue);
                                         }

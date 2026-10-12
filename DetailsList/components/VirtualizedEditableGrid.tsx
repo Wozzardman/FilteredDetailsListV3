@@ -1697,9 +1697,9 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         setEditingState(null);
     }, [editingState, filteredItems, onCellEdit, changeManager, pendingChanges]);
 
-    // Commit cell edit and advance focus to the next editable cell on the same row.
-    // If no editable cell follows on the row, editing is cleared (same as commitEdit).
-    const commitEditAndAdvance = React.useCallback((newValue: any) => {
+    // Commit cell edit and move focus to an editable cell in the requested direction on the same row.
+    // If no editable cell remains in that direction, editing is cleared (same as commitEdit).
+    const commitEditAndAdvance = React.useCallback((newValue: any, direction: 1 | -1 = 1) => {
         if (!editingState) return;
 
         const { itemIndex, columnKey, originalValue } = editingState;
@@ -1733,7 +1733,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
             setPCFValue(item, columnKey, actualOldValue);
         }
 
-        // Find the next editable column on the same row
+        // Find the next editable column in the requested direction on the same row
         const isSpecialColumn = (key?: string) =>
             key === '__selection__' || key === '__delete__' || key === '__autofill__';
         const isColumnEditable = (key?: string) => {
@@ -1747,7 +1747,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         const currentIndex = effectiveColumns.findIndex(c => (c.key || c.fieldName) === columnKey);
         let nextEditingState: EditingState | null = null;
         if (currentIndex !== -1) {
-            for (let i = currentIndex + 1; i < effectiveColumns.length; i++) {
+            for (let i = currentIndex + direction; i >= 0 && i < effectiveColumns.length; i += direction) {
                 const nextKey = effectiveColumns[i].key || effectiveColumns[i].fieldName;
                 if (isColumnEditable(nextKey)) {
                     nextEditingState = {

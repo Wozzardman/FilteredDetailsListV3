@@ -39,6 +39,7 @@ export interface IUltimateEnterpriseGridProps {
     enableFiltering?: boolean;
     enableExport?: boolean;
     enableAddNewRow?: boolean;
+    addNewRowsSave?: boolean;
     enablePerformanceMonitoring?: boolean;
     enableChangeTracking?: boolean;
     useEnhancedEditors?: boolean;
@@ -125,6 +126,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     enableFiltering = true,
     enableExport = true,
     enableAddNewRow = false,
+    addNewRowsSave = false,
     enablePerformanceMonitoring = true,
     enableChangeTracking = true,
     useEnhancedEditors = false,
@@ -202,6 +204,7 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     const [globalFilter, setGlobalFilter] = useState<string>('');
     const [columnFilters, setColumnFilters] = useState<Record<string, any[]>>({});
     const [pendingChangesCount, setPendingChangesCount] = useState<number>(0);
+    const [submittedNewRowIds, setSubmittedNewRowIds] = useState<Set<string>>(new Set());
     const [pendingEditItemIds, setPendingEditItemIds] = useState<Set<string>>(new Set());
     const [changeManager] = useState(() => new EnterpriseChangeManager());
     const [exportService] = useState(() => DataExportService.getInstance());
@@ -232,6 +235,29 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
         enablePrefetching: true,
         enableAdaptiveRendering: true,
     });
+
+    // Track new rows before cell edits so AddNewRowsSave can include them as pending work.
+    // Use all items so filtering cannot hide pending additions from the save button.
+    const newRowIds = React.useMemo(() => {
+        const ids = new Set<string>();
+        items.forEach(item => {
+            const itemId = item.key || item.id || item.recordId || item.getRecordId?.();
+            if (item.isNewRow && itemId) ids.add(itemId);
+        });
+        return ids;
+    }, [items]);
+    const pendingNewRowIds = React.useMemo(
+        () => Array.from(newRowIds).filter(id => !submittedNewRowIds.has(id)),
+        [newRowIds, submittedNewRowIds]
+    );
+
+    // Remember submitted rows while they remain in the items list, then release their IDs.
+    useEffect(() => {
+        setSubmittedNewRowIds(previous => {
+            const remaining = new Set(Array.from(previous).filter(id => newRowIds.has(id)));
+            return remaining.size === previous.size ? previous : remaining;
+        });
+    }, [newRowIds]);
 
     // Update filtered items when props change
     useEffect(() => {
@@ -488,11 +514,15 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
                 
                 // Notify parent component about the save operation
                 onCommitChanges?.();
+
+                // Only acknowledge additions included in this save. Rows added while it
+                // was in progress must remain pending, and rerenders must not restage these rows.
+                setSubmittedNewRowIds(previous => new Set([...previous, ...pendingNewRowIds]));
             } catch (error) {
                 console.error('Error committing changes:', error);
             }
         }
-    }, [changeManager, onCommitChanges]);
+    }, [changeManager, onCommitChanges, pendingNewRowIds]);
 
     // Cancel all pending changes
     const handleCancelChanges = useCallback(() => {
@@ -821,10 +851,11 @@ export const UltimateEnterpriseGrid: React.FC<IUltimateEnterpriseGridProps> = ({
     );
 
     // Change tracking display with inline buttons
-    const changeTrackingDisplay = enableChangeTracking && pendingChangesCount > 0 ? (
+    const totalPendingChangesCount = pendingChangesCount + (addNewRowsSave ? pendingNewRowIds.length : 0);
+    const changeTrackingDisplay = enableChangeTracking && totalPendingChangesCount > 0 ? (
         <Stack horizontal tokens={{ childrenGap: 8 }} verticalAlign="center">
             <DefaultButton 
-                text={`Save Changes (${pendingChangesCount})`}
+                text={`Save Changes (${totalPendingChangesCount})`}
                 onClick={handleCommitChanges}
                 primary
                 styles={{

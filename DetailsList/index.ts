@@ -1257,6 +1257,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             enableFiltering: true,
             enableExport: true,
             enableAddNewRow: this.enableAddNewRow,
+            addNewRowsSave: context.parameters.AddNewRowsSave?.raw ?? false,
             enablePerformanceMonitoring: this.enablePerformanceMonitoring,
             enableChangeTracking: !isSelectionLockEditingMode,
             useEnhancedEditors: isSelectionLockEditingMode ? false : useEnhancedEditors,
@@ -3115,7 +3116,9 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
             // Get all pending changes from AutoUpdateManager
             const pendingChangesSummary = this.autoUpdateManager.getPendingChangesSummary();
             
-            if (pendingChangesSummary.totalChanges === 0) {
+            // Untouched new rows only live in pendingChanges, not AutoUpdateManager.
+            // Include them in save cleanup so they do not remain beside refreshed records.
+            if (pendingChangesSummary.totalChanges === 0 && this.pendingChanges.size === 0) {
                 return;
             }
 

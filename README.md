@@ -27,6 +27,15 @@ When configured against a Dataverse connection:
 
 The component supports powerful inline editing capabilities through the `editorConfig` dataset. This allows you to configure different editor types for each column.
 
+### Saving Placeholder Rows
+
+Set `EnableAddNewRow` to `true` to allow adding rows. The `AddNewRowsSave` true/false property controls whether those additions reveal **Save Changes** before any cells are edited:
+
+- `false` (default): adding placeholder rows alone does not reveal Save Changes; editing a field still does.
+- `true`: each unsaved placeholder row counts as one pending change, allowing users to save rows with their template defaults and blank fields.
+
+This property enables the Save Changes button; users still click it to run the existing save workflow. Filtering does not change the pending addition count. Cancel Changes keeps unsaved placeholder rows available to save.
+
 ### EditorConfig Setup
 
 1. **Enable Enhanced Editors**

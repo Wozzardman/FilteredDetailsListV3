@@ -37,6 +37,7 @@ export function getMockParameters(): IInputs {
         
         // Add New Row Properties
         EnableAddNewRow: new MockTwoOptionsProperty(false),
+        AddNewRowsSave: new MockTwoOptionsProperty(false),
         
         // Jump To Properties
         EnableJumpTo: new MockTwoOptionsProperty(false),

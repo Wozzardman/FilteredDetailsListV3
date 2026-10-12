@@ -340,6 +340,13 @@
     <value>Add New Row Text</value>
     <comment>Custom text for the Add New Row button</comment>
   </data>
+  <data name="AddNewRowsSave" xml:space="preserve">
+    <value>AddNewRowsSave</value>
+    <comment>Controls whether new placeholder rows reveal Save Changes before a cell is edited</comment>
+  </data>
+  <data name="AddNewRowsSave_Desc" xml:space="preserve">
+    <value>When true, adding placeholder rows reveals Save Changes without requiring a field edit. Defaults to false. Rows are saved through the existing Save Changes workflow.</value>
+  </data>
   <data name="TotalItemsText" xml:space="preserve">
     <value>Total Items Label</value>
     <comment>Custom text for the Total Items label (e.g. "Total Records:", "Items Found:")</comment>
