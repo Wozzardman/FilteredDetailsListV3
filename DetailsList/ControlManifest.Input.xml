@@ -1,9 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest>                               <!-- version in sandbox is 17.6.72 | Prod is 17.6.56. Today's date is 10/12/2026 -JVT -->
-  <control namespace="JVT" constructor="FilteredDetailsListV2" version="17.6.72" display-name-key="FilteredDetailsListV2" description-key="FilteredDetailsListV2_Desc" control-type="virtual">
+<manifest> <!-- Separate parent-child test control; versions start at 1.0.0. -->
+  <control namespace="JVT" constructor="ParentChildDetailsList" version="1.0.0" display-name-key="ParentChildDetailsList" description-key="ParentChildDetailsList_Desc" control-type="virtual">
     <external-service-usage enabled="false">
       <!-- Explicitly declare no external services to avoid CORS issues -->
     </external-service-usage>
+    <!-- Canvas resolves compatible families without collapsing mixed types to the first entry. -->
+    <type-group name="ChildTextTypes">
+      <type>SingleLine.Text</type><type>Multiple</type><type>SingleLine.TextArea</type>
+      <type>SingleLine.Email</type><type>SingleLine.Phone</type><type>SingleLine.URL</type><type>SingleLine.Ticker</type>
+    </type-group>
+    <type-group name="ChildNumberTypes">
+      <type>Decimal</type><type>Whole.None</type><type>FP</type><type>Currency</type>
+    </type-group>
+    <type-group name="ChildDateTypes">
+      <type>DateAndTime.DateAndTime</type><type>DateAndTime.DateOnly</type>
+    </type-group>
     <data-set name="records" display-name-key="Records" >
     </data-set>
     <data-set name="columns" display-name-key="Columns">
@@ -211,7 +222,73 @@
     <property name="FormulaFieldExpression" display-name-key="FormulaFieldExpression" of-type="Multiple" usage="input" required="false" />
     
     <!-- Optional, generic parent/child mode. Existing records remains the primary dataset. -->
-    <data-set name="childRecords" display-name-key="ChildRecords" />
+    <data-set name="childRecords" display-name-key="ChildRecords">
+      <!-- Optional typed field bindings for Canvas hosts that project only mapped secondary fields. -->
+      <property-set name="ChildText01" display-name-key="ChildText01" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText02" display-name-key="ChildText02" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText03" display-name-key="ChildText03" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText04" display-name-key="ChildText04" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText05" display-name-key="ChildText05" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText06" display-name-key="ChildText06" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText07" display-name-key="ChildText07" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText08" display-name-key="ChildText08" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText09" display-name-key="ChildText09" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText10" display-name-key="ChildText10" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText11" display-name-key="ChildText11" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText12" display-name-key="ChildText12" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText13" display-name-key="ChildText13" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText14" display-name-key="ChildText14" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText15" display-name-key="ChildText15" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText16" display-name-key="ChildText16" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText17" display-name-key="ChildText17" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText18" display-name-key="ChildText18" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText19" display-name-key="ChildText19" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText20" display-name-key="ChildText20" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText21" display-name-key="ChildText21" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText22" display-name-key="ChildText22" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText23" display-name-key="ChildText23" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText24" display-name-key="ChildText24" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText25" display-name-key="ChildText25" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText26" display-name-key="ChildText26" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText27" display-name-key="ChildText27" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText28" display-name-key="ChildText28" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText29" display-name-key="ChildText29" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText30" display-name-key="ChildText30" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText31" display-name-key="ChildText31" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildText32" display-name-key="ChildText32" of-type-group="ChildTextTypes" usage="bound" required="false" />
+      <property-set name="ChildNumber01" display-name-key="ChildNumber01" of-type-group="ChildNumberTypes" usage="bound" required="false" />
+      <property-set name="ChildNumber02" display-name-key="ChildNumber02" of-type-group="ChildNumberTypes" usage="bound" required="false" />
+      <property-set name="ChildNumber03" display-name-key="ChildNumber03" of-type-group="ChildNumberTypes" usage="bound" required="false" />
+      <property-set name="ChildNumber04" display-name-key="ChildNumber04" of-type-group="ChildNumberTypes" usage="bound" required="false" />
+      <property-set name="ChildNumber05" display-name-key="ChildNumber05" of-type-group="ChildNumberTypes" usage="bound" required="false" />
+      <property-set name="ChildNumber06" display-name-key="ChildNumber06" of-type-group="ChildNumberTypes" usage="bound" required="false" />
+      <property-set name="ChildNumber07" display-name-key="ChildNumber07" of-type-group="ChildNumberTypes" usage="bound" required="false" />
+      <property-set name="ChildNumber08" display-name-key="ChildNumber08" of-type-group="ChildNumberTypes" usage="bound" required="false" />
+      <property-set name="ChildNumber09" display-name-key="ChildNumber09" of-type-group="ChildNumberTypes" usage="bound" required="false" />
+      <property-set name="ChildNumber10" display-name-key="ChildNumber10" of-type-group="ChildNumberTypes" usage="bound" required="false" />
+      <property-set name="ChildNumber11" display-name-key="ChildNumber11" of-type-group="ChildNumberTypes" usage="bound" required="false" />
+      <property-set name="ChildNumber12" display-name-key="ChildNumber12" of-type-group="ChildNumberTypes" usage="bound" required="false" />
+      <property-set name="ChildNumber13" display-name-key="ChildNumber13" of-type-group="ChildNumberTypes" usage="bound" required="false" />
+      <property-set name="ChildNumber14" display-name-key="ChildNumber14" of-type-group="ChildNumberTypes" usage="bound" required="false" />
+      <property-set name="ChildNumber15" display-name-key="ChildNumber15" of-type-group="ChildNumberTypes" usage="bound" required="false" />
+      <property-set name="ChildNumber16" display-name-key="ChildNumber16" of-type-group="ChildNumberTypes" usage="bound" required="false" />
+      <property-set name="ChildDate01" display-name-key="ChildDate01" of-type-group="ChildDateTypes" usage="bound" required="false" />
+      <property-set name="ChildDate02" display-name-key="ChildDate02" of-type-group="ChildDateTypes" usage="bound" required="false" />
+      <property-set name="ChildDate03" display-name-key="ChildDate03" of-type-group="ChildDateTypes" usage="bound" required="false" />
+      <property-set name="ChildDate04" display-name-key="ChildDate04" of-type-group="ChildDateTypes" usage="bound" required="false" />
+      <property-set name="ChildDate05" display-name-key="ChildDate05" of-type-group="ChildDateTypes" usage="bound" required="false" />
+      <property-set name="ChildDate06" display-name-key="ChildDate06" of-type-group="ChildDateTypes" usage="bound" required="false" />
+      <property-set name="ChildDate07" display-name-key="ChildDate07" of-type-group="ChildDateTypes" usage="bound" required="false" />
+      <property-set name="ChildDate08" display-name-key="ChildDate08" of-type-group="ChildDateTypes" usage="bound" required="false" />
+      <property-set name="ChildBoolean01" display-name-key="ChildBoolean01" of-type="TwoOptions" usage="bound" required="false" />
+      <property-set name="ChildBoolean02" display-name-key="ChildBoolean02" of-type="TwoOptions" usage="bound" required="false" />
+      <property-set name="ChildBoolean03" display-name-key="ChildBoolean03" of-type="TwoOptions" usage="bound" required="false" />
+      <property-set name="ChildBoolean04" display-name-key="ChildBoolean04" of-type="TwoOptions" usage="bound" required="false" />
+      <property-set name="ChildBoolean05" display-name-key="ChildBoolean05" of-type="TwoOptions" usage="bound" required="false" />
+      <property-set name="ChildBoolean06" display-name-key="ChildBoolean06" of-type="TwoOptions" usage="bound" required="false" />
+      <property-set name="ChildBoolean07" display-name-key="ChildBoolean07" of-type="TwoOptions" usage="bound" required="false" />
+      <property-set name="ChildBoolean08" display-name-key="ChildBoolean08" of-type="TwoOptions" usage="bound" required="false" />
+    </data-set>
     <data-set name="childColumns" display-name-key="ChildColumns">
       <property-set name="ColDisplayName" display-name-key="ColDisplayName" of-type="SingleLine.Text" usage="bound" required="true" />
       <property-set name="ColName" display-name-key="ColName" of-type="SingleLine.Text" usage="bound" required="true" />

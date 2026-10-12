@@ -289,31 +289,31 @@
 }
 
 /* TARGET THE ROOT PCF CONTAINER - This is critical! */
-.JvtFilteredDetailsListV2 {
+.JvtParentChildDetailsList {
     margin: 0 !important;
     padding: 0 !important;
     gap: 0 !important;
 }
 
-.JvtFilteredDetailsListV2 > * {
+.JvtParentChildDetailsList > * {
     margin: 0 !important;
     padding: 0 !important;
 }
 
-.JvtFilteredDetailsListV2 .ultimate-enterprise-grid {
+.JvtParentChildDetailsList .ultimate-enterprise-grid {
     margin: 0 !important;
     padding: 0 !important;
     gap: 0 !important;
 }
 
 /* Target FluentUI Stack component spacing aggressively */
-.JvtFilteredDetailsListV2 .ms-Stack,
+.JvtParentChildDetailsList .ms-Stack,
 .ultimate-enterprise-grid .ms-Stack {
     margin: 0 !important;
     gap: 0 !important;
 }
 
-.JvtFilteredDetailsListV2 .ms-Stack.control-bar,
+.JvtParentChildDetailsList .ms-Stack.control-bar,
 .ultimate-enterprise-grid .ms-Stack.control-bar {
     padding: 2px 12px !important;
     margin: 0 !important;
@@ -321,8 +321,8 @@
 }
 
 /* Override any default FluentUI component margins */
-.JvtFilteredDetailsListV2 .ms-TextField,
-.JvtFilteredDetailsListV2 .ms-Button,
+.JvtParentChildDetailsList .ms-TextField,
+.JvtParentChildDetailsList .ms-Button,
 .ultimate-enterprise-grid .ms-TextField,
 .ultimate-enterprise-grid .ms-Button {
     margin: 0 !important;
@@ -374,7 +374,7 @@
 }
 
 /* MAXIMUM SPECIFICITY: Force zero spacing between control bar and grid */
-.JvtFilteredDetailsListV2 .ultimate-enterprise-grid .control-bar {
+.JvtParentChildDetailsList .ultimate-enterprise-grid .control-bar {
     margin: 0 !important;
     margin-bottom: 0 !important;
     padding: 2px 12px !important;
@@ -385,14 +385,14 @@
     backdrop-filter: none !important;
 }
 
-.JvtFilteredDetailsListV2 .ultimate-enterprise-grid .control-bar:hover {
+.JvtParentChildDetailsList .ultimate-enterprise-grid .control-bar:hover {
     margin: 0 !important;
     margin-bottom: 0 !important;
     transform: none !important;
     box-shadow: none !important;
 }
 
-.JvtFilteredDetailsListV2 .ultimate-enterprise-grid .grid-container {
+.JvtParentChildDetailsList .ultimate-enterprise-grid .grid-container {
     margin: 0 !important;
     margin-top: 0 !important;
     padding: 0 !important;
@@ -401,7 +401,7 @@
     top: 0;
 }
 
-.JvtFilteredDetailsListV2 .ultimate-enterprise-grid .virtualized-editable-grid-container {
+.JvtParentChildDetailsList .ultimate-enterprise-grid .virtualized-editable-grid-container {
     margin: 0 !important;
     margin-top: 0 !important;
     padding: 0 !important;

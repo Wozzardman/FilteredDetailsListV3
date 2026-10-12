@@ -3,8 +3,11 @@ import { IInputs, IOutputs } from '../generated/ManifestTypes';
 import { IGridColumn } from '../Component.types';
 import { ColumnEditorMapping } from '../types/ColumnEditor.types';
 import { buildColumns, buildEditors, buildTemplate, configRecords, read } from './RelationalConfig';
-import { RecordScope, RelationalRow, RelationalChanges, RelationshipResolution, row, resolveRelationship, indexRelationship, ValueFilters } from './RelationalModel';
+import { RecordScope, RelationalRow, RelationalChanges, RelationshipResolution, row, resolveRelationship, ValueFilters } from './RelationalModel';
 import { RelationalGrid } from './RelationalGrid';
+import { FilterUtils } from '../FilterUtils';
+import { IFilterState } from '../Filter.types';
+import { FilterOperators, FilterTypes } from '../ManifestConstants';
 
 type Dataset = ComponentFramework.PropertyTypes.DataSet;
 export interface ScopeState {
@@ -25,6 +28,7 @@ export class DatasetAccumulator {
     private loading = false;
     private requestedPage = '';
     private configuredSize = 0;
+    private awaitingRefresh?: { records: any; ids: any; sawLoading: boolean };
     rows: RelationalRow[] = [];
     complete = false;
 
@@ -32,18 +36,34 @@ export class DatasetAccumulator {
         this.records.clear(); this.rows = []; this.complete = false;
         this.previousRecords = undefined; this.previousIds = undefined; this.requestedPage = '';
         this.configuredSize = 0;
+        this.awaitingRefresh = undefined;
+    }
+
+    refresh(dataset: Dataset): void {
+        this.reset();
+        this.awaitingRefresh = { records: dataset.records, ids: dataset.sortedRecordIds, sawLoading: false };
+        dataset.refresh();
     }
 
     update(dataset: Dataset | undefined, scope: RecordScope, size: number): void {
         this.complete = false;
         if (!dataset || dataset.error) return;
-        if (dataset.loading) { this.loading = true; return; }
+        if (dataset.loading) {
+            this.loading = true;
+            if (this.awaitingRefresh) this.awaitingRefresh.sawLoading = true;
+            return;
+        }
+        if (this.awaitingRefresh) {
+            if (!this.awaitingRefresh.sawLoading && this.awaitingRefresh.records === dataset.records && this.awaitingRefresh.ids === dataset.sortedRecordIds) return;
+            this.awaitingRefresh = undefined;
+        }
         const paging = dataset.paging;
         if (paging && this.configuredSize !== size) {
             this.configuredSize = size;
             if (paging.pageSize !== size) {
                 paging.setPageSize(size);
                 this.requestedPage = '';
+                this.awaitingRefresh = { records: dataset.records, ids: dataset.sortedRecordIds, sawLoading: false };
                 dataset.refresh();
                 return;
             }
@@ -102,9 +122,15 @@ export class RelationalController {
     jumpResult = '';
     jumpIndex = -1;
     activeEditors = { parent: false, child: false };
+    appliedFilters: IFilterState = {};
+    sortColumn = '';
+    sortDescending = false;
+    private appliedFiltersRaw?: string;
+    private inputEvent = '';
     private commitTrigger = '';
     private cancelTrigger = '';
-    private lastResult = '';
+    private newRows: { id: string; template: Record<string, any>; timestamp: string }[] = [];
+    private publications = new Map<string, { rows: RelationalRow[]; entry: any; plain: any[] }>();
     private notify: () => void = () => undefined;
     private subscribers = new Set<() => void>();
     private contexts = new Map<string, RelationalChanges>();
@@ -115,7 +141,11 @@ export class RelationalController {
         this.subscribers.add(listener);
         return () => { this.subscribers.delete(listener); };
     };
-    private emit(): void { this.cachedRows = undefined; this.subscribers.forEach(fn => fn()); this.notify(); }
+    private emit(): void { this.subscribers.forEach(fn => fn()); this.notify(); }
+    reportJump(index: number, message: string): void { this.jumpIndex = index; this.jumpResult = message; this.emit(); }
+    reportSort(scope: RecordScope, field: string, descending: boolean): void {
+        this.eventName = 'Sort'; this.eventDataset = scope; this.sortColumn = field; this.sortDescending = descending; this.emit();
+    }
     get parameters(): IInputs { return this.context.parameters; }
     get busy(): boolean { return !!this.changes.batch; }
     get pendingCount(): number { return this.changes.count(!!this.parameters.AddNewRowsSave?.raw, !!this.parameters.ChildAddNewRowsSave?.raw); }
@@ -126,6 +156,7 @@ export class RelationalController {
         const p = context.parameters;
         const contextKey = p.RelationalContextKey?.raw || `${p.DataSourceName?.raw || 'parent'}|${p.ChildDataSourceName?.raw || 'child'}`;
         if (contextKey !== this.contextKey) {
+            this.clearPublications();
             if (this.contextKey) this.contexts.set(this.contextKey, this.changes);
             this.contextKey = contextKey;
             this.changes = this.contexts.get(contextKey) || new RelationalChanges();
@@ -133,9 +164,15 @@ export class RelationalController {
             this.pages.parent.reset(); this.pages.child.reset();
             this.scopes.parent.selected.clear(); this.scopes.child.selected.clear();
             this.scopes.parent.filters = {}; this.scopes.child.filters = {};
+            this.appliedFilters = {}; this.appliedFiltersRaw = undefined;
             this.resetVersion++;
         }
         this.errors = [];
+        if ((p.AppliedFilters?.raw || '') !== this.appliedFiltersRaw) {
+            this.appliedFiltersRaw = p.AppliedFilters?.raw || '';
+            this.appliedFilters = FilterUtils.deserializeFilters(this.appliedFiltersRaw);
+            this.scopes.parent.filters = {};
+        }
         for (const scope of ['parent', 'child'] as RecordScope[]) {
             const isParent = scope === 'parent';
             const state = this.scopes[scope];
@@ -158,23 +195,63 @@ export class RelationalController {
             });
             if (state.dataset?.error) this.errors.push(`${scope}: ${state.dataset.errorMessage || 'Unable to load records.'}`);
         }
-        this.resolution = resolveRelationship(p.RelationshipConfig?.raw, this.scopes.parent.base, this.scopes.child.base,
-            p.records?.columns || [], p.childRecords?.columns || [], this.scopes.parent.source);
+        const loaded = this.pages.parent.complete && this.pages.child.complete;
+        this.resolution = loaded ? resolveRelationship(p.RelationshipConfig?.raw, this.scopes.parent.base, this.scopes.child.base,
+            p.records?.columns || [], p.childRecords?.columns || [], this.scopes.parent.source) : { status: 'unresolved', message: '' };
         this.ready = this.pages.parent.complete && this.pages.child.complete && !!this.resolution.relationship && !this.errors.length;
-        if (p.SaveResult?.raw && p.SaveResult.raw !== this.lastResult) {
-            this.lastResult = p.SaveResult.raw;
+        if (loaded) this.publishSources();
+        if (p.SaveResult?.raw) {
+            // The user may have switched projects while a connector call was in flight.
+            // Route a late acknowledgement to its original change store, never the active table.
+            let resultRequest = '';
+            try { resultRequest = JSON.parse(p.SaveResult.raw)?.requestId || ''; } catch { /* acknowledge reports malformed active results */ }
+            const resultStore = resultRequest && this.changes.batch?.requestId !== resultRequest
+                ? Array.from(this.contexts.values()).find(changes => changes.batch?.requestId === resultRequest) : this.changes;
             const wasBusy = this.busy;
-            const succeeded = this.changes.acknowledge(p.SaveResult.raw);
+            const succeeded = resultStore?.acknowledge(p.SaveResult.raw) || [];
             if (wasBusy && !this.busy) {
                 this.resetVersion++; this.cachedRows = undefined;
-                succeeded.forEach(scope => { this.pages[scope].reset(); this.scopes[scope].dataset?.refresh(); });
-                if (succeeded.length) this.ready = false;
+                // A table-specific procedure can update related tables as a side effect.
+                if (succeeded.length) {
+                    (['parent', 'child'] as RecordScope[]).forEach(scope => {
+                        const dataset = this.scopes[scope].dataset;
+                        if (dataset) this.pages[scope].refresh(dataset);
+                    });
+                    this.ready = false;
+                }
                 this.notify();
             }
         }
         if (p.CommitTrigger?.raw && p.CommitTrigger.raw !== this.commitTrigger) { this.commitTrigger = p.CommitTrigger.raw; this.save(); }
         if (p.CancelChangesTrigger?.raw && p.CancelChangesTrigger.raw !== this.cancelTrigger) { this.cancelTrigger = p.CancelChangesTrigger.raw; this.cancel(); }
+        if (this.ready && p.InputEvent?.raw && this.inputEvent !== p.InputEvent.raw) {
+            this.inputEvent = p.InputEvent.raw;
+            const event = this.inputEvent;
+            if (event.includes('ClearSelection')) { this.select('parent', []); this.select('child', []); }
+            else if (event.startsWith('SelectRowById:')) {
+                const [, id, additive] = event.split(':');
+                this.select('parent', additive === 'true' ? [...this.scopes.parent.selected, id] : [id]);
+            } else if (event.startsWith('SelectRows:')) this.select('parent', event.split(':')[1].split(',').map(id => id.trim()).filter(Boolean));
+            else if (event.includes('SetSelection')) this.select('parent', this.scopes.parent.base.filter(record => record.getValue('RecordsSelected') || record.getValue('ItemSelected')).map(record => record.recordId));
+        }
         return React.createElement(RelationalGrid, { controller: this, key: contextKey });
+    }
+
+    matchingParentIds(excludeField?: string): Set<string> | undefined {
+        const filters = { ...this.appliedFilters };
+        if (excludeField) delete filters[excludeField];
+        if (!Object.values(filters).some(filter => filter.isActive)) return undefined;
+        const records = this.rows().parent;
+        return new Set(FilterUtils.applyFilters(Object.fromEntries(records.map(record => [record.recordId, record])) as any, records.map(record => record.recordId), filters));
+    }
+
+    private serializedFilters(scope: RecordScope): string {
+        const filters = scope === 'parent' ? { ...this.appliedFilters } : {} as IFilterState;
+        Object.entries(this.scopes[scope].filters).forEach(([field, values]) => {
+            filters[field] = { columnName: field, filterType: FilterTypes.Text, isActive: !!values.length,
+                conditions: [{ field, operator: FilterOperators.In, value: values }] };
+        });
+        return FilterUtils.serializeFilters(filters);
     }
 
     rows(): { parent: RelationalRow[]; child: RelationalRow[] } {
@@ -219,6 +296,7 @@ export class RelationalController {
             ids.push(this.changes.add(scope, values, parentId));
         }
         this.eventName = 'NewRowCreated'; this.eventDataset = scope;
+        this.newRows = ids.map(id => ({ id, template: { ...this.changes.drafts[scope].get(id)!.template }, timestamp: new Date().toISOString() }));
         this.emit(); return ids;
     };
     remove = (scope: RecordScope, id: string): void => { if (!this.busy) { this.changes.remove(scope, id); this.resetVersion++; this.emit(); } };
@@ -235,7 +313,22 @@ export class RelationalController {
             rows.filter(record => pendingIds.has(record.recordId)).forEach(record => {
                 Object.entries(this.scopes[scope].editors).forEach(([field, config]) => {
                     const value = record.getValue(field);
-                    if (config.isRequired && (value == null || value === '')) errors.push(`${scope} ${record.recordId}: ${field} is required.`);
+                    const prefix = `${scope} ${record.recordId}: ${field}`;
+                    const blank = value == null || value === '';
+                    if (config.isRequired && blank) errors.push(`${prefix} is required.`);
+                    if (blank) return;
+                    if (config.type === 'number') {
+                        const number = Number(value);
+                        if (!Number.isFinite(number)) errors.push(`${prefix} must be a valid number.`);
+                        else if (config.numberConfig?.min !== undefined && number < config.numberConfig.min) errors.push(`${prefix} must be at least ${config.numberConfig.min}.`);
+                        else if (config.numberConfig?.max !== undefined && number > config.numberConfig.max) errors.push(`${prefix} must be no more than ${config.numberConfig.max}.`);
+                    }
+                    if (config.textConfig?.maxLength && String(value).length > config.textConfig.maxLength) errors.push(`${prefix} exceeds ${config.textConfig.maxLength} characters.`);
+                    if (config.textConfig?.pattern) {
+                        try {
+                            if (!new RegExp(config.textConfig.pattern).test(String(value))) errors.push(`${prefix}: ${config.textConfig.patternErrorMessage || 'Invalid format.'}`);
+                        } catch { errors.push(`${prefix}: the configured validation pattern is invalid.`); }
+                    }
                 });
             });
         }
@@ -256,12 +349,17 @@ export class RelationalController {
     filter = (scope: RecordScope, field: string, values: any[]): void => {
         if (!this.ready) return;
         const filters = { ...this.scopes[scope].filters };
+        if (scope === 'parent' && this.appliedFilters[field]) {
+            this.appliedFilters = { ...this.appliedFilters }; delete this.appliedFilters[field];
+        }
         if (values.length) filters[field] = values; else delete filters[field];
         this.scopes[scope].filters = filters;
         this.eventName = 'FilterChanged'; this.eventDataset = scope; this.changedColumn = field;
         this.emit();
     };
     select = (scope: RecordScope, ids: string[]): void => {
+        const selectable = new Set(this.rows()[scope].filter(record => record.getValue('RecordsCanSelect') !== false && record.getValue('ItemCanSelect') !== false).map(record => record.recordId));
+        ids = ids.filter(id => selectable.has(id));
         this.scopes[scope].selected = new Set(ids);
         const persisted = new Set(this.scopes[scope].base.map(record => record.recordId));
         this.scopes[scope].dataset?.setSelectedRecordIds(ids.filter(id => persisted.has(id)));
@@ -272,24 +370,59 @@ export class RelationalController {
         const selected = this.scopes.parent.selected.size;
         const output = {
             EventName: this.eventName, EventDataset: this.eventDataset,
-            ButtonEventName: this.buttonEventName, ButtonEventType: this.buttonEventName === 'Save Changes' ? 'save' : 'cancel',
+            SortEventColumn: this.sortColumn, SortEventDirection: this.sortDescending ? '1' : '0',
+            ButtonEventName: this.buttonEventName, ButtonEventType: this.buttonEventName === 'Save Changes' ? 'save' : this.buttonEventName === 'Cancel Changes' ? 'cancel' : '',
             ClickedButtonName: this.buttonEventName, ClickedButtonText: this.buttonEventName, ButtonEventSequence: this.buttonSequence,
             PendingChanges: JSON.stringify(batch?.parent || this.changes.payload('parent')),
             ChildPendingChanges: JSON.stringify(batch?.child || this.changes.payload('child')),
             SaveRequestId: this.saveRequestId, SaveTrigger: this.saveRequestId,
-            HasPendingChanges: this.pendingCount > 0, ChangeCount: this.pendingCount,
+            HasPendingChanges: this.changes.payload('parent').length + this.changes.payload('child').length > 0, ChangeCount: this.pendingCount,
+            NewRowCreated: this.newRows.length ? JSON.stringify(this.newRows[this.newRows.length - 1]) : '',
+            NewRowKey: this.newRows.length ? this.newRows[this.newRows.length - 1].id : '', NewRowEventType: this.newRows.length ? 'created' : '',
             ChangedRecordKey: this.changedRecord, ChangedColumn: this.changedColumn, EventColumn: this.changedColumn,
             EventRowKey: this.changedRecord, OldValue: this.oldValue, NewValue: this.newValue,
             RelationshipStatus: this.resolution.status, ResolvedRelationship: this.resolution.relationship ? JSON.stringify(this.resolution.relationship) : '',
             SelectedCount: selected, ChildSelectedCount: this.scopes.child.selected.size,
+            SelectAllState: !selected ? '0' : selected === this.rows().parent.length ? '2' : '1',
             ChildSelectedRecordIds: JSON.stringify(Array.from(this.scopes.child.selected)),
-            AllFilters: JSON.stringify(this.scopes.parent.filters), ChildAllFilters: JSON.stringify(this.scopes.child.filters),
+            AllFilters: this.serializedFilters('parent'), ChildAllFilters: this.serializedFilters('child'),
             FilterEventName: this.eventName === 'FilterChanged' ? 'FilterChanged' : '', FilterEventColumn: this.changedColumn,
             TotalRecords: this.scopes.parent.base.length, TotalPages: 1, PageNumber: 1, HasNextPage: false, HasPreviousPage: false,
             JumpToResult: this.jumpResult, JumpToRowIndex: this.jumpIndex
         } as IOutputs;
-        this.eventName = ''; this.buttonEventName = '';
+        this.eventName = ''; this.buttonEventName = ''; this.newRows = [];
         return output;
     }
-    destroy(): void { this.subscribers.clear(); this.contexts.clear(); }
+    private publishSources(): void {
+        if (typeof window === 'undefined') return;
+        const w = window as any;
+        w.__FDLSharedData = w.__FDLSharedData || {};
+        w.PowerAppsDataSources = w.PowerAppsDataSources || {};
+        for (const scope of ['parent', 'child'] as RecordScope[]) {
+            const { source, base } = this.scopes[scope];
+            if (this.publications.get(source)?.rows === base) continue;
+            const records = Object.fromEntries(base.map(record => [record.recordId, record]));
+            const recordIds = base.map(record => record.recordId);
+            const cache = new Map<string, any>();
+            const entry = { records, recordIds, getDistinct: (field: string) => {
+                if (!cache.has(field)) cache.set(field, FilterUtils.getUniqueValues(records as any, recordIds, field));
+                return cache.get(field);
+            } };
+            const plain = base.map(record => ({ ...record.values }));
+            w.__FDLSharedData[source] = entry;
+            w.PowerAppsDataSources[source] = plain;
+            this.publications.set(source, { rows: base, entry, plain });
+        }
+    }
+    private clearPublications(): void {
+        if (typeof window !== 'undefined') {
+            const w = window as any;
+            this.publications.forEach(({ entry, plain }, source) => {
+                if (w.__FDLSharedData?.[source] === entry) delete w.__FDLSharedData[source];
+                if (w.PowerAppsDataSources?.[source] === plain) delete w.PowerAppsDataSources[source];
+            });
+        }
+        this.publications.clear();
+    }
+    destroy(): void { this.clearPublications(); this.subscribers.clear(); this.contexts.clear(); }
 }

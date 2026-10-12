@@ -118,12 +118,12 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
 
-  <data name="FilteredDetailsListV2" xml:space="preserve">
-    <value>Filtered Details List V2 (%VERSION%)</value>
+  <data name="ParentChildDetailsList" xml:space="preserve">
+    <value>Parent-Child DetailsList (Test) (%VERSION%)</value>
     <comment/>
   </data>
-  <data name="FilteredDetailsListV2_Desc" xml:space="preserve">
-    <value>Enhanced table that uses the Fluent UI DetailsList with filtering capabilities</value>
+  <data name="ParentChildDetailsList_Desc" xml:space="preserve">
+    <value>Standalone parent-child test grid with inline editing, filtering, and independent child column configuration</value>
     <comment/>
   </data>
   <data name="Columns" xml:space="preserve">
@@ -390,4 +390,68 @@
   <data name="ChildSelectedCount" xml:space="preserve"><value>Child Selected Count</value></data>
   <data name="ChildAllFilters" xml:space="preserve"><value>Child All Filters</value></data>
   <data name="RelationalContextKey" xml:space="preserve"><value>Relational Context Key</value></data>
+  <data name="ChildText01" xml:space="preserve"><value>Child field: Text01</value></data>
+  <data name="ChildText02" xml:space="preserve"><value>Child field: Text02</value></data>
+  <data name="ChildText03" xml:space="preserve"><value>Child field: Text03</value></data>
+  <data name="ChildText04" xml:space="preserve"><value>Child field: Text04</value></data>
+  <data name="ChildText05" xml:space="preserve"><value>Child field: Text05</value></data>
+  <data name="ChildText06" xml:space="preserve"><value>Child field: Text06</value></data>
+  <data name="ChildText07" xml:space="preserve"><value>Child field: Text07</value></data>
+  <data name="ChildText08" xml:space="preserve"><value>Child field: Text08</value></data>
+  <data name="ChildText09" xml:space="preserve"><value>Child field: Text09</value></data>
+  <data name="ChildText10" xml:space="preserve"><value>Child field: Text10</value></data>
+  <data name="ChildText11" xml:space="preserve"><value>Child field: Text11</value></data>
+  <data name="ChildText12" xml:space="preserve"><value>Child field: Text12</value></data>
+  <data name="ChildText13" xml:space="preserve"><value>Child field: Text13</value></data>
+  <data name="ChildText14" xml:space="preserve"><value>Child field: Text14</value></data>
+  <data name="ChildText15" xml:space="preserve"><value>Child field: Text15</value></data>
+  <data name="ChildText16" xml:space="preserve"><value>Child field: Text16</value></data>
+  <data name="ChildText17" xml:space="preserve"><value>Child field: Text17</value></data>
+  <data name="ChildText18" xml:space="preserve"><value>Child field: Text18</value></data>
+  <data name="ChildText19" xml:space="preserve"><value>Child field: Text19</value></data>
+  <data name="ChildText20" xml:space="preserve"><value>Child field: Text20</value></data>
+  <data name="ChildText21" xml:space="preserve"><value>Child field: Text21</value></data>
+  <data name="ChildText22" xml:space="preserve"><value>Child field: Text22</value></data>
+  <data name="ChildText23" xml:space="preserve"><value>Child field: Text23</value></data>
+  <data name="ChildText24" xml:space="preserve"><value>Child field: Text24</value></data>
+  <data name="ChildText25" xml:space="preserve"><value>Child field: Text25</value></data>
+  <data name="ChildText26" xml:space="preserve"><value>Child field: Text26</value></data>
+  <data name="ChildText27" xml:space="preserve"><value>Child field: Text27</value></data>
+  <data name="ChildText28" xml:space="preserve"><value>Child field: Text28</value></data>
+  <data name="ChildText29" xml:space="preserve"><value>Child field: Text29</value></data>
+  <data name="ChildText30" xml:space="preserve"><value>Child field: Text30</value></data>
+  <data name="ChildText31" xml:space="preserve"><value>Child field: Text31</value></data>
+  <data name="ChildText32" xml:space="preserve"><value>Child field: Text32</value></data>
+  <data name="ChildNumber01" xml:space="preserve"><value>Child field: Number01</value></data>
+  <data name="ChildNumber02" xml:space="preserve"><value>Child field: Number02</value></data>
+  <data name="ChildNumber03" xml:space="preserve"><value>Child field: Number03</value></data>
+  <data name="ChildNumber04" xml:space="preserve"><value>Child field: Number04</value></data>
+  <data name="ChildNumber05" xml:space="preserve"><value>Child field: Number05</value></data>
+  <data name="ChildNumber06" xml:space="preserve"><value>Child field: Number06</value></data>
+  <data name="ChildNumber07" xml:space="preserve"><value>Child field: Number07</value></data>
+  <data name="ChildNumber08" xml:space="preserve"><value>Child field: Number08</value></data>
+  <data name="ChildNumber09" xml:space="preserve"><value>Child field: Number09</value></data>
+  <data name="ChildNumber10" xml:space="preserve"><value>Child field: Number10</value></data>
+  <data name="ChildNumber11" xml:space="preserve"><value>Child field: Number11</value></data>
+  <data name="ChildNumber12" xml:space="preserve"><value>Child field: Number12</value></data>
+  <data name="ChildNumber13" xml:space="preserve"><value>Child field: Number13</value></data>
+  <data name="ChildNumber14" xml:space="preserve"><value>Child field: Number14</value></data>
+  <data name="ChildNumber15" xml:space="preserve"><value>Child field: Number15</value></data>
+  <data name="ChildNumber16" xml:space="preserve"><value>Child field: Number16</value></data>
+  <data name="ChildDate01" xml:space="preserve"><value>Child field: Date01</value></data>
+  <data name="ChildDate02" xml:space="preserve"><value>Child field: Date02</value></data>
+  <data name="ChildDate03" xml:space="preserve"><value>Child field: Date03</value></data>
+  <data name="ChildDate04" xml:space="preserve"><value>Child field: Date04</value></data>
+  <data name="ChildDate05" xml:space="preserve"><value>Child field: Date05</value></data>
+  <data name="ChildDate06" xml:space="preserve"><value>Child field: Date06</value></data>
+  <data name="ChildDate07" xml:space="preserve"><value>Child field: Date07</value></data>
+  <data name="ChildDate08" xml:space="preserve"><value>Child field: Date08</value></data>
+  <data name="ChildBoolean01" xml:space="preserve"><value>Child field: Boolean01</value></data>
+  <data name="ChildBoolean02" xml:space="preserve"><value>Child field: Boolean02</value></data>
+  <data name="ChildBoolean03" xml:space="preserve"><value>Child field: Boolean03</value></data>
+  <data name="ChildBoolean04" xml:space="preserve"><value>Child field: Boolean04</value></data>
+  <data name="ChildBoolean05" xml:space="preserve"><value>Child field: Boolean05</value></data>
+  <data name="ChildBoolean06" xml:space="preserve"><value>Child field: Boolean06</value></data>
+  <data name="ChildBoolean07" xml:space="preserve"><value>Child field: Boolean07</value></data>
+  <data name="ChildBoolean08" xml:space="preserve"><value>Child field: Boolean08</value></data>
 </root>

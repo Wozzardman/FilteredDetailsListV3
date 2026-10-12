@@ -34,7 +34,7 @@ module.exports = {
       clickSelector: "",
       postInteractionWait: 0,
       selectors: [
-        ".JvtFilteredDetailsListV2"
+        ".JvtParentChildDetailsList"
       ],
       selectorExpansion: true,
       expect: 0,
@@ -45,7 +45,7 @@ module.exports = {
       label: "FilteredDetailsList-WithFilters",
       url: "http://localhost:8080/test-harness.html?scenario=filtered",
       selectors: [
-        ".JvtFilteredDetailsListV2"
+        ".JvtParentChildDetailsList"
       ],
       delay: 2000,
       misMatchThreshold: 0.1
@@ -54,7 +54,7 @@ module.exports = {
       label: "FilteredDetailsList-LargeDataset",
       url: "http://localhost:8080/test-harness.html?scenario=large",
       selectors: [
-        ".JvtFilteredDetailsListV2"
+        ".JvtParentChildDetailsList"
       ],
       delay: 3000,
       misMatchThreshold: 0.2

@@ -1,6 +1,6 @@
 /** @jest-environment node */
 
-import { FilteredDetailsListV2 } from '../index';
+import { ParentChildDetailsList } from '../index';
 import { IInputs } from '../generated/ManifestTypes';
 import { AutoUpdateManager } from '../services/AutoUpdateManager';
 import * as React from 'react';
@@ -36,13 +36,13 @@ interface SaveHarness {
 }
 
 describe('Saving placeholder rows', () => {
-    let control: FilteredDetailsListV2;
+    let control: ParentChildDetailsList;
     let save: SaveHarness;
 
     beforeEach(() => {
         jest.useFakeTimers('legacy');
         jest.spyOn(console, 'log').mockImplementation(() => undefined);
-        control = new FilteredDetailsListV2();
+        control = new ParentChildDetailsList();
         control.context = {
             parameters: {
                 records: { paging: { totalResultCount: 0, pageSize: 100 } },

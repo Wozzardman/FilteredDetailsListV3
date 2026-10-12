@@ -10,6 +10,7 @@ export interface RelationalRow {
     parentId?: string;
     getRecordId(): string;
     getValue(field: string): any;
+    setValue(field: string, value: any): void;
     getFormattedValue(field: string): string;
 }
 export interface KeyPair { parentField: string; childField: string }
@@ -32,6 +33,7 @@ export function row(scope: RecordScope, recordId: string, values: Values, draft?
         scope, recordId, key: recordId, values, isNewRow: !!draft, parentId: draft?.parentId,
         getRecordId: () => recordId,
         getValue: field => values[field],
+        setValue: (field, value) => { values[field] = value; },
         getFormattedValue: field => values[field] == null ? '' : values[field] instanceof Date
             ? values[field].toLocaleDateString() : String(values[field])
     };
@@ -109,6 +111,8 @@ export function resolveRelationship(
     if (!parents.length || !persisted.length) return { status: 'unresolved', message: 'Configure RelationshipConfig to link these tables. There is not enough data to detect a relationship.' };
     const normalize = (name: string) => name.replace(/[^a-z0-9]/gi, '').toLowerCase();
     const source = normalize(parentSource.replace(/^.*[.]/, '').replace(/s$/i, ''));
+    const typeFamily = (type = '') => /Whole|Decimal|Currency|FP/i.test(type) ? 'number'
+        : /SingleLine|Multiple/i.test(type) ? 'string' : /DateAndTime/i.test(type) ? 'date' : type;
     const candidates: Relationship[] = [];
     for (const p of parentColumns) {
         if (!/(id|key)$/i.test(p.name)) continue;
@@ -116,7 +120,7 @@ export function resolveRelationship(
             const pn = normalize(p.name), cn = normalize(c.name);
             const nameMatches = (pn === cn && pn !== 'id' && pn !== 'key') ||
                 (!!source && (pn === 'id' || pn === 'key') && cn === source + pn);
-            if (!nameMatches || p.dataType !== c.dataType) continue;
+            if (!nameMatches || typeFamily(p.dataType) !== typeFamily(c.dataType)) continue;
             const candidate = { keys: [{ parentField: p.name, childField: c.name }] };
             const index = indexRelationship(parents, persisted, candidate);
             if (!index.duplicateKeys.size && !index.unmatched.length &&
@@ -155,7 +159,7 @@ export function filterRelation(
     parentFilters: ValueFilters, childFilters: ValueFilters, search = '',
     parentTypes: Record<string, string> = {}, childTypes: Record<string, string> = {},
     pinnedParents = new Set<string>(), pinnedChildren = new Set<string>(),
-    parentSearchFields?: string[], childSearchFields?: string[]
+    parentSearchFields?: string[], childSearchFields?: string[], allowedParentIds?: Set<string>
 ): FilteredRelation {
     const result: FilteredRelation = { parents: [], children: [], childrenByParent: new Map() };
     const query = search.trim().toLocaleLowerCase();
@@ -165,12 +169,13 @@ export function filterRelation(
     for (const parent of parents) {
         const siblings = index.get(parent.recordId) || [];
         const pinned = pinnedParents.has(parent.recordId) || siblings.some(child => pinnedChildren.has(child.recordId));
-        if (!pinned && !matches(parent, parentFilters, parentTypes)) continue;
+        if (!pinned && (!matches(parent, parentFilters, parentTypes) || (allowedParentIds && !allowedParentIds.has(parent.recordId)))) continue;
         const parentSearch = searchMatches(parent, parentSearchFields);
         const matching = siblings.filter(child => matches(child, childFilters, childTypes) &&
             (parentSearch || searchMatches(child, childSearchFields)));
         if (!pinned && ((hasChildFilters && !matching.length) || (!parentSearch && !matching.length))) continue;
-        const displayed = siblings.filter(child => matching.includes(child) || pinnedChildren.has(child.recordId));
+        const matchingIds = new Set(matching.map(child => child.recordId));
+        const displayed = siblings.filter(child => matchingIds.has(child.recordId) || pinnedChildren.has(child.recordId));
         result.parents.push(parent);
         result.children.push(...displayed);
         result.childrenByParent.set(parent.recordId, displayed);
@@ -179,6 +184,7 @@ export function filterRelation(
 }
 
 const equal = (a: any, b: any) => a instanceof Date && b instanceof Date ? a.getTime() === b.getTime() : a === b;
+let nextChangeStore = 0;
 
 /** Owns pending edits independently of React rendering and dataset refreshes. */
 export class RelationalChanges {
@@ -188,6 +194,7 @@ export class RelationalChanges {
     errors: string[] = [];
     revision = 0;
     private sequence = 0;
+    private readonly storeId = ++nextChangeStore;
 
     edit(scope: RecordScope, record: RelationalRow, field: string, value: any, original: any): void {
         if (this.batch) return;
@@ -202,7 +209,7 @@ export class RelationalChanges {
 
     add(scope: RecordScope, values: Values, parentId?: string): string {
         if (this.batch) throw new Error('Wait for the current save to finish.');
-        const id = `NEW_ROW_${scope}_${Date.now()}_${++this.sequence}`;
+        const id = `NEW_ROW_${scope}_${Date.now()}_${this.storeId}_${++this.sequence}`;
         this.drafts[scope].set(id, { values: { ...values }, template: { ...values }, parentId });
         this.revision++;
         return id;
@@ -237,7 +244,7 @@ export class RelationalChanges {
         const parent = this.payload('parent'), child = this.payload('child');
         if (!parent.length && !child.length) return undefined;
         this.errors = [];
-        this.batch = { requestId: `save-${Date.now()}-${++this.sequence}`, parent, child };
+        this.batch = { requestId: `save-${Date.now()}-${this.storeId}-${++this.sequence}`, parent, child };
         return this.batch;
     }
 

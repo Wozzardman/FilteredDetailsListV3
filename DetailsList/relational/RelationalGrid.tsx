@@ -12,6 +12,7 @@ import { IExportOptions } from '../types/Advanced.types';
 import { RelationalController } from './RelationalController';
 import { RecordScope, RelationalRow, filterRelation, filterValue, indexRelationship } from './RelationalModel';
 import { configRecords, read } from './RelationalConfig';
+import { evaluateFormula } from './RelationalFormula';
 import '../css/RelationalGrid.css';
 
 interface Entry { kind: 'parentHeader' | 'parent' | 'childHeader' | 'child'; key: string; index: number; parentId?: string }
@@ -53,12 +54,14 @@ export const RelationalGrid: React.FC<{ controller: RelationalController }> = ({
     const childTypes = React.useMemo(() => Object.fromEntries(c.scopes.child.columns.map(col => [col.key, col.dataType || 'text'])), [c.scopes.child.columns]);
     const relation = c.resolution.relationship;
     const relationKey = JSON.stringify(relation);
+    const allowedParentIds = React.useMemo(() => c.matchingParentIds(), [all.parent, c.appliedFilters]);
     const index = React.useMemo(() => relation ? indexRelationship(all.parent, all.child, relation) : { childrenByParent: new Map<string, RelationalRow[]>(), duplicateKeys: new Set<string>(), unmatched: [] }, [all.parent, all.child, relationKey]);
     const filtered = React.useMemo(() => filterRelation(all.parent, index.childrenByParent,
         c.scopes.parent.filters, c.scopes.child.filters, search, parentTypes, childTypes,
-        c.changes.pinned('parent'), c.changes.pinned('child'), c.scopes.parent.columns.map(col => col.key), c.scopes.child.columns.map(col => col.key)),
-    [all.parent, all.child, index, c.scopes.parent.filters, c.scopes.child.filters, search, parentTypes, childTypes]);
+        c.changes.pinned('parent'), c.changes.pinned('child'), c.scopes.parent.columns.map(col => col.key), c.scopes.child.columns.map(col => col.key), allowedParentIds),
+    [all.parent, all.child, index, c.scopes.parent.filters, c.scopes.child.filters, search, parentTypes, childTypes, allowedParentIds]);
     const parentRows = React.useMemo(() => sorted(filtered.parents, sorts.parent), [filtered, sorts.parent]);
+    const formula = React.useMemo(() => p.ShowFormulaField?.raw ? evaluateFormula(p.FormulaFieldExpression?.raw || '', parentRows, c.scopes.parent.columns) : '', [p.ShowFormulaField?.raw, p.FormulaFieldExpression?.raw, parentRows, c.scopes.parent.columns]);
     const childRows = React.useMemo(() => parentRows.flatMap(parent => sorted(filtered.childrenByParent.get(parent.recordId) || [], sorts.child)), [parentRows, filtered, sorts.child]);
     const childFilterKey = JSON.stringify(c.scopes.child.filters);
     const filteringChildren = Object.keys(c.scopes.child.filters).length > 0;
@@ -74,8 +77,7 @@ export const RelationalGrid: React.FC<{ controller: RelationalController }> = ({
         parentRows.forEach((parent, i) => {
             result.push({ kind: 'parent', key: `parent:${parent.recordId}`, index: i });
             const children = filtered.childrenByParent.get(parent.recordId) || [];
-            const hasPinnedChild = children.some(child => c.changes.pinned('child').has(child.recordId));
-            const open = filteringChildren ? !filterCollapsed.has(parent.recordId) : expanded.has(parent.recordId) || hasPinnedChild;
+            const open = filteringChildren ? !filterCollapsed.has(parent.recordId) : expanded.has(parent.recordId);
             if (children.length && open) {
                 result.push({ kind: 'childHeader', key: `header:child:${parent.recordId}`, index: -1, parentId: parent.recordId });
                 sorted(children, sorts.child).forEach(child => result.push({ kind: 'child', key: `child:${child.recordId}`, index: childIndices.get(child.recordId)!, parentId: parent.recordId }));
@@ -83,6 +85,7 @@ export const RelationalGrid: React.FC<{ controller: RelationalController }> = ({
         });
         return result;
     }, [parentRows, childRows, filtered, expanded, filterCollapsed, filteringChildren, sorts.child]);
+    const openParentIds = React.useMemo(() => new Set(entries.filter(entry => entry.kind === 'childHeader').map(entry => entry.parentId)), [entries]);
     const virtualizer = useVirtualizer({
         count: entries.length, getScrollElement: () => scrollRef.current,
         getItemKey: i => entries[i].key,
@@ -111,13 +114,14 @@ export const RelationalGrid: React.FC<{ controller: RelationalController }> = ({
         if (filteringChildren) setFilterCollapsed(update); else setExpanded(update);
     });
     const facetCache = React.useMemo(() => new Map<string, Array<{ value: any; displayValue: string; count: number }>>(),
-        [all.parent, all.child, c.scopes.parent.filters, c.scopes.child.filters, search, parentTypes, childTypes]);
+        [all.parent, all.child, c.scopes.parent.filters, c.scopes.child.filters, search, parentTypes, childTypes, c.appliedFilters]);
     const available = (scope: RecordScope, field: string) => {
         const cacheKey = `${scope}:${field}`;
         if (facetCache.has(cacheKey)) return facetCache.get(cacheKey)!;
         const parentFilters = { ...c.scopes.parent.filters }, childFilters = { ...c.scopes.child.filters };
         delete (scope === 'parent' ? parentFilters : childFilters)[field];
-        const results = filterRelation(all.parent, index.childrenByParent, parentFilters, childFilters, search, parentTypes, childTypes);
+        const results = filterRelation(all.parent, index.childrenByParent, parentFilters, childFilters, search, parentTypes, childTypes,
+            undefined, undefined, undefined, undefined, c.matchingParentIds(scope === 'parent' ? field : undefined));
         const counts = new Map<any, number>();
         (scope === 'parent' ? results.parents : results.children).filter(record => !record.isNewRow).forEach(record => {
             const value = filterValue(record.getValue(field), (scope === 'parent' ? parentTypes : childTypes)[field]);
@@ -131,7 +135,7 @@ export const RelationalGrid: React.FC<{ controller: RelationalController }> = ({
             const columns = c.scopes[exportScope].columns.filter(col => col.isVisible !== false);
             await DataExportService.getInstance().exportData(exportScope === 'parent' ? parentRows : childRows, {
                 format: exportFormat, fileName: `${c.scopes[exportScope].source}-${new Date().toISOString().slice(0, 10)}`,
-                customColumns: columns.map(col => col.key), customHeaders: columns.map(col => col.name), includeHeaders: true
+                customColumns: columns.map(col => col.key), customHeaders: columns.map(col => col.name), includeHeaders: true, includeFilters: true
             });
         } catch (error) { setUiError((error as Error).message); }
     };
@@ -139,21 +143,36 @@ export const RelationalGrid: React.FC<{ controller: RelationalController }> = ({
     const jumpTo = (value: string) => {
         const field = read(jumpField, 'ColName');
         const i = parentRows.findIndex(record => String(record.getValue(field) ?? '').toLowerCase().startsWith(value.trim().toLowerCase()));
-        c.jumpIndex = i; c.jumpResult = i < 0 ? 'No matching parent record.' : '';
+        c.reportJump(i, i < 0 ? 'No matching parent record.' : '');
         if (i >= 0) setScrollTarget(`parent:${parentRows[i].recordId}`);
         render();
     };
     React.useEffect(() => { if (p.JumpToValue?.raw) jumpTo(p.JumpToValue.raw); }, [p.JumpToValue?.raw]);
+    React.useEffect(() => {
+        const event = p.InputEvent?.raw || '';
+        if (!c.ready || !event.includes('SetFocus')) return;
+        const header = event.includes('SetFocusOnHeader');
+        const match = event.match(/SetFocusOnRow(?:SetSelection)?(\d+)/);
+        const record = parentRows[match ? Number(match[1]) : 0];
+        if (!header && record) setScrollTarget(`parent:${record.recordId}`);
+        const handle = requestAnimationFrame(() => {
+            const target = header ? scrollRef.current?.querySelector<HTMLElement>('.relation-parent-header [tabindex="0"]')
+                : scrollRef.current;
+            target?.focus();
+        });
+        return () => cancelAnimationFrame(handle);
+    }, [p.InputEvent?.raw, c.ready]);
 
     const renderScope = (scope: RecordScope) => {
         const state = c.scopes[scope], parent = scope === 'parent';
         const records = parent ? parentRows : childRows;
         const selectedCount = records.filter(record => state.selected.has(record.recordId)).length;
         const externalLayout: ExternalGridLayout = {
+            filters: state.filters, readOnlyFields: record => c.readOnly(scope, record),
             scope, scrollRef, virtualizer, resetVersion: c.resetVersion, leadingWidth: parent ? 84 : 108,
             renderLeading: parent ? record => {
                 const count = index.childrenByParent.get(record.recordId)?.length || 0;
-                const open = entries.some(entry => entry.kind === 'childHeader' && entry.parentId === record.recordId);
+                const open = openParentIds.has(record.recordId);
                 return <>
                     {count > 0 && <button type="button" className="relation-chevron" aria-label={`${open ? 'Collapse' : 'Expand'} ${label} (${count})`} aria-expanded={open} onClick={() => toggle(record.recordId)}>{open ? '⌄' : '›'} <small>{count}</small></button>}
                     {!record.isNewRow && p.EnableAddChildRow?.raw && <button type="button" className="relation-add" title={`Add ${label}`} aria-label={`Add ${label} to this record`} disabled={!c.editingAllowed} onClick={() => afterEditor(() => { setAddCount('1'); setAddDialog({ scope: 'child', parentId: record.recordId }); })}>+</button>}
@@ -179,11 +198,15 @@ export const RelationalGrid: React.FC<{ controller: RelationalController }> = ({
             height="100%" enableInlineEditing={c.editingAllowed} useEnhancedEditors={!!p.UseEnhancedEditors?.raw} columnEditorMapping={state.editors}
             enableDragFill={c.editingAllowed} enableColumnFilters={c.ready} enableCascadingFilters={true}
             onCellEdit={(id, column, value) => c.edit(scope, id, column, value)} onDeleteNewRow={id => c.remove(scope, id)}
-            readOnlyColumns={c.readOnly(scope)}
+
             getAvailableValues={field => available(scope, field)} getColumnDataType={field => {
                 const type = (parent ? parentTypes : childTypes)[field]; return type === 'number' || type === 'date' || type === 'boolean' ? type : 'text';
             }} onColumnFilter={(field, values) => c.filter(scope, field, values)}
-            onSortColumn={field => afterEditor(() => setSorts(old => ({ ...old, [scope]: { field, descending: old[scope]?.field === field ? !old[scope]?.descending : false } })))}
+            onSortColumn={field => afterEditor(() => {
+                const descending = sorts[scope]?.field === field ? !sorts[scope]?.descending : false;
+                setSorts(old => ({ ...old, [scope]: { field, descending } }));
+                c.reportSort(scope, field, descending);
+            })}
             headerTextSize={p.HeaderTextSize?.raw || 14} columnTextSize={p.ColumnTextSize?.raw || 13}
             enableHeaderTextWrapping={!!p.EnableHeaderTextWrapping?.raw} alternateRowColor={p.AlternateRowColor?.raw || undefined}
             selectionType={p.SelectionType?.raw || '1'} enableSelectionMode={p.SelectionMode?.raw !== '0' && p.SelectionType?.raw !== '0'}
@@ -209,6 +232,7 @@ export const RelationalGrid: React.FC<{ controller: RelationalController }> = ({
             {p.EnableJumpTo?.raw && <TextField ariaLabel="Jump to parent record" placeholder="Jump to record" value={jump} onChange={(_, value) => setJump(value || '')} onKeyDown={e => { if (e.key === 'Enter') jumpTo(jump); }} />}
             {p.EnableAddNewRow?.raw && <PrimaryButton disabled={!c.editingAllowed} text={p.AddNewRowText?.raw || 'Add New Row'} onClick={() => afterEditor(() => { setAddCount('1'); setAddDialog({ scope: 'parent' }); })} />}
             <span>{p.TotalItemsText?.raw || 'Total Items:'} {parentRows.length} · {label}: {childRows.length}</span>
+            {p.ShowFormulaField?.raw && <span>{p.FormulaFieldText?.raw || 'Formula Result:'} {formula}</span>}
             {!!c.pendingCount && <><PrimaryButton text={c.busy ? 'Saving…' : `Save Changes (${c.pendingCount})`} disabled={!c.ready || c.busy} onClick={() => afterEditor(c.save)} /><DefaultButton text="Cancel Changes" disabled={c.busy} onClick={c.cancel} /></>}
             <label>{label} filters <select aria-label={`${label} filter column`} value={childFilterField} onChange={e => setChildFilterField(e.target.value)}>
                 <option value="">Choose column</option>{c.scopes.child.columns.filter(col => col.isVisible !== false).map(col => <option key={col.key} value={col.key}>{col.name}</option>)}
@@ -218,7 +242,7 @@ export const RelationalGrid: React.FC<{ controller: RelationalController }> = ({
             <select aria-label="Export format" value={exportFormat} onChange={e => setExportFormat(e.target.value as IExportOptions['format'])}>{['CSV','Excel','PDF','JSON'].map(format => <option key={format}>{format}</option>)}</select>
             <DefaultButton text="Export" disabled={!c.ready} onClick={exportData} />
         </div>}
-        <div className="relation-scroll" ref={scrollRef} aria-label="Parent and related records">
+        <div className="relation-scroll" ref={scrollRef} tabIndex={0} aria-label="Parent and related records">
             <div className="relation-surface" style={{ height: virtualizer.getTotalSize(), minWidth: Math.max(sizes.parent.width, sizes.child.width) }}>
                 {renderScope('parent')}{renderScope('child')}
             </div>
@@ -227,7 +251,7 @@ export const RelationalGrid: React.FC<{ controller: RelationalController }> = ({
             dataType={childTypes[childFilterField] === 'string' ? 'text' : childTypes[childFilterField] as any || 'text'}
             allData={all.child} filteredData={childRows} currentFilters={c.scopes.child.filters} getAvailableValues={field => available('child', field)}
             onFilterChange={(field, values) => c.filter('child', field, values)} target={filterButton.current} isOpen onDismiss={() => setFilterOpen(false)} />}
-        <Dialog hidden={!addDialog} onDismiss={() => setAddDialog(null)} dialogContentProps={{ type: DialogType.normal, title: addDialog?.scope === 'child' ? `Add ${label}` : p.AddNewRowText?.raw || 'Add rows' }}>
+        <Dialog hidden={!addDialog} onDismiss={() => setAddDialog(null)} modalProps={{ focusTrapZoneProps: { disabled: !addDialog } }} dialogContentProps={{ type: DialogType.normal, title: addDialog?.scope === 'child' ? `Add ${label}` : p.AddNewRowText?.raw || 'Add rows' }}>
             <TextField label="Number of rows" type="number" min={1} max={10000} value={addCount} onChange={(_, value) => setAddCount(value || '')} />
             <DialogFooter><PrimaryButton text="Add" disabled={!/^\d+$/.test(addCount) || Number(addCount) < 1 || Number(addCount) > 10000} onClick={() => {
                 if (!addDialog) return;

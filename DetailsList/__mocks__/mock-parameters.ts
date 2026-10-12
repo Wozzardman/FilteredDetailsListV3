@@ -6,6 +6,20 @@ import { MockDataSet } from './mock-datasets';
 
 export function getMockParameters(): IInputs {
     return {
+        EnableParentChild: new MockTwoOptionsProperty(false),
+        RelationshipConfig: new MockStringProperty(),
+        ChildDataSourceName: new MockStringProperty(),
+        ChildLabel: new MockStringProperty(),
+        ChildPageSize: new MockWholeNumberProperty(),
+        EnableAddChildRow: new MockTwoOptionsProperty(false),
+        ChildAddNewRowsSave: new MockTwoOptionsProperty(false),
+        ChildColumnEditorFormulas: new MockStringProperty(),
+        SaveResult: new MockStringProperty(),
+        RelationalContextKey: new MockStringProperty(),
+        childRecords: new MockDataSet([]),
+        childColumns: new MockDataSet([]),
+        childEditorConfig: new MockDataSet([]),
+        childNewRowTemplateConfig: new MockDataSet([]),
         Theme: new MockStringProperty(),
         PageSize: new MockWholeNumberProperty(),
         SelectionType: new MockEnumProperty('0'),

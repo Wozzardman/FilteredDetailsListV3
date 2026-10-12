@@ -2,6 +2,7 @@ import { IDetailsList, IObjectWithKey, SelectionMode, Selection, IColumn } from 
 import * as React from 'react';
 import { IInputs, IOutputs } from './generated/ManifestTypes';
 import { getRecordKey } from './utils/RecordUtils';
+import type { RelationalController } from './relational/RelationalController';
 import { UltimateEnterpriseGrid } from './components/UltimateEnterpriseGrid';
 import { LoadingOverlay } from './components/LoadingOverlay';
 import { InputEvents, OutputEvents, RecordsColumns, ItemsColumns, SortDirection } from './ManifestConstants';
@@ -45,8 +46,17 @@ const SelectionTypes: Record<'0' | '1' | '2', SelectionMode> = {
     '2': SelectionMode.multiple,
 };
 
-export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<IInputs, IOutputs> {
+export class ParentChildDetailsList implements ComponentFramework.ReactControl<IInputs, IOutputs> {
     private static readonly COLUMN_LIMIT: number = 125;
+    private relationalController?: RelationalController;
+    private getRelationalController(): RelationalController {
+        // Keep optional relational dependencies out of the existing single-table initialization path.
+        if (!this.relationalController) {
+            const Controller: typeof import('./relational/RelationalController').RelationalController = require('./relational/RelationalController').RelationalController;
+            this.relationalController = new Controller();
+        }
+        return this.relationalController;
+    }
     notifyOutputChanged: () => void;
     container: HTMLDivElement;
     context: ComponentFramework.Context<IInputs>;
@@ -462,6 +472,8 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     }
 
     public updateView(context: ComponentFramework.Context<IInputs>): React.ReactElement {
+        this.context = context;
+        if (context.parameters.EnableParentChild?.raw) return this.getRelationalController().update(context, this.notifyOutputChanged);
         try {
             // Safety check: if we're stuck in loading state for too long, force recovery
             if (this.isLoading && this.loadingStartTime > 0) {
@@ -537,8 +549,8 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
 
         // Set column limit to 150 for the selected columns dataset
         try {
-            if (columns?.paging && columns.paging.pageSize !== FilteredDetailsListV2.COLUMN_LIMIT) {
-                columns.paging.setPageSize(FilteredDetailsListV2.COLUMN_LIMIT);
+            if (columns?.paging && columns.paging.pageSize !== ParentChildDetailsList.COLUMN_LIMIT) {
+                columns.paging.setPageSize(ParentChildDetailsList.COLUMN_LIMIT);
                 columns.refresh();
             }
         } catch (columnError) {
@@ -549,8 +561,8 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
         // Set page size for editorConfig dataset so all rows are loaded (default is 25)
         try {
             const editorConfigDataset = (context.parameters as any).editorConfig;
-            if (editorConfigDataset?.paging && editorConfigDataset.paging.pageSize < FilteredDetailsListV2.COLUMN_LIMIT) {
-                editorConfigDataset.paging.setPageSize(FilteredDetailsListV2.COLUMN_LIMIT);
+            if (editorConfigDataset?.paging && editorConfigDataset.paging.pageSize < ParentChildDetailsList.COLUMN_LIMIT) {
+                editorConfigDataset.paging.setPageSize(ParentChildDetailsList.COLUMN_LIMIT);
                 editorConfigDataset.refresh();
             }
         } catch (editorConfigError) {
@@ -1425,6 +1437,29 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
      * @returns an object based on nomenclature defined in manifest, expecting object[s] for property marked as “bound” or “output”
      */
     public getOutputs(): IOutputs {
+        if (this.context.parameters.EnableParentChild?.raw) {
+            const output = this.getRelationalController().outputs();
+            const parentChanges = JSON.parse(output.PendingChanges || '[]') as Array<{ recordId: string; changes: Record<string, any> }>;
+            const currentParentChange = this.getRelationalController().eventDataset === 'parent'
+                ? parentChanges.find(change => change.recordId === output.ChangedRecordKey)?.changes : undefined;
+            const previousPending = this.pendingChanges;
+            this.pendingChanges = new Map(parentChanges.map(change => [change.recordId, new Map(Object.entries(change.changes))]));
+            try {
+                return {
+                    ...output,
+                    EditedRecords: JSON.stringify(parentChanges.map(change => ({ id: change.recordId, ...change.changes }))),
+                    EditedRecordsCount: parentChanges.length,
+                    EditedRecordKeys: JSON.stringify(parentChanges.map(change => change.recordId)),
+                    PatchDataSource: this.getPatchDataSourceName(),
+                    PatchRecord: this.getPatchRecordReference(),
+                    PatchChanges: JSON.stringify(currentParentChange || {}),
+                    PatchChangesColumn: currentParentChange ? Object.keys(currentParentChange)[0] || '' : '',
+                    PatchChangesValue: currentParentChange ? String(Object.values(currentParentChange)[0] ?? '') : '',
+                    PatchFormula: this.generatePatchFormula(),
+                    ForAllFormula: this.generateForAllFormula()
+                };
+            } finally { this.pendingChanges = previousPending; }
+        }
         const dataset = this.context.parameters.records;
         const defaultOutputs = {
             PageNumber: dataset.paging.lastPageNumber,
@@ -1568,6 +1603,7 @@ export class FilteredDetailsListV2 implements ComponentFramework.ReactControl<II
     }
 
     public destroy(): void {
+        this.relationalController?.destroy();
         // Clean up auto-recovery timer
         this.clearErrorRecoveryTimer();
 

@@ -100,6 +100,8 @@ export interface ExternalGridLayout {
     scrollRef: React.RefObject<HTMLDivElement>;
     virtualizer: any;
     resetVersion: number;
+    filters: Record<string, any[]>;
+    readOnlyFields: (item: any) => string[];
     leadingWidth: number;
     renderLeading?: (item: any) => React.ReactNode;
     groupKey?: (item: any) => string | undefined;
@@ -198,6 +200,8 @@ interface EditingState {
     originalValue: any;
 }
 
+const EMPTY_FROZEN_COLUMNS: string[] = [];
+
 export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridRef, VirtualizedEditableGridProps>(({
     items = [],
     columns = [],
@@ -250,7 +254,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     alternateRowColor,
     
     // Frozen column props
-    frozenColumnKeys: initialFrozenColumnKeys = [],
+    frozenColumnKeys: initialFrozenColumnKeys = EMPTY_FROZEN_COLUMNS,
     onFrozenColumnsChange,
     
     // New row management
@@ -288,6 +292,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     const [frozenColumnKeys, setFrozenColumnKeys] = React.useState<Set<string>>(() => {
         // Initialize from props: both explicitly passed keys and columns with isFrozen=true
         const initial = new Set<string>(initialFrozenColumnKeys);
+        if (externalLayout) initial.add('__relation__');
         columns.forEach(col => {
             if ((col as any).isFrozen) {
                 initial.add(col.key || col.fieldName || '');
@@ -305,7 +310,8 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         columnName: string;
     } | null>(null);
 
-    // Sync frozen column keys when columns prop changes (pick up isFrozen from column config)
+    const configuredFrozenKeys = columns.filter(col => col.isFrozen).map(col => col.key).join('\u0000');
+    // Sync frozen column keys when configuration changes, not on every row edit.
     React.useEffect(() => {
         const fromProps = new Set<string>(initialFrozenColumnKeys);
         columns.forEach(col => {
@@ -318,10 +324,10 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 // Merge: keep user-toggled keys, add prop-based keys
                 const merged = new Set(prev);
                 fromProps.forEach(k => merged.add(k));
-                return merged;
+                return merged.size === prev.size ? prev : merged;
             });
         }
-    }, [columns, initialFrozenColumnKeys]);
+    }, [configuredFrozenKeys, initialFrozenColumnKeys]);
 
     // Excel-like column filtering state
     const [columnFilters, setColumnFilters] = React.useState<IFilterState>({});
@@ -430,7 +436,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         const handleClickOutside = (e: MouseEvent) => {
             // Check if click is outside the grid
             const target = e.target as HTMLElement;
-            const isInsideGrid = target.closest('.virtualized-editable-grid-container');
+            const isInsideGrid = target.closest(externalLayout ? '.relational-grid' : '.virtualized-editable-grid-container');
             if (!isInsideGrid && selectedCells.size > 0) {
                 setSelectedCells(new Set());
                 setSelectionAnchor(null);
@@ -672,6 +678,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                     };
 
                     for (const dependentField of dependentFields) {
+                        if (externalLayout?.readOnlyFields(item).includes(dependentField)) continue;
                         const fieldConfig = columnEditorMapping[dependentField];
                         const requiresConfirmation = fieldConfig?.RequiresAutoFillConfirmation === true;
                         
@@ -1588,6 +1595,16 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         ? JSON.stringify([filteredItems[itemIndex]?.recordId, columnKey]) : `${itemIndex}-${columnKey}`;
     const resolveEditIndex = (state: EditingState) => externalLayout && state.itemId
         ? filteredItems.findIndex(item => item.recordId === state.itemId) : state.itemIndex;
+    const previousExternalItems = React.useRef<any[]>([]);
+    React.useEffect(() => {
+        if (!externalLayout) return;
+        const previous = previousExternalItems.current;
+        if (previous.length !== filteredItems.length || previous.some((item, i) => item.recordId !== filteredItems[i]?.recordId)) {
+            setSelectedCells(new Set());
+            setSelectionAnchor(null);
+        }
+        previousExternalItems.current = filteredItems;
+    }, [filteredItems, !!externalLayout]);
     React.useEffect(() => {
         if (!externalLayout) return;
         setPendingChanges(new Map());
@@ -1601,7 +1618,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
 
     // Start inline editing
     const startEdit = React.useCallback((itemIndex: number, columnKey: string) => {
-        if (!enableInlineEditing || readOnlyColumns.includes(columnKey)) return;
+        if (!enableInlineEditing || readOnlyColumns.includes(columnKey) || externalLayout?.readOnlyFields(filteredItems[itemIndex]).includes(columnKey)) return;
         // Enforce editLock: when not in selection mode, columns with editLock cannot be edited
         if (!enableSelectionMode && columnEditorMapping[columnKey]?.editLock) return;
 
@@ -1617,6 +1634,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         const itemIndex = resolveEditIndex(editingState);
         const item = filteredItems[itemIndex];
         if (!item) return;
+        if (externalLayout?.readOnlyFields(item).includes(targetColumnKey)) return;
         const itemId = item.key || item.id || item.getRecordId?.() || itemIndex.toString();
 
         // Get the original value BEFORE updating the item
@@ -1784,7 +1802,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
             key === '__selection__' || key === '__delete__' || key === '__autofill__' || key === '__relation__';
         const isColumnEditable = (key?: string) => {
             if (!key || isSpecialColumn(key)) return false;
-            if (readOnlyColumns.includes(key)) return false;
+            if (readOnlyColumns.includes(key) || externalLayout?.readOnlyFields(item).includes(key)) return false;
             // Mirrors startEdit's editLock check
             if (!enableSelectionMode && columnEditorMapping[key]?.editLock) return false;
             return true;
@@ -2002,6 +2020,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 data-index={virtualRow.flatIndex ?? index}
                 data-row-index={index}
                 data-scope={externalLayout?.scope}
+                data-record-id={externalLayout ? item.recordId : undefined}
                 style={rowStyle}
                 onClick={() => onItemClick?.(item, index)}
                 onDoubleClick={() => onItemDoubleClick?.(item, index)}
@@ -2141,10 +2160,10 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                     const cellKey = getCellKey(index, columnKey);
                     const isEditing = (externalLayout ? editingState?.itemId === item.recordId : editingState?.itemIndex === index) && editingState?.columnKey === columnKey;
                     const hasChanges = pendingChanges.has(cellKey) || !!externalLayout?.isDirty(item.recordId, columnKey);
-                    const isReadOnly = readOnlyColumns.includes(columnKey) || (!enableSelectionMode && !!columnEditorMapping[columnKey]?.editLock);
+                    const isReadOnly = !!externalLayout?.readOnlyFields(item).includes(columnKey) || readOnlyColumns.includes(columnKey) || (!enableSelectionMode && !!columnEditorMapping[columnKey]?.editLock);
 
                     const cellValue = pendingChanges.get(cellKey)?.newValue ?? getPCFValue(item, columnKey);
-                    const dataType = column.data?.dataType || 'string';
+                    const dataType = (externalLayout ? column.dataType : column.data?.dataType) || 'string';
                     // PERFORMANCE OPTIMIZATION: Use cached available values to prevent recalculation on scroll
                     const availableValues = memoizedAvailableValues(columnKey);
 
@@ -2209,7 +2228,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                         };
                         
                         return (
-                            <div key={columnKey} style={cellStyle}>
+                            <div key={columnKey} data-column-key={columnKey} style={cellStyle}>
                                 {useEnhancedEditors && editorConfig ? (
                                     <EnhancedInlineEditor
                                         value={editingState.originalValue}
@@ -2272,6 +2291,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                     return (
                         <div
                             key={columnKey}
+                            data-column-key={columnKey}
                             className={`virtualized-cell ${isReadOnly ? 'read-only' : 'editable'}${isCellInSelection ? ' cell-selected' : ''} ${getFrozenCellClassName(columnIndex)}`}
                             style={{
                                 ...cellStyle,
@@ -2412,6 +2432,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                                         
                                                         for (let i = minIndex; i <= maxIndex; i++) {
                                                             const targetItem = filteredItems[i];
+                                                            if (targetItem && externalLayout?.readOnlyFields(targetItem).includes(columnKey)) continue;
                                                             if (targetItem) {
                                                                 const itemId = targetItem.key || targetItem.id || targetItem.getRecordId?.() || i.toString();
                                                                 const changeKey = getCellKey(i, columnKey);
@@ -2606,7 +2627,9 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                             const element = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY);
                                             if (element && element.closest('.virtualized-row')) {
                                                 const rowElement = element.closest('.virtualized-row') as HTMLElement;
-                                                const targetEndRow = parseInt(rowElement.dataset.index || '0');
+                                                if (externalLayout && rowElement.dataset.scope !== externalLayout.scope) return;
+                                                const targetEndRow = parseInt(rowElement.dataset.rowIndex || rowElement.dataset.index || '0');
+                                                if (externalLayout?.groupKey && externalLayout.groupKey(filteredItems[targetEndRow]) !== externalLayout.groupKey(filteredItems[selectionBounds.endRow])) return;
                                                 
                                                 // Only fill downward from the selection end
                                                 if (targetEndRow <= selectionBounds.endRow) {
@@ -2627,8 +2650,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                                 
                                                 // Mark previous changes for removal
                                                 multiCellDragChanges.forEach((_, changeKey) => {
-                                                    const [indexStr] = changeKey.split('-');
-                                                    const idx = parseInt(indexStr);
+                                                    const idx = multiCellDragChanges.get(changeKey)?.itemIndex;
                                                     if (idx > selectionBounds.endRow) {
                                                         keysToRemove.push(changeKey);
                                                     }
@@ -2647,6 +2669,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                                         if (sourceRowValues) {
                                                             // Only apply values for columns that were actually selected in this source row
                                                             sourceRowValues.forEach((newValue, colKey) => {
+                                                                if (externalLayout?.readOnlyFields(targetItem).includes(colKey)) return;
                                                                 const changeKey = getCellKey(targetRow, colKey);
                                                                 
                                                                 let originalValue: any;
@@ -2917,7 +2940,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                     );
                 }
                 
-                const hasFilter = columnFilters[column.key]?.isActive && columnFilters[column.key]?.conditions?.length > 0;
+                const hasFilter = externalLayout ? !!externalLayout.filters[column.key]?.length : columnFilters[column.key]?.isActive && columnFilters[column.key]?.conditions?.length > 0;
                 const dataType = getColumnDataType?.(column.key) || 'text';
                 
                 // Get header alignment styles for this column
@@ -3116,7 +3139,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                     dataType={getColumnDataType?.(activeFilterColumn) || 'text'}
                     allData={originalItems}
                     filteredData={filteredItems}
-                    currentFilters={convertFiltersToSimpleFormat(columnFilters)}
+                    currentFilters={externalLayout?.filters || convertFiltersToSimpleFormat(columnFilters)}
                     onFilterChange={handleColumnFilterChange}
                     target={filterTargets[activeFilterColumn]}
                     onDismiss={() => setActiveFilterColumn(null)}

@@ -1,4 +1,6 @@
-# PowerApps Filtered DetailsList PCF Control
+# Parent-Child DetailsList PCF Control
+
+This branch builds **Parent-Child DetailsList (Test)**, component identity `JVT.ParentChildDetailsList`, starting at version **1.0.0**. Its constructor and resource keys are separate from the production `JVT.FilteredDetailsListV2` control, so the newly built component can be installed alongside production. The source folder and `.pcfproj` filename remain `DetailsList`; they do not determine the deployed control identity. Existing solution folders and ZIPs are not part of this rename.
 
 An enterprise-grade PowerApps Component Framework (PCF) control that provides an enhanced version of the [Fluent UI DetailsList component](https://developer.microsoft.com/en-us/fluentui#/controls/web/detailslist) with advanced filtering, vir- `ColHorizontalAlign` - The alignment of the cell content if the `ColCellType` is of type `image`, or `clickableimage`.
 - `ColVerticalAlign` -  The alignment of the cell content if the `ColCellType` is of type `image`, or `clickableimage`.
@@ -22,6 +24,137 @@ When configured against a Dataverse connection:
 ![DetailsList Demo](media/README/DetailsList.gif)
 
 ## 🔍 Advanced Filtering Features
+
+## Parent–child grid (experimental branch)
+
+Set `EnableParentChild = true` to display two related tables in one virtualized scroll surface. The default remains the existing single-table grid. This implementation supports one parent/child level. It has no table-specific business rules and continues to use the app's save connectors or stored procedures.
+
+Each parent remains a complete editable row. Its chevron appears only when related records are loaded; expanding it shows the child table's own headers and editable cells. The child filter chooser in the toolbar works even when every parent is collapsed. Parent filters restrict the available children, and child filters retain parents with a matching child. Multiple child conditions must match the same child. Filter choices reflect the other active filters. Pending edits and new rows stay visible while filtering, even when their values do not match.
+
+### Bind and configure both tables
+
+| Property | Configuration |
+| --- | --- |
+| `records` / primary `Items` | Parent data source, with all required fields selected. |
+| `childRecords_Items` | Child data source, filtered to the same application/project scope. |
+| `DataSourceName`, `ChildDataSourceName` | Distinct names used for outputs and shared lookup/dropdown data. |
+| `ChildLabel` | User-facing child table label, such as `Order lines`. |
+| `RelationshipConfig` | Optional explicit key mapping; examples below. |
+| `RelationalContextKey` | Stable identifier for the current project or app context. Change it when the bound data scope changes. Unsaved work is kept separately for each context while this control instance lives. |
+| `PageSize`, `ChildPageSize` | Retrieval batch sizes. Both sources are accumulated until their dataset reports no next page. There is one displayed page. |
+| `columns`, `childColumns_Items` | Independent parent and child column override tables. |
+| `editorConfig`, `childEditorConfig_Items` | Independent editor/validation/conditional configuration tables. Enable `UseEnhancedEditors` to use them. |
+| `ColumnEditorFormulas`, `ChildColumnEditorFormulas` | Formula configuration fallback when that scope has no editor table rows. |
+| `newRowTemplateConfig`, `childNewRowTemplateConfig_Items` | Independent default/template tables with `ColumnName`, `DefaultValue`, `ValueType`, and `AutoIncrement`. |
+| `EnableAddNewRow`, `EnableAddChildRow` | Independently enable parent additions and the add-child button on saved parents. |
+| `AddNewRowsSave`, `ChildAddNewRowsSave` | Independently count unedited placeholders toward showing Save Changes; both default to `false`. |
+| `SaveResult` | Bind to the variable containing the acknowledgement JSON described below. |
+
+Canvas only provides the main field selector for the primary dataset. Secondary datasets use property-set bindings. The manifest supplies optional `ChildText01`–`ChildText32`, `ChildNumber01`–`ChildNumber16`, `ChildDate01`–`ChildDate08`, and `ChildBoolean01`–`ChildBoolean08` bindings: map these to the child source fields needed by the relationship, display, filters, templates, and editors. These names are generic binding slots, not database column names. Runtime configuration uses the actual field names exposed in `childRecords.columns`. Any additional columns supplied by the host are also supported; column config does not fetch missing source fields. See Microsoft's [multiple-dataset binding documentation](https://learn.microsoft.com/en-us/power-apps/developer/component-framework/manifest-schema-reference/data-set).
+
+Bind delegable source queries directly. A collection already truncated by the Canvas row limit cannot be repaired by paging inside the control. Filters and editing wait for **both** datasets to finish loading. Draft rows are separate from those source pages, so adding 200 rows to 50,000 loaded records does not require increasing the page size. No server request is made when a parent is expanded. Pending changes are held in memory, not durable offline storage; closing/reloading the app loses unsaved work.
+
+Text, number, and date slots use separate compatible type groups: number slots accept whole numbers, decimals, floating point, and currency; date slots accept date-only or date/time; text slots also accept multiline text. Boolean bindings stay separate. This follows the Canvas [type-group compatibility rules](https://learn.microsoft.com/en-us/power-apps/developer/component-framework/manifest-schema-reference/type-group).
+
+Automatic detection accepts a single compatible ID/key mapping supported by all loaded child rows and unique parent values. Canvas SQL foreign-key metadata is not assumed to be available. Empty, ambiguous, or mismatched sources require an explicit mapping. For an `Orders`/`OrderLines` example:
+
+```powerfx
+// RelationshipConfig
+JSON({keys: Table({parentField: "OrderID", childField: "OrderID"})})
+```
+
+Composite keys are supported:
+
+```powerfx
+JSON({keys: Table(
+    {parentField: "TenantID", childField: "TenantID"},
+    {parentField: "OrderID", childField: "ParentOrderID"}
+)})
+```
+
+Use `parentField: "$recordId"` to join against the parent dataset record identity. Key values must have compatible types; large numeric IDs should arrive as strings if they exceed JavaScript's safe integer range. Persisted relationship keys and all child foreign-key fields are protected from editing. Adding a child automatically copies every configured foreign-key value from its saved parent. Save a new parent before adding children to it. Unmatched children are reported rather than attached to an arbitrary parent.
+
+### Child column overrides
+
+`childColumns_Items` has the same override schema as `columns`, including display name, width, cell type, alignment, header alignment, wrapping, visibility, frozen columns, accessibility text, and header colors. It does not inherit the parent's overrides. For example:
+
+```powerfx
+Table(
+    {ColName: "OrderID", ColDisplayName: "Order", ColWidth: 100,
+     ColMultiLine: false, ColVisible: false, ColFrozen: false},
+    {ColName: "Description", ColDisplayName: "Line description", ColWidth: 280,
+     ColMultiLine: true, ColVisible: true, ColFrozen: true},
+    {ColName: "Status", ColDisplayName: "Status", ColWidth: 140,
+     ColMultiLine: false, ColVisible: true, ColFrozen: false}
+)
+```
+
+Bind the configuration columns to their matching property-set names, just as for the existing parent configuration. Missing `ColName` fields produce a visible binding diagnostic. Child editors use `ColumnKey` against the same child field names; they support the existing typed and direct-input editors. Tab/Enter advance right and Shift+Tab moves left within that table. Drag fill stays within one child group and cannot cross into parent rows. Export offers parent or child scope in CSV, Excel, PDF, or JSON, and includes filtered child rows from collapsed groups.
+
+### One save action, two acknowledgements
+
+On `EventName = "ButtonEvent"` and `ButtonEventName = "Save Changes"`, capture these outputs together:
+
+- `SaveRequestId`: identifies this specific submission.
+- `PendingChanges`: parent JSON, retaining the existing `[{recordId, changes}]` contract.
+- `ChildPendingChanges`: child JSON with the same contract.
+- `EventDataset`: `parent`, `child`, or `both`.
+
+Each new row has a temporary `NEW_ROW_...` identity and `changes.isNewRow = true`; template values and the child relationship fields are included. When a save is enabled by an edit or either placeholder flag, all current drafts are included. `HasPendingChanges` also reports unsaved placeholders with a flag set to false; `ChangeCount` and button visibility respect the flags.
+
+The grid locks edits during submission and keeps the submitted snapshot until the app reports a result. Bind `SaveResult` to a text variable, for example `GridSaveResult`. Replace the connector names and parameters in this **integration template** with those required by your app. Enable formula-level error handling and ensure procedures surface failure as connector errors (or inspect an explicit success field before acknowledging).
+
+```powerfx
+// Control.OnChange
+If(
+    Self.EventName = "ButtonEvent" && Self.ButtonEventName = "Save Changes",
+    With(
+        {request: Self.SaveRequestId,
+         parentJson: Self.PendingChanges,
+         childJson: Self.ChildPendingChanges},
+        UpdateContext({
+            parentResult: {status: "succeeded", message: ""},
+            childResult: {status: "succeeded", message: ""}
+        });
+        If(
+            parentJson <> "[]",
+            IfError(
+                MyConnector.SaveParents({ChangesJson: parentJson}),
+                UpdateContext({parentResult: {status: "failed", message: FirstError.Message}})
+            )
+        );
+        If(
+            childJson <> "[]",
+            IfError(
+                MyConnector.SaveChildren({ChangesJson: childJson}),
+                UpdateContext({childResult: {status: "failed", message: FirstError.Message}})
+            )
+        );
+        UpdateContext({GridSaveResult: JSON({
+            requestId: request, parent: parentResult, child: childResult
+        })})
+    )
+)
+```
+
+Both calls are attempted independently in this template. If your parent procedure changes the child table, preserve the required ordering and business rules in your app/backend. Two connector calls are not a database transaction; use a coordinating backend operation if both must be atomic. The [Power Fx IfError documentation](https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-iferror) explains chaining and connector-error handling. Additional collections or tables used elsewhere in the app still need their existing refresh logic.
+
+The result must contain `succeeded` or `failed` for every table with a nonempty submitted payload. Old request IDs are ignored. Successful scopes clear only the submitted edits and placeholder rows; failed scopes retain them and show the returned message. Any success refreshes both bound datasets because a procedure may update related tables. There is no automatic retry after a timeout: a server may have committed even if its response was lost. Resolve that outcome in the app/backend before resubmitting inserts. `Cancel Changes` resets edits and restores placeholder template defaults; use the row's remove button to discard a placeholder completely.
+
+`ChildSelectedRecordIds`, `ChildSelectedCount`, `ChildAllFilters`, `RelationshipStatus`, and `ResolvedRelationship` expose the child state. Existing parent selection is still set through the primary dataset. The shared dropdown/conditional lookup registry publishes both loaded source names.
+
+### Validation before deployment
+
+The local automated checks cover relationship inference and composite keys, same-child filtering, independent configs, paging, context isolation, partial/stale acknowledgements, both placeholder-toggle states, and a synthetic 50,000-parent / 100,000-child dataset with 200 drafts. The Edge browser check exercises expansion, child headers, inline editing, Tab/Shift+Tab, collapse persistence, filter UI, save failure, and successful add/save/refresh cleanup.
+
+```powershell
+node node_modules/typescript/bin/tsc --noEmit
+node node_modules/jest/bin/jest.js DetailsList/__tests__/RelationalModel.test.ts DetailsList/__tests__/RelationalController.test.ts DetailsList/__tests__/PlaceholderRowSave.test.ts --runInBand --coverage=false --testPathIgnorePatterns 'node_modules|GridCell|ChildCells'
+node scripts/test-relational-browser.cjs
+npm run build -- --buildMode production
+```
+
+The browser harness uses installed Edge and synthetic datasets. Before deploying, verify secondary field bindings in a real Canvas app, complete retrieval of **both** connector datasets beyond 2,000 records, actual procedure acknowledgements, and project switching during a failed save. These host/SQL checks cannot be established by the local harness. The control is not published automatically by these commands.
 
 ## 🎛️ Inline Editing with EditorConfig
 

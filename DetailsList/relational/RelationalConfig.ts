@@ -12,7 +12,7 @@ export function configRecords(dataset?: Dataset): any[] {
 }
 export function buildColumns(metadata: ColumnMetadata[], dataset: Dataset | undefined, defaultWidth = 150, resizable = true): IGridColumn[] {
     const overrides = new Map(configRecords(dataset).map(record => [read(record, 'ColName'), record]));
-    const columns = metadata.filter(col => !['RecordKey','RecordCanSelect','RecordSelected','ItemKey','ItemCanSelect','ItemSelected'].includes(col.name));
+    const columns = metadata.filter(col => !['RecordsKey','RecordsCanSelect','RecordsSelected','RecordKey','RecordCanSelect','RecordSelected','ItemKey','ItemCanSelect','ItemSelected'].includes(col.name));
     return columns.map(meta => {
         const record = overrides.get(meta.name);
         const value = (field: string) => read(record, field);
@@ -59,7 +59,7 @@ export function buildEditors(dataset: Dataset | undefined, formulas: string | nu
         if (useEnhancedEditors) {
             // Priority 1: Table-based configuration (new Power Apps native approach)
             const editorConfigDataset = (context.parameters as any).editorConfig;
-            if (editorConfigDataset && editorConfigDataset.records) {
+            if (editorConfigDataset && Object.keys(editorConfigDataset.records || {}).length) {
                 try {
                     const records = editorConfigDataset.records;
                     const recordIds = Object.keys(records);

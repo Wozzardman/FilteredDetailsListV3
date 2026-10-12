@@ -1,5 +1,5 @@
 /**
- * Advanced accessibility features for FilteredDetailsListV2
+ * Advanced accessibility features for ParentChildDetailsList
  * Implements WCAG 2.2 AA+ standards used by Google, Microsoft, and Apple
  */
 

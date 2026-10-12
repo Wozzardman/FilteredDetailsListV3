@@ -1,13 +1,13 @@
-import { FilteredDetailsListV2 } from '../index';
+import { ParentChildDetailsList } from '../index';
 import { IInputs } from '../generated/ManifestTypes';
 
 describe('Cancel Changes Functionality', () => {
-    let component: FilteredDetailsListV2;
+    let component: ParentChildDetailsList;
     let mockContext: any;
     let mockNotifyOutputChanged: jest.Mock;
 
     beforeEach(() => {
-        component = new FilteredDetailsListV2();
+        component = new ParentChildDetailsList();
         mockNotifyOutputChanged = jest.fn();
 
         mockContext = {

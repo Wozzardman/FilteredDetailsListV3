@@ -1,5 +1,5 @@
 /**
- * Enterprise-grade performance monitoring for FilteredDetailsListV2
+ * Enterprise-grade performance monitoring for ParentChildDetailsList
  * Implements performance patterns used by META, Google, Microsoft
  */
 
@@ -304,7 +304,7 @@ export class PerformanceMonitor {
         const averages = this.getAverageMetrics();
         const report = {
             timestamp: new Date().toISOString(),
-            componentName: 'FilteredDetailsListV2',
+            componentName: 'ParentChildDetailsList',
             averageMetrics: averages,
             totalSamples: this.metrics.length,
             webVitalsGrade: this.calculateWebVitalsGrade(averages),
