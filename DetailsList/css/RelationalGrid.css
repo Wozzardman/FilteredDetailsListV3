@@ -1,0 +1,13 @@
+.relational-grid { display: flex; flex-direction: column; min-height: 0; max-width: 100%; position: relative; font-family: 'Segoe UI', sans-serif; }
+.relation-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px; flex: none; }
+.relation-toolbar select, .relation-toolbar > button { min-height: 32px; border: 1px solid #8a8886; border-radius: 3px; background: white; color: #323130; }
+.relation-scroll { overflow: auto; flex: 1; min-height: 0; position: relative; }
+.relation-surface { position: relative; width: 100%; }
+.relation-parent-header { position: sticky; top: 0; z-index: 30; }
+.relation-child-header { position: absolute; top: 0; left: 0; width: 100%; border-left: 3px solid #0078d4; box-sizing: border-box; z-index: 4; }
+.relation-chevron, .relation-add { background: transparent; border: none; cursor: pointer; color: #005a9e; min-width: 32px; min-height: 32px; font-size: 22px; }
+.relation-chevron small { font-size: 11px; }
+.relation-indent { padding-left: 40px; color: #605e5c; font-size: 12px; }
+.relation-status { padding: 8px; }
+.relation-scroll [data-scope='child'] { border-left: 3px solid #0078d4; box-sizing: border-box; }
+.relation-scroll button:focus-visible { outline: 2px solid #005a9e; outline-offset: -2px; }

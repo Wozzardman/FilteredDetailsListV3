@@ -94,7 +94,25 @@ const formatCellValue = (value: any, dataType?: string, getColumnDataType?: (col
     return String(value);
 };
 
+/** Two grid schemas can share one virtualized scroll surface without mounting a grid per parent. */
+export interface ExternalGridLayout {
+    scope: 'parent' | 'child';
+    scrollRef: React.RefObject<HTMLDivElement>;
+    virtualizer: any;
+    resetVersion: number;
+    leadingWidth: number;
+    renderLeading?: (item: any) => React.ReactNode;
+    groupKey?: (item: any) => string | undefined;
+    isDirty: (recordId: string, column: string) => boolean;
+    onMeasure: (width: number, headerHeight: number) => void;
+    onActiveEditorChange: (active: boolean) => void;
+    render: (parts: { row: (virtualRow: any) => React.ReactNode; header: () => React.ReactNode; overlays: React.ReactNode }) => React.ReactElement;
+}
+
 export interface VirtualizedEditableGridProps {
+    externalLayout?: ExternalGridLayout;
+    onSortColumn?: (column: string) => void;
+
     items: any[];
     columns: IGridColumn[];
     height: number | string;
@@ -175,6 +193,7 @@ export interface VirtualizedEditableGridRef {
 
 interface EditingState {
     itemIndex: number;
+    itemId?: string;
     columnKey: string;
     originalValue: any;
 }
@@ -182,6 +201,8 @@ interface EditingState {
 export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridRef, VirtualizedEditableGridProps>(({
     items = [],
     columns = [],
+    externalLayout,
+    onSortColumn,
     height,
     width = '100%',
     onCellEdit,
@@ -250,7 +271,8 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     onClipboardOperation
 }, ref) => {
     // Refs for scrolling synchronization - DECLARE FIRST BEFORE ALL OTHER LOGIC
-    const parentRef = React.useRef<HTMLDivElement>(null);
+    const internalParentRef = React.useRef<HTMLDivElement>(null);
+    const parentRef = externalLayout?.scrollRef || internalParentRef;
     const headerRef = React.useRef<HTMLDivElement>(null);
 
     const [editingState, setEditingState] = React.useState<EditingState | null>(null);
@@ -484,7 +506,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
 
     // Calculate filtered items based on column filters
     const filteredItems = React.useMemo(() => {
-        if (Object.keys(columnFilters).length === 0) return items;
+        if (externalLayout || Object.keys(columnFilters).length === 0) return items;
 
         // Build set of item IDs with pending changes so we can exempt them from filtering
         const pendingItemIds = new Set<string>();
@@ -895,9 +917,9 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
 
     // Virtual scrolling container ref
     // PURE VIRTUALIZATION - Always on, META/Google competitive performance
-    const virtualizer = useVirtualizer({
-        count: filteredItems.length,
-        getScrollElement: () => parentRef.current,
+    const ownVirtualizer = useVirtualizer({
+        count: externalLayout ? 0 : filteredItems.length,
+        getScrollElement: () => externalLayout ? null : parentRef.current,
         estimateSize: () => rowHeight,
         overscan: overscan,
         // Always measure rows for dynamic/variable row height based on content
@@ -930,6 +952,8 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
             }
         },
     });
+
+    const virtualizer = externalLayout?.virtualizer || ownVirtualizer;
 
     // PERFORMANCE OPTIMIZATION: Memoize available values to prevent recalculation on scroll
     const memoizedAvailableValues = React.useMemo(() => {
@@ -985,6 +1009,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
 
     // Create a wrapper for ExcelLikeColumnFilter that returns cascaded filtered values
     const getAvailableValuesForFilter = React.useCallback((columnKey: string) => {
+        if (externalLayout) return (getAvailableValues?.(columnKey) || []) as Array<{value: any, displayValue: string, count: number}>;
         // Get the original available values
         const availableValuesData = getAvailableValues?.(columnKey) || [];
         
@@ -1172,8 +1197,9 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
             } as IGridColumn);
         }
         
+        if (externalLayout) result.unshift({ key: '__relation__', fieldName: '__relation__', name: '', minWidth: externalLayout.leadingWidth, maxWidth: externalLayout.leadingWidth, defaultWidth: externalLayout.leadingWidth, isResizable: false } as IGridColumn);
         return result;
-    }, [columns, enableSelectionMode, onDeleteNewRow, hasNewRows, pendingAutoFillRows]);
+    }, [columns, enableSelectionMode, onDeleteNewRow, hasNewRows, pendingAutoFillRows, externalLayout?.leadingWidth]);
 
     // PERFORMANCE OPTIMIZATION: Memoize column widths to prevent recalculation
     const memoizedColumnWidths = React.useMemo(() => {
@@ -1558,7 +1584,20 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     };
 
     // Get cell key for change tracking
-    const getCellKey = (itemIndex: number, columnKey: string) => `${itemIndex}-${columnKey}`;
+    const getCellKey = (itemIndex: number, columnKey: string) => externalLayout
+        ? JSON.stringify([filteredItems[itemIndex]?.recordId, columnKey]) : `${itemIndex}-${columnKey}`;
+    const resolveEditIndex = (state: EditingState) => externalLayout && state.itemId
+        ? filteredItems.findIndex(item => item.recordId === state.itemId) : state.itemIndex;
+    React.useEffect(() => {
+        if (!externalLayout) return;
+        setPendingChanges(new Map());
+        setEditingState(null);
+        setSelectedCells(new Set());
+    }, [externalLayout?.resetVersion]);
+    React.useLayoutEffect(() => {
+        externalLayout?.onActiveEditorChange(!!editingState);
+    }, [!!editingState, externalLayout?.onActiveEditorChange]);
+
 
     // Start inline editing
     const startEdit = React.useCallback((itemIndex: number, columnKey: string) => {
@@ -1568,15 +1607,16 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
 
         const item = filteredItems[itemIndex];
         const originalValue = getPCFValue(item, columnKey);
-        setEditingState({ itemIndex, columnKey, originalValue });
+        setEditingState({ itemIndex, itemId: item.recordId, columnKey, originalValue });
     }, [enableInlineEditing, readOnlyColumns, filteredItems, enableSelectionMode, columnEditorMapping]);
 
     // Handle conditional item changes
     const handleItemChange = React.useCallback((targetColumnKey: string, newValue: any) => {
         if (!editingState) return;
 
-        const { itemIndex } = editingState;
+        const itemIndex = resolveEditIndex(editingState);
         const item = filteredItems[itemIndex];
+        if (!item) return;
         const itemId = item.key || item.id || item.getRecordId?.() || itemIndex.toString();
 
         // Get the original value BEFORE updating the item
@@ -1619,7 +1659,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         let item: any = targetItem;
         
         if (!item && editingState) {
-            const { itemIndex } = editingState;
+            const itemIndex = resolveEditIndex(editingState);
             item = filteredItems[itemIndex];
         }
         
@@ -1645,8 +1685,10 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     const commitEdit = React.useCallback((newValue: any) => {
         if (!editingState) return;
 
-        const { itemIndex, columnKey, originalValue } = editingState;
+        const { columnKey, originalValue } = editingState;
+        const itemIndex = resolveEditIndex(editingState);
         const item = filteredItems[itemIndex];
+        if (!item) return;
         const itemId = item.key || item.id || item.getRecordId?.() || itemIndex.toString();
 
         const changeKey = getCellKey(itemIndex, columnKey);
@@ -1689,6 +1731,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 // Revert the item to original value
                 setPCFValue(item, columnKey, actualOldValue);
                 
+                if (externalLayout) onCellEdit?.(itemId, columnKey, newValue);
                 // Note: We don't remove from changeManager since it doesn't track individual
                 // cell changes the same way - the main change tracking is via pendingChanges
             }
@@ -1702,8 +1745,10 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
     const commitEditAndAdvance = React.useCallback((newValue: any, direction: 1 | -1 = 1) => {
         if (!editingState) return;
 
-        const { itemIndex, columnKey, originalValue } = editingState;
+        const { columnKey, originalValue } = editingState;
+        const itemIndex = resolveEditIndex(editingState);
         const item = filteredItems[itemIndex];
+        if (!item) return;
         const itemId = item.key || item.id || item.getRecordId?.() || itemIndex.toString();
 
         const changeKey = getCellKey(itemIndex, columnKey);
@@ -1725,6 +1770,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 changeManager.addChange(itemId, columnKey, actualOldValue, newValue);
             }
         } else if (existingChange) {
+            if (externalLayout) onCellEdit?.(itemId, columnKey, newValue);
             setPendingChanges(prev => {
                 const newMap = new Map(prev);
                 newMap.delete(changeKey);
@@ -1735,7 +1781,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
 
         // Find the next editable column in the requested direction on the same row
         const isSpecialColumn = (key?: string) =>
-            key === '__selection__' || key === '__delete__' || key === '__autofill__';
+            key === '__selection__' || key === '__delete__' || key === '__autofill__' || key === '__relation__';
         const isColumnEditable = (key?: string) => {
             if (!key || isSpecialColumn(key)) return false;
             if (readOnlyColumns.includes(key)) return false;
@@ -1752,6 +1798,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 if (isColumnEditable(nextKey)) {
                     nextEditingState = {
                         itemIndex,
+                        itemId: item.recordId,
                         columnKey: nextKey as string,
                         originalValue: getPCFValue(item, nextKey as string)
                     };
@@ -1802,7 +1849,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         changesToRevert.forEach(([changeKey, change]) => {
             
             // Use filteredItems to match the same array used in drag fill
-            const item = filteredItems[change.itemIndex];
+            const item = externalLayout ? (allItems || filteredItems).find(r => r.recordId === change.itemId) : filteredItems[change.itemIndex];
             if (item) {
                 const currentValue = getPCFValue(item, change.columnKey);
                 
@@ -1949,10 +1996,12 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
 
         return (
             <div
-                key={index}
+                key={externalLayout ? item.recordId : index}
                 ref={virtualizer.measureElement}
                 className={rowClassName}
-                data-index={index}
+                data-index={virtualRow.flatIndex ?? index}
+                data-row-index={index}
+                data-scope={externalLayout?.scope}
                 style={rowStyle}
                 onClick={() => onItemClick?.(item, index)}
                 onDoubleClick={() => onItemDoubleClick?.(item, index)}
@@ -1960,6 +2009,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 {effectiveColumns.map((column, columnIndex) => {
                     const columnKey = column.fieldName || column.key;
                     
+                    if (columnKey === '__relation__') return <div key={columnKey} style={{ width: externalLayout!.leadingWidth, minWidth: externalLayout!.leadingWidth, display: 'flex', alignItems: 'center', position: 'sticky', left: 0, background: rowBg, zIndex: 3 }}>{externalLayout?.renderLeading?.(item)}</div>;
                     // Special handling for selection column
                     if (columnKey === '__selection__') {
                         const itemId = item.recordId || item.key || item.id || index.toString();
@@ -2089,8 +2139,8 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                     }
                     
                     const cellKey = getCellKey(index, columnKey);
-                    const isEditing = editingState?.itemIndex === index && editingState?.columnKey === columnKey;
-                    const hasChanges = pendingChanges.has(cellKey);
+                    const isEditing = (externalLayout ? editingState?.itemId === item.recordId : editingState?.itemIndex === index) && editingState?.columnKey === columnKey;
+                    const hasChanges = pendingChanges.has(cellKey) || !!externalLayout?.isDirty(item.recordId, columnKey);
                     const isReadOnly = readOnlyColumns.includes(columnKey) || (!enableSelectionMode && !!columnEditorMapping[columnKey]?.editLock);
 
                     const cellValue = pendingChanges.get(cellKey)?.newValue ?? getPCFValue(item, columnKey);
@@ -2336,7 +2386,9 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                                 const element = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY);
                                                 if (element && element.closest('.virtualized-row')) {
                                                     const rowElement = element.closest('.virtualized-row') as HTMLElement;
-                                                    const targetIndex = parseInt(rowElement.dataset.index || '0');
+                                                    if (externalLayout && rowElement.dataset.scope !== externalLayout.scope) return;
+                                                    const targetIndex = parseInt(rowElement.dataset.rowIndex || rowElement.dataset.index || '0');
+                                                    if (externalLayout?.groupKey && externalLayout.groupKey(filteredItems[targetIndex]) !== externalLayout.groupKey(filteredItems[startIndex])) return;
                                                     
                                                     // PERFORMANCE: Batch all state updates instead of updating per-cell
                                                     // Collect all changes first, then update state once
@@ -2345,8 +2397,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                                                     
                                                     // Mark previous drag fill changes for removal (but preserve original values)
                                                     dragFillChanges.forEach((_, changeKey) => {
-                                                        const [indexStr] = changeKey.split('-');
-                                                        const index = parseInt(indexStr);
+                                                        const index = dragFillChanges.get(changeKey)?.itemIndex;
                                                         // Don't remove the starting cell's original change
                                                         if (index !== startIndex) {
                                                             keysToRemove.push(changeKey);
@@ -2669,7 +2720,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 })}
             </div>
         );
-    }, [filteredItems, columns, memoizedColumnWidths, editingState, pendingChanges, readOnlyColumns, enableInlineEditing, enableDragFill, startEdit, commitEdit, commitEditAndAdvance, cancelEdit, memoizedAvailableValues, onItemClick, onItemDoubleClick, refreshTrigger, effectiveColumns, enableSelectionMode, onCellEdit, rowDragFillTargets, rowDragFillSource, selectedCells, selectionBounds, isCellSelected, isBottomRightOfSelection, handleCellMouseDown, handleCellMouseEnter, isSelecting, setSelectedCells, setSelectionAnchor, frozenColumnInfo, hasFrozenColumns, getFrozenCellStyle, getFrozenCellClassName, virtualizer, rowHeight]);
+    }, [filteredItems, columns, memoizedColumnWidths, editingState, pendingChanges, readOnlyColumns, enableInlineEditing, enableDragFill, startEdit, commitEdit, commitEditAndAdvance, cancelEdit, memoizedAvailableValues, onItemClick, onItemDoubleClick, refreshTrigger, effectiveColumns, enableSelectionMode, onCellEdit, rowDragFillTargets, rowDragFillSource, selectedCells, selectionBounds, isCellSelected, isBottomRightOfSelection, handleCellMouseDown, handleCellMouseEnter, isSelecting, setSelectedCells, setSelectionAnchor, frozenColumnInfo, hasFrozenColumns, getFrozenCellStyle, getFrozenCellClassName, virtualizer, rowHeight, externalLayout]);
 
     // PERFORMANCE OPTIMIZATION: Create stable render function to prevent unnecessary re-renders
     const renderRow = React.useCallback((virtualRow: any) => {
@@ -2758,6 +2809,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
             {effectiveColumns.map((column, index) => {
                 const columnKey = column.key || column.fieldName || index.toString();
                 
+                if (columnKey === '__relation__') return <div key={columnKey} style={{ width: externalLayout!.leadingWidth, minWidth: externalLayout!.leadingWidth }} />;
                 // Special handling for selection column
                 if (columnKey === '__selection__') {
                     return (
@@ -2910,6 +2962,10 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                     >
                         <span 
                             className="virtualized-header-text"
+                            role={onSortColumn ? "button" : undefined}
+                            tabIndex={onSortColumn ? 0 : undefined}
+                            onClick={() => onSortColumn?.(columnKey)}
+                            onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSortColumn?.(columnKey); } }}
                             title={column.accessibilityText || column.name}
                             style={{ 
                                 flex: 1, 
@@ -3051,6 +3107,65 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
         </div>
     );
 
+    const renderOverlays = () => <React.Fragment>
+            {/* Excel-like Column Filter */}
+            {activeFilterColumn && (
+                <ExcelLikeColumnFilter
+                    columnKey={activeFilterColumn}
+                    columnName={columns.find(c => c.key === activeFilterColumn)?.name || activeFilterColumn}
+                    dataType={getColumnDataType?.(activeFilterColumn) || 'text'}
+                    allData={originalItems}
+                    filteredData={filteredItems}
+                    currentFilters={convertFiltersToSimpleFormat(columnFilters)}
+                    onFilterChange={handleColumnFilterChange}
+                    target={filterTargets[activeFilterColumn]}
+                    onDismiss={() => setActiveFilterColumn(null)}
+                    isOpen={!!activeFilterColumn}
+                    getAvailableValues={getAvailableValuesForFilter}
+                />
+            )}
+
+            {/* Freeze/Unfreeze Column Context Menu */}
+            {freezeContextMenu?.visible && (
+                <div
+                    className="freeze-column-context-menu"
+                    style={{ left: freezeContextMenu.x, top: freezeContextMenu.y }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {frozenColumnKeys.has(freezeContextMenu.columnKey) ? (
+                        <>
+                            <div
+                                className="freeze-column-context-menu-item"
+                                onClick={() => { toggleFreezeColumn(freezeContextMenu.columnKey); setFreezeContextMenu(null); }}
+                            >
+                                <span className="menu-icon">🔓</span>
+                                Unfreeze "{freezeContextMenu.columnName}"
+                            </div>
+                            <div
+                                className="freeze-column-context-menu-item"
+                                onClick={() => { unfreezeAllColumns(); setFreezeContextMenu(null); }}
+                            >
+                                <span className="menu-icon">🔓</span>
+                                Unfreeze All Columns
+                            </div>
+                        </>
+                    ) : (
+                        <div
+                            className="freeze-column-context-menu-item"
+                            onClick={() => { toggleFreezeColumn(freezeContextMenu.columnKey); setFreezeContextMenu(null); }}
+                        >
+                            <span className="menu-icon">❄️</span>
+                            Freeze "{freezeContextMenu.columnName}"
+                        </div>
+                    )}
+                </div>
+            )}
+    </React.Fragment>;
+    React.useLayoutEffect(() => {
+        externalLayout?.onMeasure(totalGridWidth, parseInt(uniformHeaderHeight, 10));
+    }, [totalGridWidth, uniformHeaderHeight, externalLayout?.onMeasure]);
+    if (externalLayout) return externalLayout.render({ row: renderRow, header: renderHeader, overlays: renderOverlays() });
+
     return (
         <div 
             className="virtualized-editable-grid-container"
@@ -3125,58 +3240,7 @@ export const VirtualizedEditableGrid = React.forwardRef<VirtualizedEditableGridR
                 </div>
             </div>
 
-            {/* Excel-like Column Filter */}
-            {activeFilterColumn && (
-                <ExcelLikeColumnFilter
-                    columnKey={activeFilterColumn}
-                    columnName={columns.find(c => c.key === activeFilterColumn)?.name || activeFilterColumn}
-                    dataType={getColumnDataType?.(activeFilterColumn) || 'text'}
-                    allData={originalItems}
-                    filteredData={filteredItems}
-                    currentFilters={convertFiltersToSimpleFormat(columnFilters)}
-                    onFilterChange={handleColumnFilterChange}
-                    target={filterTargets[activeFilterColumn]}
-                    onDismiss={() => setActiveFilterColumn(null)}
-                    isOpen={!!activeFilterColumn}
-                    getAvailableValues={getAvailableValuesForFilter}
-                />
-            )}
-
-            {/* Freeze/Unfreeze Column Context Menu */}
-            {freezeContextMenu?.visible && (
-                <div
-                    className="freeze-column-context-menu"
-                    style={{ left: freezeContextMenu.x, top: freezeContextMenu.y }}
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    {frozenColumnKeys.has(freezeContextMenu.columnKey) ? (
-                        <>
-                            <div
-                                className="freeze-column-context-menu-item"
-                                onClick={() => { toggleFreezeColumn(freezeContextMenu.columnKey); setFreezeContextMenu(null); }}
-                            >
-                                <span className="menu-icon">🔓</span>
-                                Unfreeze "{freezeContextMenu.columnName}"
-                            </div>
-                            <div
-                                className="freeze-column-context-menu-item"
-                                onClick={() => { unfreezeAllColumns(); setFreezeContextMenu(null); }}
-                            >
-                                <span className="menu-icon">🔓</span>
-                                Unfreeze All Columns
-                            </div>
-                        </>
-                    ) : (
-                        <div
-                            className="freeze-column-context-menu-item"
-                            onClick={() => { toggleFreezeColumn(freezeContextMenu.columnKey); setFreezeContextMenu(null); }}
-                        >
-                            <span className="menu-icon">❄️</span>
-                            Freeze "{freezeContextMenu.columnName}"
-                        </div>
-                    )}
-                </div>
-            )}
+            {renderOverlays()}
         </div>
     );
 });

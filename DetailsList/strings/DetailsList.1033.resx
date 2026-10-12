@@ -368,4 +368,26 @@
     <comment>Formula to calculate values from records (e.g. "SUM(amount)", "COUNT(status='Active')", "AVG(score)")</comment>
   </data>
   
+  <data name="ChildRecords" xml:space="preserve"><value>Child Records</value></data>
+  <data name="ChildColumns" xml:space="preserve"><value>Child Columns</value></data>
+  <data name="ChildEditorConfig" xml:space="preserve"><value>Child Editor Config</value></data>
+  <data name="ChildNewRowTemplateConfig" xml:space="preserve"><value>Child New Row Template Config</value></data>
+  <data name="EnableParentChild" xml:space="preserve"><value>Enable Parent Child</value></data>
+  <data name="RelationshipConfig" xml:space="preserve"><value>Relationship Config</value></data>
+  <data name="ChildDataSourceName" xml:space="preserve"><value>Child Data Source Name</value></data>
+  <data name="ChildLabel" xml:space="preserve"><value>Child Label</value></data>
+  <data name="ChildPageSize" xml:space="preserve"><value>Child Page Size</value></data>
+  <data name="EnableAddChildRow" xml:space="preserve"><value>Enable Add Child Row</value></data>
+  <data name="ChildAddNewRowsSave" xml:space="preserve"><value>Child Add New Rows Save</value></data>
+  <data name="ChildColumnEditorFormulas" xml:space="preserve"><value>Child Column Editor Formulas</value></data>
+  <data name="SaveResult" xml:space="preserve"><value>Save Result</value></data>
+  <data name="ChildPendingChanges" xml:space="preserve"><value>Child Pending Changes</value></data>
+  <data name="SaveRequestId" xml:space="preserve"><value>Save Request Id</value></data>
+  <data name="EventDataset" xml:space="preserve"><value>Event Dataset</value></data>
+  <data name="RelationshipStatus" xml:space="preserve"><value>Relationship Status</value></data>
+  <data name="ResolvedRelationship" xml:space="preserve"><value>Resolved Relationship</value></data>
+  <data name="ChildSelectedRecordIds" xml:space="preserve"><value>Child Selected Record Ids</value></data>
+  <data name="ChildSelectedCount" xml:space="preserve"><value>Child Selected Count</value></data>
+  <data name="ChildAllFilters" xml:space="preserve"><value>Child All Filters</value></data>
+  <data name="RelationalContextKey" xml:space="preserve"><value>Relational Context Key</value></data>
 </root>
