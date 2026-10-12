@@ -55,6 +55,9 @@ export class ParentChildDetailsList implements ComponentFramework.ReactControl<I
             const Controller: typeof import('./relational/RelationalController').RelationalController = require('./relational/RelationalController').RelationalController;
             this.relationalController = new Controller();
         }
+        // Outputs can be requested after init or a mode switch, before the first
+        // relational updateView. Reading them must not start dataset loading.
+        this.relationalController.context = this.context;
         return this.relationalController;
     }
     notifyOutputChanged: () => void;
