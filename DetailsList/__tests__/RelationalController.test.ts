@@ -141,6 +141,28 @@ describe('Relational PCF integration', () => {
         expect(c.ready).toBe(false);
         expect(c.errors[0]).toContain('Missing');
     });
+    it('uses child aliases for column overrides, editors, templates and binding diagnostics', () => {
+        const boundConfig = (values: Record<string, any>, aliases: Record<string, string>) => {
+            const data = dataset([{ id: 1, ...values }], Object.values(aliases));
+            data.columns = data.columns.map((column: any) => ({ ...column, alias: Object.keys(aliases).find(alias => aliases[alias] === column.name) }));
+            return data;
+        };
+        context.parameters.childColumns = boundConfig({ target: 'Name', label: 'Child name' }, { ChildColName: 'target', ChildColDisplayName: 'label' });
+        context.parameters.UseEnhancedEditors.raw = true;
+        context.parameters.childEditorConfig = boundConfig({ target: 'Name', type: 'text', required: true }, { ChildColumnKey: 'target', ChildEditorType: 'type', ChildIsRequired: 'required' });
+        context.parameters.childNewRowTemplateConfig = boundConfig({ target: 'Name', initial: 'New child' }, { ChildColumnName: 'target', ChildDefaultValue: 'initial' });
+        c.update(context, notify);
+        expect(c.ready).toBe(true);
+        expect(c.scopes.child.columns.find(column => column.key === 'Name')?.name).toBe('Child name');
+        expect(c.scopes.child.editors.Name).toMatchObject({ type: 'text', isRequired: true });
+        expect(c.scopes.parent.editors.Name).toBeUndefined();
+        const childId = c.add('child', 1, '1')[0];
+        expect(c.changes.drafts.child.get(childId)?.template).toMatchObject({ Name: 'New child', OrderID: 101 });
+        context.parameters.childColumns = boundConfig({ target: 'Missing' }, { ChildColName: 'target' });
+        c.update(context, notify);
+        expect(c.ready).toBe(false);
+        expect(c.errors).toContain('child: configured column "Missing" is not supplied by the dataset. Check the Canvas field bindings.');
+    });
     it.each([false, true])('cleans up successful child placeholders with ChildAddNewRowsSave=%s', flag => {
         context.parameters.ChildAddNewRowsSave.raw = flag;
         const id = c.add('child', 1, '1')[0];

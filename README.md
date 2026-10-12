@@ -89,7 +89,9 @@ Table(
 )
 ```
 
-Bind the configuration columns to their matching property-set names, just as for the existing parent configuration. Missing `ColName` fields produce a visible binding diagnostic. Child editors use `ColumnKey` against the same child field names; they support the existing typed and direct-input editors. Tab/Enter advance right and Shift+Tab moves left within that table. Drag fill stays within one child group and cannot cross into parent rows. Export offers parent or child scope in CSV, Excel, PDF, or JSON, and includes filtered child rows from collapsed groups.
+The child configuration property-set names start with `Child` so they are unique in the import manifest. Your configuration tables can keep their existing field names. Bind `ChildColName` to `ColName`, `ChildColDisplayName` to `ColDisplayName`, and `ChildColWidth` to `ColWidth`, following the same pattern for the other child column settings. For child editors, bind `ChildColumnKey` to `ColumnKey`, `ChildEditorType` to `EditorType`, and so on. For child row templates, bind `ChildColumnName`, `ChildDefaultValue`, `ChildValueType`, and `ChildAutoIncrement` to their corresponding unprefixed table fields. Parent bindings retain their existing names. The readers resolve the bindings through dataset column aliases, including when a source field has a different name.
+
+Missing configured source fields produce a visible binding diagnostic. Child editors use `ColumnKey` against the same child field names; they support the existing typed and direct-input editors. Tab/Enter advance right and Shift+Tab moves left within that table. Drag fill stays within one child group and cannot cross into parent rows. Export offers parent or child scope in CSV, Excel, PDF, or JSON, and includes filtered child rows from collapsed groups.
 
 ### One save action, two acknowledgements
 

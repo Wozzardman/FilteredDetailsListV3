@@ -185,11 +185,11 @@ export class RelationalController {
             for (const config of [columnConfig, isParent ? p.editorConfig : p.childEditorConfig, isParent ? p.newRowTemplateConfig : p.childNewRowTemplateConfig]) {
                 if (config?.paging && config.paging.pageSize < 125 && !config.loading) { config.paging.setPageSize(125); config.refresh(); }
             }
-            state.columns = buildColumns(state.dataset?.columns || [], columnConfig, p.DefaultColumnWidth?.raw || 150, p.EnableColumnResizing?.raw !== false);
+            state.columns = buildColumns(state.dataset?.columns || [], columnConfig, p.DefaultColumnWidth?.raw || 150, p.EnableColumnResizing?.raw !== false, scope);
             state.editors = buildEditors(isParent ? p.editorConfig : p.childEditorConfig,
-                isParent ? p.ColumnEditorFormulas?.raw : p.ChildColumnEditorFormulas?.raw, () => this.rows()[scope], !!p.UseEnhancedEditors?.raw);
+                isParent ? p.ColumnEditorFormulas?.raw : p.ChildColumnEditorFormulas?.raw, () => this.rows()[scope], !!p.UseEnhancedEditors?.raw, scope);
             const available = new Set((state.dataset?.columns || []).map(column => column.name));
-            configRecords(columnConfig).forEach(record => {
+            configRecords(columnConfig, scope).forEach(record => {
                 const name = read(record, 'ColName');
                 if (name && !available.has(name)) this.errors.push(`${scope}: configured column "${name}" is not supplied by the dataset. Check the Canvas field bindings.`);
             });
@@ -289,7 +289,7 @@ export class RelationalController {
         if (scope === 'child' && (!parent || !this.resolution.relationship)) return [];
         const ids: string[] = [];
         for (let i = 0; i < count; i++) {
-            const values = buildTemplate(scope === 'parent' ? p.newRowTemplateConfig : p.childNewRowTemplateConfig, i);
+            const values = buildTemplate(scope === 'parent' ? p.newRowTemplateConfig : p.childNewRowTemplateConfig, i, scope);
             if (scope === 'child') this.resolution.relationship!.keys.forEach(pair => {
                 values[pair.childField] = pair.parentField === '$recordId' ? parent!.recordId : parent!.getValue(pair.parentField);
             });

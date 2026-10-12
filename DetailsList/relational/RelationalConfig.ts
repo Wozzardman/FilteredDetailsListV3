@@ -1,17 +1,33 @@
 import { IGridColumn } from '../Component.types';
 import { ColumnEditorMapping } from '../types/ColumnEditor.types';
 import { PowerAppsFxColumnEditorParser } from '../services/PowerAppsFxColumnEditorParser';
-import { ColumnMetadata, RelationalRow, Values } from './RelationalModel';
+import { ColumnMetadata, RecordScope, RelationalRow, Values } from './RelationalModel';
 
 type Dataset = ComponentFramework.PropertyTypes.DataSet;
 export function read(record: any, field: string): any {
     try { return record?.getValue ? record.getValue(field) : record?.[field]; } catch { return undefined; }
 }
-export function configRecords(dataset?: Dataset): any[] {
-    return (dataset?.sortedRecordIds || Object.keys(dataset?.records || {})).map(id => dataset?.records[id]).filter(Boolean);
+export function configRecords(dataset?: Dataset, scope: RecordScope = 'parent'): { getValue(field: string): any }[] {
+    const columns = dataset?.columns || [];
+    const byAlias = new Map(columns.filter(column => column.alias).map(column => [column.alias, column]));
+    const byName = new Map(columns.map(column => [column.name, column]));
+    return (dataset?.sortedRecordIds || Object.keys(dataset?.records || {})).map(id => dataset?.records[id]).filter(Boolean).map(record => ({
+        getValue: (field: string) => {
+            // Property-set names must be unique across the control, but the app's
+            // configuration tables can retain their original column names.
+            const binding = scope === 'child' ? `Child${field}` : field;
+            const column = byAlias.get(binding) || byName.get(binding) || byAlias.get(field) || byName.get(field);
+            if (column) {
+                const value = read(record, column.name);
+                if (value !== undefined) return value;
+            }
+            const value = read(record, binding);
+            return value !== undefined || binding === field ? value : read(record, field);
+        }
+    }));
 }
-export function buildColumns(metadata: ColumnMetadata[], dataset: Dataset | undefined, defaultWidth = 150, resizable = true): IGridColumn[] {
-    const overrides = new Map(configRecords(dataset).map(record => [read(record, 'ColName'), record]));
+export function buildColumns(metadata: ColumnMetadata[], dataset: Dataset | undefined, defaultWidth = 150, resizable = true, scope: RecordScope = 'parent'): IGridColumn[] {
+    const overrides = new Map(configRecords(dataset, scope).map(record => [read(record, 'ColName'), record]));
     const columns = metadata.filter(col => !['RecordsKey','RecordsCanSelect','RecordsSelected','RecordKey','RecordCanSelect','RecordSelected','ItemKey','ItemCanSelect','ItemSelected'].includes(col.name));
     return columns.map(meta => {
         const record = overrides.get(meta.name);
@@ -31,9 +47,9 @@ export function buildColumns(metadata: ColumnMetadata[], dataset: Dataset | unde
         } as IGridColumn;
     });
 }
-export function buildTemplate(dataset: Dataset | undefined, increment: number): Values {
+export function buildTemplate(dataset: Dataset | undefined, increment: number, scope: RecordScope = 'parent'): Values {
     const values: Values = {};
-    configRecords(dataset).forEach(record => {
+    configRecords(dataset, scope).forEach(record => {
         const name = read(record, 'ColumnName');
         if (!name) return;
         const raw = read(record, 'DefaultValue');
@@ -47,7 +63,7 @@ export function buildTemplate(dataset: Dataset | undefined, increment: number): 
     });
     return values;
 }
-export function buildEditors(dataset: Dataset | undefined, formulas: string | null | undefined, rows: () => RelationalRow[], enabled: boolean): ColumnEditorMapping {
+export function buildEditors(dataset: Dataset | undefined, formulas: string | null | undefined, rows: () => RelationalRow[], enabled: boolean, scope: RecordScope = 'parent'): ColumnEditorMapping {
     const context: any = { parameters: { editorConfig: dataset, ColumnEditorFormulas: { raw: formulas } } };
     const useEnhancedEditors = enabled;
     let columnEditorMapping: ColumnEditorMapping = {};
@@ -61,11 +77,7 @@ export function buildEditors(dataset: Dataset | undefined, formulas: string | nu
             const editorConfigDataset = (context.parameters as any).editorConfig;
             if (editorConfigDataset && Object.keys(editorConfigDataset.records || {}).length) {
                 try {
-                    const records = editorConfigDataset.records;
-                    const recordIds = Object.keys(records);
-                    
-                    for (const recordId of recordIds) {
-                        const record = records[recordId];
+                    for (const record of configRecords(editorConfigDataset, scope)) {
                         const columnKey = record.getValue('ColumnKey') as string;
                         const editorType = record.getValue('EditorType') as string;
                         

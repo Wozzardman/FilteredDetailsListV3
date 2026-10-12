@@ -290,64 +290,64 @@
       <property-set name="ChildBoolean08" display-name-key="ChildBoolean08" of-type="TwoOptions" usage="bound" required="false" />
     </data-set>
     <data-set name="childColumns" display-name-key="ChildColumns">
-      <property-set name="ColDisplayName" display-name-key="ColDisplayName" of-type="SingleLine.Text" usage="bound" required="true" />
-      <property-set name="ColName" display-name-key="ColName" of-type="SingleLine.Text" usage="bound" required="true" />
-      <property-set name="ColWidth" display-name-key="ColWidth" of-type="Whole.None" usage="bound" required="true" />
-      <property-set name="ColCellType" display-name-key="ColCellType" of-type="SingleLine.Text" usage="bound" required="false" />
-      <property-set name="ColHorizontalAlign" display-name-key="ColHorizontalAlign" of-type="SingleLine.Text" usage="bound" required="false" />
-      <property-set name="ColVerticalAlign" display-name-key="ColVerticalAlign" of-type="SingleLine.Text" usage="bound" required="false" />
-      <property-set name="ColHeaderHorizontalAlign" display-name-key="ColHeaderHorizontalAlign" of-type="SingleLine.Text" usage="bound" required="false" />
-      <property-set name="ColHeaderVerticalAlign" display-name-key="ColHeaderVerticalAlign" of-type="SingleLine.Text" usage="bound" required="false" />
-      <property-set name="ColMultiLine" display-name-key="ColIsMultiLine" of-type="TwoOptions" usage="bound" required="true" />
-      <property-set name="ColVisible" display-name-key="ColVisible" of-type="TwoOptions" usage="bound" required="false" />
+      <property-set name="ChildColDisplayName" display-name-key="ColDisplayName" of-type="SingleLine.Text" usage="bound" required="true" />
+      <property-set name="ChildColName" display-name-key="ColName" of-type="SingleLine.Text" usage="bound" required="true" />
+      <property-set name="ChildColWidth" display-name-key="ColWidth" of-type="Whole.None" usage="bound" required="true" />
+      <property-set name="ChildColCellType" display-name-key="ColCellType" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ChildColHorizontalAlign" display-name-key="ColHorizontalAlign" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ChildColVerticalAlign" display-name-key="ColVerticalAlign" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ChildColHeaderHorizontalAlign" display-name-key="ColHeaderHorizontalAlign" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ChildColHeaderVerticalAlign" display-name-key="ColHeaderVerticalAlign" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ChildColMultiLine" display-name-key="ColIsMultiLine" of-type="TwoOptions" usage="bound" required="true" />
+      <property-set name="ChildColVisible" display-name-key="ColVisible" of-type="TwoOptions" usage="bound" required="false" />
 
-      <property-set name="ColFrozen" display-name-key="ColFrozen" of-type="TwoOptions" usage="bound" required="false" />
-      <property-set name="ColAccessibilityText" display-name-key="ColAccessibilityText" of-type="SingleLine.Text" usage="bound" required="false" />
-      <property-set name="ColHeaderColor" display-name-key="ColHeaderColor" of-type="SingleLine.Text" usage="bound" required="false" />
-      <property-set name="ColHeaderFontColor" display-name-key="ColHeaderFontColor" of-type="SingleLine.Text" usage="bound" required="false" />
-      <property-set name="JumptoColumn" display-name-key="JumptoColumn" of-type="TwoOptions" usage="bound" required="false" />
+      <property-set name="ChildColFrozen" display-name-key="ColFrozen" of-type="TwoOptions" usage="bound" required="false" />
+      <property-set name="ChildColAccessibilityText" display-name-key="ColAccessibilityText" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ChildColHeaderColor" display-name-key="ColHeaderColor" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ChildColHeaderFontColor" display-name-key="ColHeaderFontColor" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ChildJumptoColumn" display-name-key="JumptoColumn" of-type="TwoOptions" usage="bound" required="false" />
     </data-set>
     <data-set name="childEditorConfig" display-name-key="ChildEditorConfig">
-      <property-set name="ColumnKey" display-name-key="ColumnKey" of-type="SingleLine.Text" usage="bound" required="true" />
-      <property-set name="EditorType" display-name-key="EditorType" of-type="SingleLine.Text" usage="bound" required="true" />
-      <property-set name="IsRequired" display-name-key="IsRequired" of-type="TwoOptions" usage="bound" required="false" />
-      <property-set name="EditLock" display-name-key="EditLock" of-type="TwoOptions" usage="bound" required="false" />
-      <property-set name="Placeholder" display-name-key="Placeholder" of-type="SingleLine.Text" usage="bound" required="false" />
-      <property-set name="MinValue" display-name-key="MinValue" of-type="Decimal" usage="bound" required="false" />
-      <property-set name="MaxValue" display-name-key="MaxValue" of-type="Decimal" usage="bound" required="false" />
-      <property-set name="MaxLength" display-name-key="MaxLength" of-type="Whole.None" usage="bound" required="false" />
-      <property-set name="IsMultiline" display-name-key="IsMultiline" of-type="TwoOptions" usage="bound" required="false" />
-      <property-set name="ValidationPattern" display-name-key="ValidationPattern" of-type="SingleLine.Text" usage="bound" required="false" />
-      <property-set name="PatternErrorMessage" display-name-key="PatternErrorMessage" of-type="SingleLine.Text" usage="bound" required="false" />
-      <property-set name="DropdownOptions" display-name-key="DropdownOptions" of-type="SingleLine.Text" usage="bound" required="false" />
-      <property-set name="AllowDirectTextInput" display-name-key="AllowDirectTextInput" of-type="TwoOptions" usage="bound" required="false" />
-      <property-set name="RestrictedValueMessage" display-name-key="RestrictedValueMessage" of-type="SingleLine.Text" usage="bound" required="false" />
-      <property-set name="CurrencySymbol" display-name-key="CurrencySymbol" of-type="SingleLine.Text" usage="bound" required="false" />
-      <property-set name="DecimalPlaces" display-name-key="DecimalPlaces" of-type="Whole.None" usage="bound" required="false" />
-      <property-set name="StepValue" display-name-key="StepValue" of-type="Decimal" usage="bound" required="false" />
-      <property-set name="ShowTime" display-name-key="ShowTime" of-type="TwoOptions" usage="bound" required="false" />
-      <property-set name="DateFormat" display-name-key="DateFormat" of-type="SingleLine.Text" usage="bound" required="false" />
-      <property-set name="MaxRating" display-name-key="MaxRating" of-type="Whole.None" usage="bound" required="false" />
-      <property-set name="AllowZeroRating" display-name-key="AllowZeroRating" of-type="TwoOptions" usage="bound" required="false" />
-      <property-set name="ShowSliderValue" display-name-key="ShowSliderValue" of-type="TwoOptions" usage="bound" required="false" />
+      <property-set name="ChildColumnKey" display-name-key="ColumnKey" of-type="SingleLine.Text" usage="bound" required="true" />
+      <property-set name="ChildEditorType" display-name-key="EditorType" of-type="SingleLine.Text" usage="bound" required="true" />
+      <property-set name="ChildIsRequired" display-name-key="IsRequired" of-type="TwoOptions" usage="bound" required="false" />
+      <property-set name="ChildEditLock" display-name-key="EditLock" of-type="TwoOptions" usage="bound" required="false" />
+      <property-set name="ChildPlaceholder" display-name-key="Placeholder" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ChildMinValue" display-name-key="MinValue" of-type="Decimal" usage="bound" required="false" />
+      <property-set name="ChildMaxValue" display-name-key="MaxValue" of-type="Decimal" usage="bound" required="false" />
+      <property-set name="ChildMaxLength" display-name-key="MaxLength" of-type="Whole.None" usage="bound" required="false" />
+      <property-set name="ChildIsMultiline" display-name-key="IsMultiline" of-type="TwoOptions" usage="bound" required="false" />
+      <property-set name="ChildValidationPattern" display-name-key="ValidationPattern" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ChildPatternErrorMessage" display-name-key="PatternErrorMessage" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ChildDropdownOptions" display-name-key="DropdownOptions" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ChildAllowDirectTextInput" display-name-key="AllowDirectTextInput" of-type="TwoOptions" usage="bound" required="false" />
+      <property-set name="ChildRestrictedValueMessage" display-name-key="RestrictedValueMessage" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ChildCurrencySymbol" display-name-key="CurrencySymbol" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ChildDecimalPlaces" display-name-key="DecimalPlaces" of-type="Whole.None" usage="bound" required="false" />
+      <property-set name="ChildStepValue" display-name-key="StepValue" of-type="Decimal" usage="bound" required="false" />
+      <property-set name="ChildShowTime" display-name-key="ShowTime" of-type="TwoOptions" usage="bound" required="false" />
+      <property-set name="ChildDateFormat" display-name-key="DateFormat" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ChildMaxRating" display-name-key="MaxRating" of-type="Whole.None" usage="bound" required="false" />
+      <property-set name="ChildAllowZeroRating" display-name-key="AllowZeroRating" of-type="TwoOptions" usage="bound" required="false" />
+      <property-set name="ChildShowSliderValue" display-name-key="ShowSliderValue" of-type="TwoOptions" usage="bound" required="false" />
       <!-- Conditional Logic Fields -->
-      <property-set name="DependsOn" display-name-key="DependsOn" of-type="SingleLine.Text" usage="bound" required="false" />
-      <property-set name="LookupMappingSource" display-name-key="LookupMappingSource" of-type="SingleLine.Text" usage="bound" required="false" />
-      <property-set name="LookupMappingFilter" display-name-key="LookupMappingFilter" of-type="SingleLine.Text" usage="bound" required="false" />
-      <property-set name="LookupMappingReturn" display-name-key="LookupMappingReturn" of-type="SingleLine.Text" usage="bound" required="false" />
-      <property-set name="LookupDataSource" display-name-key="LookupDataSource" of-type="SingleLine.Text" usage="bound" required="false" />
-      <property-set name="LookupFilterColumn" display-name-key="LookupFilterColumn" of-type="SingleLine.Text" usage="bound" required="false" />
-      <property-set name="LookupReturnColumn" display-name-key="LookupReturnColumn" of-type="SingleLine.Text" usage="bound" required="false" />
-      <property-set name="DefaultValueFormula" display-name-key="DefaultValueFormula" of-type="SingleLine.Text" usage="bound" required="false" />
-      <property-set name="ConditionalFormula" display-name-key="ConditionalFormula" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ChildDependsOn" display-name-key="DependsOn" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ChildLookupMappingSource" display-name-key="LookupMappingSource" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ChildLookupMappingFilter" display-name-key="LookupMappingFilter" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ChildLookupMappingReturn" display-name-key="LookupMappingReturn" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ChildLookupDataSource" display-name-key="LookupDataSource" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ChildLookupFilterColumn" display-name-key="LookupFilterColumn" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ChildLookupReturnColumn" display-name-key="LookupReturnColumn" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ChildDefaultValueFormula" display-name-key="DefaultValueFormula" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ChildConditionalFormula" display-name-key="ConditionalFormula" of-type="SingleLine.Text" usage="bound" required="false" />
       <!-- Auto-fill confirmation control per column -->
-      <property-set name="RequiresAutoFillConfirmation" display-name-key="RequiresAutoFillConfirmation" of-type="TwoOptions" usage="bound" required="false" />
+      <property-set name="ChildRequiresAutoFillConfirmation" display-name-key="RequiresAutoFillConfirmation" of-type="TwoOptions" usage="bound" required="false" />
     </data-set>
     <data-set name="childNewRowTemplateConfig" display-name-key="ChildNewRowTemplateConfig">
-      <property-set name="ColumnName" display-name-key="ColumnName" of-type="SingleLine.Text" usage="bound" required="true" />
-      <property-set name="DefaultValue" display-name-key="DefaultValue" of-type="SingleLine.Text" usage="bound" required="false" />
-      <property-set name="ValueType" display-name-key="ValueType" of-type="SingleLine.Text" usage="bound" required="false" />
-      <property-set name="AutoIncrement" display-name-key="AutoIncrement" of-type="TwoOptions" usage="bound" required="false" />
+      <property-set name="ChildColumnName" display-name-key="ColumnName" of-type="SingleLine.Text" usage="bound" required="true" />
+      <property-set name="ChildDefaultValue" display-name-key="DefaultValue" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ChildValueType" display-name-key="ValueType" of-type="SingleLine.Text" usage="bound" required="false" />
+      <property-set name="ChildAutoIncrement" display-name-key="AutoIncrement" of-type="TwoOptions" usage="bound" required="false" />
     </data-set>
     <property name="EnableParentChild" display-name-key="EnableParentChild" of-type="TwoOptions" usage="input" required="false" default-value="false" />
     <property name="RelationshipConfig" display-name-key="RelationshipConfig" of-type="Multiple" usage="input" required="false" />
